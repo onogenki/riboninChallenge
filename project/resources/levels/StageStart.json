@@ -1,0 +1,53 @@
+{
+    "coordinate_system": "engine",
+    "name": "scene",
+    "objects": [
+        {
+            "type": "MESH",
+            "name": "StartFloor",
+            "object_type": "STATIC",
+            "tag": "Floor",
+            "file_name": "debug/floor.obj",
+            "transform": {
+                "translation": [
+                    20.0,
+                    -3.5,
+                    25.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        },
+        {
+            "type": "EMPTY",
+            "name": "PlayerStart",
+            "object_type": "PLAYER_START",
+            "tag": "PlayerStart",
+            "transform": {
+                "translation": [
+                    20.0,
+                    -0.8,
+                    25.0
+                ],
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            }
+        }
+    ]
+}

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Tests"><UniqueIdentifier>{7418CE1F-DC2C-474D-9818-A12611FD3F58}</UniqueIdentifier></Filter>
+    <Filter Include="LevelData"><UniqueIdentifier>{587E3E75-80DB-4339-A657-D3B74309B31F}</UniqueIdentifier></Filter>
+    <Filter Include="GameStage"><UniqueIdentifier>{B1142A99-304E-471D-A0AC-1F0AF7355AC9}</UniqueIdentifier></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="LevelApiSmoke.cpp"><Filter>Tests</Filter></ClCompile>
+    <ClCompile Include="..\engine\level\MapChipField.cpp"><Filter>LevelData</Filter></ClCompile>
+    <ClCompile Include="..\engine\level\MapChipRegistry.cpp"><Filter>LevelData</Filter></ClCompile>
+    <ClCompile Include="..\engine\level\StageMapObjectIndex.cpp"><Filter>LevelData</Filter></ClCompile>
+    <ClCompile Include="..\game\stage1\StageMapChipFactory.cpp"><Filter>GameStage</Filter></ClCompile>
+    <ClInclude Include="..\engine\level\MapChipField.h"><Filter>LevelData</Filter></ClInclude>
+    <ClInclude Include="..\engine\level\MapChipRegistry.h"><Filter>LevelData</Filter></ClInclude>
+    <ClInclude Include="..\engine\level\StageMapObjectIndex.h"><Filter>LevelData</Filter></ClInclude>
+    <ClInclude Include="..\game\stage1\StageMapChipFactory.h"><Filter>GameStage</Filter></ClInclude>
+  </ItemGroup>
+</Project>

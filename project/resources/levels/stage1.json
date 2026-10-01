@@ -1,0 +1,793 @@
+{
+    "coordinate_system": "engine",
+    "name": "scene",
+    "stage_start": {
+        "duration": 3.2,
+        "player_air_height": 6.0,
+        "camera_front_distance": 6.0,
+        "camera_front_height": 0.5,
+        "camera_orbit_angle": 3.14159265,
+        "camera_handoff_duration": 1.0
+    },
+    "lighting": {
+        "directional": {
+            "color": [
+                0.35,
+                0.48,
+                0.80
+            ],
+            "direction": [
+                -0.35,
+                1.0,
+                -0.4
+            ],
+            "intensity": 0.50,
+            "ambient": {
+                "color": [
+                    0.36,
+                    0.50,
+                    0.82
+                ],
+                "intensity": 0.18
+            }
+        },
+        "point": {
+            "color": [
+                1.0,
+                0.95,
+                0.82
+            ],
+            "position": [
+                24.0,
+                5.2,
+                35.0
+            ],
+            "intensity": 0.30,
+            "radius": 35.0,
+            "decay": 1.1
+        },
+        "spot_lights": [
+            {
+                "name": "KeyLight",
+                "color": [
+                    1.0,
+                    0.78,
+                    0.52
+                ],
+                "position": [
+                    18.0,
+                    5.3,
+                    19.0
+                ],
+                "intensity": 0.30,
+                "direction": [
+                    0.35,
+                    -0.55,
+                    0.75
+                ],
+                "distance": 30.0,
+                "decay": 1.2,
+                "cos_angle": 0.55,
+                "cos_falloff_start": 0.82
+            },
+            {
+                "name": "FillLight",
+                "color": [
+                    0.55,
+                    0.75,
+                    1.0
+                ],
+                "position": [
+                    31.0,
+                    4.8,
+                    38.0
+                ],
+                "intensity": 0.08,
+                "direction": [
+                    -0.35,
+                    -0.35,
+                    -0.8
+                ],
+                "distance": 34.0,
+                "decay": 1.1,
+                "cos_angle": 0.45,
+                "cos_falloff_start": 0.75
+            },
+            {
+                "name": "BackLight",
+                "color": [
+                    1.0,
+                    0.66,
+                    0.38
+                ],
+                "position": [
+                    24.0,
+                    5.4,
+                    33.0
+                ],
+                "intensity": 0.18,
+                "direction": [
+                    0.0,
+                    -0.5,
+                    -0.9
+                ],
+                "distance": 28.0,
+                "decay": 1.3,
+                "cos_angle": 0.68,
+                "cos_falloff_start": 0.88
+            }
+        ]
+    },
+    "objects": [
+        {
+            "name": "PlayerStart",
+            "object_type": "PLAYER_START",
+            "tag": "PlayerStart",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    24.0,
+                    -0.8,
+                    25.0
+                ]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "file_name": "debug/plane.obj",
+            "name": "CarryableMirrorStart",
+            "object_type": "CARRYABLE_MIRROR",
+            "tag": "CarryableMirror",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    20.0,
+                    -0.8,
+                    30.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.0,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/floor.obj",
+            "name": "StartFloor",
+            "object_type": "STATIC",
+            "tag": "StartFloor",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    4.0
+                ],
+                "translation": [
+                    24.0,
+                    -3.5,
+                    35.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.0,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/floor.obj",
+            "name": "LightingTestLeftWall",
+            "object_type": "STATIC",
+            "tag": "CameraBoundary",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    0.1,
+                    2.5,
+                    4.0
+                ],
+                "translation": [
+                    13.0,
+                    1.75,
+                    35.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.0,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/floor.obj",
+            "name": "LightingTestRightWall",
+            "object_type": "STATIC",
+            "tag": "CameraBoundary",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    0.1,
+                    2.5,
+                    4.0
+                ],
+                "translation": [
+                    35.0,
+                    1.75,
+                    35.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.0,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/floor.obj",
+            "name": "LightingTestCeiling",
+            "object_type": "STATIC",
+            "tag": "CameraBoundary",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.1,
+                    0.5,
+                    4.0
+                ],
+                "translation": [
+                    24.0,
+                    6.25,
+                    35.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.0,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/floor.obj",
+            "name": "LightingTestEntranceWall",
+            "object_type": "STATIC",
+            "tag": "CameraBoundary",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.1,
+                    2.5,
+                    0.1
+                ],
+                "translation": [
+                    24.0,
+                    1.75,
+                    -5.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.0,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/floor.obj",
+            "name": "LightingTestExitWall",
+            "object_type": "STATIC",
+            "tag": "CameraBoundary",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.1,
+                    2.5,
+                    0.1
+                ],
+                "translation": [
+                    24.0,
+                    1.75,
+                    75.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.000001907348633,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/floor.obj",
+            "name": "StageFloor",
+            "object_type": "STATIC",
+            "tag": "Floor",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    0.0,
+                    -3.5000009536743164,
+                    5.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "camera_area": {
+                "distance": 14.0,
+                "fov_y": 0.60,
+                "pitch": 0.32
+            },
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    22.0,
+                    8.0,
+                    78.0
+                ],
+                "type": "BOX"
+            },
+            "name": "StartCameraArea",
+            "object_type": "CAMERA_AREA",
+            "tag": "CameraArea",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    24.0,
+                    -0.8,
+                    35.0
+                ]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    2.0,
+                    2.0,
+                    0.10000000149011612
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/plane.obj",
+            "name": "StageMirror",
+            "object_type": "STATIC",
+            "tag": "Mirror",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    180.0,
+                    0.0
+                ],
+                "scaling": [
+                    3.0,
+                    3.0,
+                    1.0
+                ],
+                "translation": [
+                    0.025751762092113495,
+                    1.0,
+                    8.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/sphere.obj",
+            "name": "MapSphere1",
+            "object_type": "STATIC",
+            "tag": "MapObject",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    3.9000000953674316,
+                    0.7000001072883606,
+                    2.450000047683716
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "camera_focus": [
+                0.0,
+                0.2000001072883606,
+                10.605470657348633
+            ],
+            "name": "EventCamera1",
+            "object_type": "EVENT_CAMERA",
+            "tag": "EventCamera",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    7.349999904632568,
+                    4.099999904632568,
+                    1.6549999713897705
+                ]
+            },
+            "type": "CAMERA"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "type": "BOX"
+            },
+            "control_points": [
+                [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                [
+                    2.0,
+                    1.0,
+                    2.0
+                ],
+                [
+                    -2.0,
+                    2.0,
+                    4.0
+                ],
+                [
+                    0.0,
+                    0.0,
+                    6.0
+                ]
+            ],
+            "file_name": "debug/sphere.obj",
+            "name": "PathSphere1",
+            "object_type": "PATH_OBJECT",
+            "path_loop": true,
+            "path_speed": 1.0,
+            "tag": "MapObject",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    -4.0,
+                    0.7000000476837158,
+                    4.920739650726318
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "camera_focus": [
+                5.063324451446533,
+                0.19999998807907104,
+                6.544574737548828
+            ],
+            "name": "EventCamera2",
+            "object_type": "EVENT_CAMERA",
+            "tag": "EventCamera",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    11.063323974609375,
+                    3.200000047683716,
+                    -1.4554252624511719
+                ]
+            },
+            "type": "CAMERA"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    4.0,
+                    3.0,
+                    4.0
+                ],
+                "type": "BOX"
+            },
+            "event_camera": "EventCamera2",
+            "event_id": "Event2",
+            "name": "EventTrigger2",
+            "object_type": "EVENT_TRIGGER",
+            "tag": "EventTrigger",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    5.063324451446533,
+                    -0.800000011920929,
+                    6.544574737548828
+                ]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "camera_focus": [
+                -1.4033424854278564,
+                0.20000004768371582,
+                9.481008529663086
+            ],
+            "name": "EventCamera3",
+            "object_type": "EVENT_CAMERA",
+            "tag": "EventCamera",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    4.596657752990723,
+                    3.200000047683716,
+                    1.481008529663086
+                ]
+            },
+            "type": "CAMERA"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    4.0,
+                    3.0,
+                    4.0
+                ],
+                "type": "BOX"
+            },
+            "event_camera": "EventCamera3",
+            "event_id": "Event3",
+            "name": "EventTrigger3",
+            "object_type": "EVENT_TRIGGER",
+            "tag": "EventTrigger",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    -1.4033424854278564,
+                    -0.7999999523162842,
+                    9.481008529663086
+                ]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "camera_focus": [
+                0.0,
+                0.20000004768371582,
+                11.0
+            ],
+            "name": "EventCamera4",
+            "object_type": "EVENT_CAMERA",
+            "tag": "EventCamera",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    6.0,
+                    3.200000047683716,
+                    4.5
+                ]
+            },
+            "type": "CAMERA"
+        }
+    ]
+}

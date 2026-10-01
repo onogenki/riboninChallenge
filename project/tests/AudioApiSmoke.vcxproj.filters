@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Tests"><UniqueIdentifier>{3317CF68-900D-42BB-B64A-30A8EDAF1DC8}</UniqueIdentifier></Filter>
+    <Filter Include="EngineAudio"><UniqueIdentifier>{F51FB945-9974-41AB-A486-30B9E4BF3A93}</UniqueIdentifier></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AudioApiSmoke.cpp"><Filter>Tests</Filter></ClCompile>
+    <ClCompile Include="..\engine\audio\Audio.cpp"><Filter>EngineAudio</Filter></ClCompile>
+    <ClCompile Include="..\engine\audio\AudioMixer.cpp"><Filter>EngineAudio</Filter></ClCompile>
+    <ClCompile Include="..\engine\audio\BgmPlayer.cpp"><Filter>EngineAudio</Filter></ClCompile>
+    <ClCompile Include="..\engine\audio\SoundEffectPlayer.cpp"><Filter>EngineAudio</Filter></ClCompile>
+    <ClInclude Include="..\engine\audio\Audio.h"><Filter>EngineAudio</Filter></ClInclude>
+    <ClInclude Include="..\engine\audio\AudioMixer.h"><Filter>EngineAudio</Filter></ClInclude>
+    <ClInclude Include="..\engine\audio\BgmPlayer.h"><Filter>EngineAudio</Filter></ClInclude>
+    <ClInclude Include="..\engine\audio\SoundEffectPlayer.h"><Filter>EngineAudio</Filter></ClInclude>
+  </ItemGroup>
+</Project>
