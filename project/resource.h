@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by CG2_00-01.rc
+// Used by ribboninCharenge.rc
 
 // 新しいオブジェクトの次の既定値
 // 

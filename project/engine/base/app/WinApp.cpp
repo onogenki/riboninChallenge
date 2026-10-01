@@ -45,7 +45,7 @@ void WinApp::Initialize()
 	isComInitialized_ = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 
 	wc.lpfnWndProc = WindowProc;
-	wc.lpszClassName = L"CG2WindowClass";
+	wc.lpszClassName = L"riboninCharengeWindowClass";
 	wc.hInstance = GetModuleHandle(nullptr);
 	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
 	RegisterClass(&wc);
@@ -64,7 +64,7 @@ void WinApp::Initialize()
 	// 起動時は閉じるボタンを使える最大化ウィンドウにする。
 	hwnd = CreateWindow(
 		wc.lpszClassName,
-		L"CG2",
+		L"riboninCharenge",
 		WS_OVERLAPPEDWINDOW,
 		windowedRect_.left,
 		windowedRect_.top,

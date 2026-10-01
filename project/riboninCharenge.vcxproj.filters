@@ -990,7 +990,7 @@
 	</ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="CG2_00-01.rc">
+    <ResourceCompile Include="riboninCharenge.rc">
       <Filter>00_App</Filter>
     </ResourceCompile>
   </ItemGroup>

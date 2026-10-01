@@ -18,7 +18,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{963a161e-63fc-4849-9cf3-803dd53f7cb8}</ProjectGuid>
-    <RootNamespace>CG20001</RootNamespace>
+    <RootNamespace>riboninCharenge</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -618,7 +618,7 @@
     <None Include="resources\shaders\Sprite.hlsli" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="CG2_00-01.rc" />
+    <ResourceCompile Include="riboninCharenge.rc" />
   </ItemGroup>
   <Target Name="CopyDirectXShaderRuntime" AfterTargets="Build">
     <ItemGroup>
