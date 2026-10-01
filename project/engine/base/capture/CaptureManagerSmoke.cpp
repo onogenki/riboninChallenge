@@ -163,9 +163,9 @@ void CaptureManager::UpdateSmokeBeforeCapture()
 						directError < swappedError * 0.95;
 
 					const std::filesystem::path decodedFirstPath =
-						GetCaptureDirectory("Screenshots") / "CG2_mp4_decoded_first.bmp";
+						GetCaptureDirectory("Screenshots") / "ribonin_challenge_mp4_decoded_first.bmp";
 					const std::filesystem::path decodedLastPath =
-						GetCaptureDirectory("Screenshots") / "CG2_mp4_decoded_last.bmp";
+						GetCaptureDirectory("Screenshots") / "ribonin_challenge_mp4_decoded_last.bmp";
 					mp4ContentValid = mp4ContentValid &&
 						SavePixelsAsBmp(decodedFirstPath, decodedFirst, decodedWidth, decodedHeight) &&
 						SavePixelsAsBmp(decodedLastPath, decodedLast, decodedWidth, decodedHeight);
@@ -206,9 +206,9 @@ void CaptureManager::UpdateSmokeBeforeCapture()
 						replayDirectError < replaySwappedError * 0.95;
 
 					const std::filesystem::path replayFirstPath =
-						GetCaptureDirectory("Screenshots") / "CG2_replay_decoded_first.bmp";
+						GetCaptureDirectory("Screenshots") / "ribonin_challenge_replay_decoded_first.bmp";
 					const std::filesystem::path replayLastPath =
-						GetCaptureDirectory("Screenshots") / "CG2_replay_decoded_last.bmp";
+						GetCaptureDirectory("Screenshots") / "ribonin_challenge_replay_decoded_last.bmp";
 					replayContentValid = replayContentValid &&
 						SavePixelsAsBmp(replayFirstPath, decodedReplayFirst, decodedReplayWidth, decodedReplayHeight) &&
 						SavePixelsAsBmp(replayLastPath, decodedReplayLast, decodedReplayWidth, decodedReplayHeight);

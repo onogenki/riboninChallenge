@@ -377,7 +377,7 @@ bool GameViewCapture::SaveReplayClip()
 	}
 
 	const std::filesystem::path replayPath =
-		GetCaptureDirectory("Replays") / ("CG2_replay_" + MakeTimestampString() + ".avi");
+		GetCaptureDirectory("Replays") / ("ribonin_challenge_replay_" + MakeTimestampString() + ".avi");
 	const ReplayFrame& firstFrame = replayFrames_.front();
 	recordingFrameIndex_ = 0;
 	if (!BeginRecordingAvi(replayPath, firstFrame.width, firstFrame.height, kReplayFramesPerSecond_)) {
@@ -418,7 +418,7 @@ void GameViewCapture::DrawImGui()
 	ImGui::TextDisabled("Game View only");
 
 	if (ImGui::Button("Photo")) {
-		const std::filesystem::path capturePath = screenshotDirectory / ("CG2_" + MakeTimestampString() + ".bmp");
+		const std::filesystem::path capturePath = screenshotDirectory / ("ribonin_challenge_" + MakeTimestampString() + ".bmp");
 		std::vector<unsigned char> pixels;
 		int width = 0;
 		int height = 0;
@@ -439,7 +439,7 @@ void GameViewCapture::DrawImGui()
 			lastVideoPath_ = recordingVideoPath_;
 			lastMessage_ = "Saved video: " + recordingVideoPath_.string();
 		} else {
-			recordingVideoPath_ = videoDirectory / ("CG2_" + MakeTimestampString() + ".avi");
+			recordingVideoPath_ = videoDirectory / ("ribonin_challenge_" + MakeTimestampString() + ".avi");
 			std::vector<unsigned char> pixels;
 			int width = 0;
 			int height = 0;

@@ -276,7 +276,7 @@ bool CaptureManager::SaveReplayFrames(std::vector<ReplayFrame> frames)
 	recordingFrameIndex_ = 0;
 	if (!BeginSelectedVideo(
 		GetCaptureDirectory("Replays"),
-		"CG2_replay_",
+		"ribonin_challenge_replay_",
 		firstFrame.width,
 		firstFrame.height,
 		kReplayFramesPerSecond_)) {

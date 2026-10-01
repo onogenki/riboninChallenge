@@ -32,11 +32,11 @@ void Game::Initialize()
 	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
 
 	// 環境変数を指定すると、通常のLoading画面を経由せず対象Sceneを起動できます。
-	const std::string startSceneName = GetEnvironmentString("CG2_START_SCENE");
+	const std::string startSceneName = GetEnvironmentString("RIBONIN_CHALLENGE_START_SCENE");
 	SceneManager::GetInstance()->ChangeScene(startSceneName.empty() ? "LOADING" : startSceneName);
 	InitializeSceneStressFromEnvironment();
 	startupRouteSmoke_.Initialize(
-		GetEnvironmentString("CG2_STARTUP_ROUTE_SMOKE") == "1",
+		GetEnvironmentString("RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE") == "1",
 		startSceneName.empty());
 }
 
@@ -65,7 +65,7 @@ void Game::Finalize()
 void Game::InitializeSceneStressFromEnvironment()
 {
 	// 自動テスト時だけ有効にするため、設定がなければ何も変更しない。
-	const std::string restartCountText = GetEnvironmentString("CG2_SCENE_STRESS_RESTARTS");
+	const std::string restartCountText = GetEnvironmentString("RIBONIN_CHALLENGE_SCENE_STRESS_RESTARTS");
 	if (restartCountText.empty()) {
 		return;
 	}
@@ -75,11 +75,11 @@ void Game::InitializeSceneStressFromEnvironment()
 		return;
 	}
 
-	const std::string targetSceneText = GetEnvironmentString("CG2_SCENE_STRESS_SCENE");
+	const std::string targetSceneText = GetEnvironmentString("RIBONIN_CHALLENGE_SCENE_STRESS_SCENE");
 	if (!targetSceneText.empty()) {
 		sceneStressTarget_ = targetSceneText;
 	}
-	const std::string intervalText = GetEnvironmentString("CG2_SCENE_STRESS_INTERVAL");
+	const std::string intervalText = GetEnvironmentString("RIBONIN_CHALLENGE_SCENE_STRESS_INTERVAL");
 	if (!intervalText.empty()) {
 		sceneStressIntervalFrames_ = (std::max)(1, std::atoi(intervalText.c_str()));
 	}

@@ -19,13 +19,13 @@ MSBuild project/tests/AudioApiSmoke.vcxproj /m /p:Configuration=Debug /p:Platfor
 
 ## 通常起動のScene順
 
-`CG2_STARTUP_ROUTE_SMOKE=1`は撮影・録画をせず、`Loading → Title → Loading → Stage1`の更新と各SceneのDraw呼び出しを確認して終了します。`CG2_START_SCENE`は指定しません。
+`RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE=1`は撮影・録画をせず、`Loading → Title → Loading → Stage1`の更新と各SceneのDraw呼び出しを確認して終了します。`RIBONIN_CHALLENGE_START_SCENE`は指定しません。
 
 ```powershell
 # projectフォルダを作業ディレクトリとして、Release版の通常起動順を確認します。
-$env:CG2_STARTUP_ROUTE_SMOKE = '1'
-../generated/outputs/Release/CG2_00-01.exe
-Remove-Item Env:CG2_STARTUP_ROUTE_SMOKE
+$env:RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE = '1'
+../generated/outputs/Release/riboninCharenge.exe
+Remove-Item Env:RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE
 Get-Content logs/startup_route_smoke.log
 ```
 
@@ -33,14 +33,14 @@ Get-Content logs/startup_route_smoke.log
 
 ## 撮影Smokeの対応構成
 
-`CG2_CAPTURE_SMOKE=1`による写真・録画テストは`USE_IMGUI`付きのDebug／Development構成だけに対応します。Releaseで指定した場合は待ち続けず、`logs/capture_manager_smoke.log`へ非対応の`FAILURE`を残して終了します。Releaseの画面確認にはこのSmokeを成功の根拠に使わないでください。
+`RIBONIN_CHALLENGE_CAPTURE_SMOKE=1`による写真・録画テストは`USE_IMGUI`付きのDebug／Development構成だけに対応します。Releaseで指定した場合は待ち続けず、`logs/capture_manager_smoke.log`へ非対応の`FAILURE`を残して終了します。Releaseの画面確認にはこのSmokeを成功の根拠に使わないでください。
 
 ## 通常モデルとAnimationモデルの描画確認
 
-既存のゲーム内テスト`CG2_DEBUG_UI_SMOKE=walk-scene`は、Debug Sceneへwalk.gltfを棚と同じ経路で追加し、30回・90回更新後のGame ViewをBMPへ保存して終了します。起動Sceneには`CG2_START_SCENE=DEBUG`を指定します。環境変数は検証用プロセスだけに指定し、検証後は元に戻してください。
+既存のゲーム内テスト`RIBONIN_CHALLENGE_DEBUG_UI_SMOKE=walk-scene`は、Debug Sceneへwalk.gltfを棚と同じ経路で追加し、30回・90回更新後のGame ViewをBMPへ保存して終了します。起動Sceneには`RIBONIN_CHALLENGE_START_SCENE=DEBUG`を指定します。環境変数は検証用プロセスだけに指定し、検証後は元に戻してください。
 
 - ログ：`project/logs/gameplay_ui_smoke_<日時>.log`
-- 画像：`project/resources/Captures/Screenshots/CG2_walk_scene_frame<回数>_<日時>.bmp`
+- 画像：`project/resources/Captures/Screenshots/ribonin_challenge_walk_scene_frame<回数>_<日時>.bmp`
 - 2026-09-28：Development x64で実行成功。画像を開いてwalkの人物、Animationモデル直後に描く通常の球体武器、地形の表示を確認。
 - `SUCCESS`は追加・更新・画像保存の成功です。モデルの可視性は必ず画像を開いて確認してください。静止画2枚だけでは全Animation、鏡の反射、ユーザーのF5起動経路を保証できません。
 

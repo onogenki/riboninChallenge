@@ -260,8 +260,8 @@ void DebugUiSmoke::UpdateAfterDraw(State& state, const Context& context)
 	}
 
 	const std::string capturePrefix = state.isAnimationSceneTest
-		? "CG2_walk_scene_frame" + std::to_string(state.frame) + "_"
-		: "CG2_ui_smoke_";
+		? "ribonin_challenge_walk_scene_frame" + std::to_string(state.frame) + "_"
+		: "ribonin_challenge_ui_smoke_";
 	const std::filesystem::path screenshotPath =
 		context.gameViewCapture->GetCaptureDirectory("Screenshots") /
 		(capturePrefix + context.gameViewCapture->MakeTimestampString() + ".bmp");
@@ -294,7 +294,7 @@ void DebugUiSmoke::UpdateAfterDraw(State& state, const Context& context)
 
 	const std::filesystem::path videoPath =
 		context.gameViewCapture->GetCaptureDirectory("Videos") /
-		("CG2_ui_smoke_" + context.gameViewCapture->MakeTimestampString() + ".avi");
+		("ribonin_challenge_ui_smoke_" + context.gameViewCapture->MakeTimestampString() + ".avi");
 	if (!context.gameViewCapture->SaveSingleFrameAvi(videoPath, pixels, width, height)) {
 		Finish(state, false, "SaveSingleFrameAvi failed: " + videoPath.string());
 		return;

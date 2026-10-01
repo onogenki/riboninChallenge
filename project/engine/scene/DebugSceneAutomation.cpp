@@ -24,7 +24,7 @@ std::string GetEnvironmentString(const char* name)
 // 環境変数が有効な時だけ、Scene内の確認対象をDebug専用テストへ渡して開始します。
 void DebugScene::InitializeTimePlaybackSmokeFromEnvironment()
 {
-	if (GetEnvironmentString("CG2_TIME_PLAYBACK_SMOKE") != "1") {
+	if (GetEnvironmentString("RIBONIN_CHALLENGE_TIME_PLAYBACK_SMOKE") != "1") {
 		return;
 	}
 
@@ -50,7 +50,7 @@ void DebugScene::InitializeTimePlaybackSmokeFromEnvironment()
 // UI自動確認を環境変数から初期化し、有効時だけ操作対象を渡します。
 void DebugScene::InitializeUiSmokeFromEnvironment()
 {
-	const std::string smokeMode = GetEnvironmentString("CG2_DEBUG_UI_SMOKE");
+	const std::string smokeMode = GetEnvironmentString("RIBONIN_CHALLENGE_DEBUG_UI_SMOKE");
 	if (smokeMode.empty()) {
 		return;
 	}

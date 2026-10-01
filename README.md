@@ -5,7 +5,7 @@
 ## 初めて使う方へ
 
 1. `project/riboninCharenge.sln`をVisual Studioで開き、x64でビルドします。開発中の確認にはDebug、普段の起動構成にはDevelopmentがあります。
-2. F5で起動するとLoadingを経由してTitleへ進みます。`CG2_START_SCENE`などの自動確認用環境変数を設定した場合は経路が変わります。
+2. F5で起動するとLoadingを経由してTitleへ進みます。`RIBONIN_CHALLENGE_START_SCENE`などの自動確認用環境変数を設定した場合は経路が変わります。
 3. 本編は`STAGE1`、機能確認・授業用画面は`DEBUG`です。画面左のScene一覧から選択できます。
 4. 操作確認はGame View、配置や素材の確認はEdit Viewを使います。Model Shelfの項目をダブルクリックすると、そのSceneへ追加できます。
 5. コードを変更する前に[クラス構成と使い方](project/ArchitectureGuide.md)の「初めて読む時の入口」「よく使う処理の早見表」を確認してください。

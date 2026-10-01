@@ -57,7 +57,7 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	doorSwitchRadius_ = context.doorSwitchRadius;
 	largeMirrorBaseYaw_ = context.largeMirrorBaseYaw;
 	largeMirrorTargetYawOffset_ = context.largeMirrorTargetYawOffset;
-	gameplaySmokeEnabled_ = IsEnvironmentEnabled("CG2_STAGE1_GAMEPLAY_SMOKE");
+	gameplaySmokeEnabled_ = IsEnvironmentEnabled("RIBONIN_CHALLENGE_STAGE1_GAMEPLAY_SMOKE");
 	if (!gameplaySmokeEnabled_ || !player_ || !carryableMirror_ || !fixedMirrors_ ||
 		!context.object3dCommon) {
 		return;

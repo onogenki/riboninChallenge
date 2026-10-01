@@ -74,8 +74,8 @@ void CaptureManager::Initialize()
 	pendingCaptureRequests_.clear();
 	droppedCaptureFrames_ = 0;
 	CreateCaptureDirectories();
-	smokeEnabled_ = GetEnvironmentString("CG2_CAPTURE_SMOKE") == "1";
-	performanceBaselineEnabled_ = GetEnvironmentString("CG2_CAPTURE_PERF_BASELINE") == "1";
+	smokeEnabled_ = GetEnvironmentString("RIBONIN_CHALLENGE_CAPTURE_SMOKE") == "1";
+	performanceBaselineEnabled_ = GetEnvironmentString("RIBONIN_CHALLENGE_CAPTURE_PERF_BASELINE") == "1";
 	if (performanceBaselineEnabled_) {
 		replayBufferEnabled_ = false;
 	}
@@ -110,7 +110,7 @@ void CaptureManager::Initialize()
 	smokeReplayPath_.clear();
 	smokeTrackActiveVideo_ = false;
 	smokeLogPath_ = std::filesystem::path("logs") / "capture_manager_smoke.log";
-	const std::string requestedFormat = GetEnvironmentString("CG2_CAPTURE_VIDEO_FORMAT");
+	const std::string requestedFormat = GetEnvironmentString("RIBONIN_CHALLENGE_CAPTURE_VIDEO_FORMAT");
 	if (requestedFormat == "AVI" || requestedFormat == "avi") {
 		selectedVideoFormat_ = VideoFormat::Avi;
 	} else if (requestedFormat == "MP4" || requestedFormat == "mp4") {
@@ -329,7 +329,7 @@ void CaptureManager::ProcessCapturedFrame(
 		UpdateSmokeAfterCapture(validPixels, visiblyNonBlack);
 		if (validPixels) {
 			const std::filesystem::path capturePath =
-				GetCaptureDirectory("Screenshots") / ("CG2_" + MakeTimestampString() + ".png");
+				GetCaptureDirectory("Screenshots") / ("ribonin_challenge_" + MakeTimestampString() + ".png");
 			if (SavePixelsAsPng(capturePath, pixels, width, height)) {
 				lastScreenshotPath_ = capturePath;
 				if (smokeEnabled_) {
@@ -372,7 +372,7 @@ void CaptureManager::ProcessCapturedFrame(
 			const auto videoStart = std::chrono::steady_clock::now();
 			const bool videoStarted = validPixels && BeginSelectedVideo(
 				GetCaptureDirectory("Videos"),
-				"CG2_",
+				"ribonin_challenge_",
 				width,
 				height,
 				selectedFrameRate) && AppendActiveVideoFrame(*sharedPixels, width, height, 0);

@@ -4,9 +4,9 @@
 #include "Model.h"
 #if __has_include("Laser.h")
 #include "Laser.h"
-#define CG2_HAS_LASER_DEBUG 1
+#define RIBONIN_CHALLENGE_HAS_LASER_DEBUG 1
 #else
-#define CG2_HAS_LASER_DEBUG 0
+#define RIBONIN_CHALLENGE_HAS_LASER_DEBUG 0
 #endif
 #include <cmath>
 #include <numbers>
@@ -185,7 +185,7 @@ void ImGuiManager::DrawControlPointPathDebug(
 }
 
 // レーザー経路をGame Viewへ赤い線として重ねて表示します。
-#if CG2_HAS_LASER_DEBUG
+#if RIBONIN_CHALLENGE_HAS_LASER_DEBUG
 void ImGuiManager::DrawLaserDebug(
 	const std::vector<LaserSegment>& segments,
 	const Camera* camera)

@@ -8,7 +8,7 @@ void StartupRouteSmoke::Initialize(bool requested, bool startsWithLoading)
 {
 	enabled_ = requested;
 	if (enabled_ && !startsWithLoading) {
-		Finish(false, "CG2_START_SCENE must be unset.");
+		Finish(false, "RIBONIN_CHALLENGE_START_SCENE must be unset.");
 	}
 }
 

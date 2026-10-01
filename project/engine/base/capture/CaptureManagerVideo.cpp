@@ -297,7 +297,7 @@ bool CaptureManager::BeginSelectedVideo(
 	EndActiveVideo();
 	const std::string timestamp = MakeTimestampString();
 	if (selectedVideoFormat_ == VideoFormat::Mp4) {
-		smokeTrackActiveVideo_ = smokeEnabled_ && filePrefix == "CG2_";
+		smokeTrackActiveVideo_ = smokeEnabled_ && filePrefix == "ribonin_challenge_";
 		recordingVideoPath_ = directory / (filePrefix + timestamp + ".mp4");
 		const int mp4Width = (std::max)(2, width & ~1);
 		const int mp4Height = (std::max)(2, height & ~1);
@@ -319,7 +319,7 @@ bool CaptureManager::BeginSelectedVideo(
 	}
 
 	recordingVideoPath_ = directory / (filePrefix + timestamp + ".avi");
-	smokeTrackActiveVideo_ = smokeEnabled_ && filePrefix == "CG2_";
+	smokeTrackActiveVideo_ = smokeEnabled_ && filePrefix == "ribonin_challenge_";
 	if (!BeginRecordingAvi(recordingVideoPath_, width, height, frameRate)) {
 		return false;
 	}

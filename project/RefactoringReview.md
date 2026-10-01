@@ -11,7 +11,7 @@
 ## Stage1の角度入力とRelease画面の確認（2026-09-29）
 
 - `Stage Player`の角度入力欄は、現在角度を表示していたため、Edit Viewで数値を確定すると見た目だけ旧値へ戻っていた。`CameraController`が所有する目標角度を読むようにし、入力した`-135`度が欄に残り、Game Viewの通常Cameraが斜め後方へ移動することをDevelopment実画面で確認した。値は実行中だけで、配置データは変更していない。
-- DevelopmentのGame Viewで正面・左右・背面・斜め後方を確認し、壁越しの黄色い点は再現しなかった。Release版を`CG2_START_SCENE=STAGE1`で直接起動すると、正面視点のPlayer・携帯鏡・床・左右の壁は描画された。Releaseでは元画像と同じ背面角度へ自動操作できておらず、黄色い点の原因・解消は未確認。
+- DevelopmentのGame Viewで正面・左右・背面・斜め後方を確認し、壁越しの黄色い点は再現しなかった。Release版を`RIBONIN_CHALLENGE_START_SCENE=STAGE1`で直接起動すると、正面視点のPlayer・携帯鏡・床・左右の壁は描画された。Releaseでは元画像と同じ背面角度へ自動操作できておらず、黄色い点の原因・解消は未確認。
 - ReleaseのTitleに表示されたチェッカー画像は`TitleObjectManager::Initialize()`が`uvChecker.png`を初期Spriteとして指定しているため、それだけで読込失敗とは判定しない。Releaseの起動順Smokeを再実行し、Loading→Title→Loading→Stage1のDraw回数7／8／7／7と成功を確認した。これは実キー入力と各画面の見た目を保証しない。
 - Development／Release／最後のDebug x64ビルドが成功。`.vcxproj`のClCompile／ClIncludeにワイルドカードはなく、`git diff --check`は空白エラーなし。
 
@@ -36,7 +36,7 @@
 ## Title画像追加の失敗経路とRelease起動の再確認（2026-09-29）
 
 - `TitleObjectManager::AddTexture()`のShelf用・直接配置用の両方で`LoadTexture()`の結果を確認する。欠損画像なら`false`を返し、`GetMetaData()`やSprite一覧への登録へ進まない。所有者や既存画像の配置は変えない。
-- Release／最後のDebug x64ビルドと`CG2_STARTUP_ROUTE_SMOKE`は成功。ログでLoading→Title→Loading→Stage1の各Draw回数が7／8／7／7回と確認できた。`.vcxproj`のClCompile／ClIncludeにワイルドカードなし、`git diff --check`は空白エラーなし。これは実キー入力や見た目の保証ではない。
+- Release／最後のDebug x64ビルドと`RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE`は成功。ログでLoading→Title→Loading→Stage1の各Draw回数が7／8／7／7回と確認できた。`.vcxproj`のClCompile／ClIncludeにワイルドカードなし、`git diff --check`は空白エラーなし。これは実キー入力や見た目の保証ではない。
 - Visual StudioのRelease F5で白いLoadingの後にTitleの初期UV画像・背景・平面を実画面で確認した。自動Enter入力ではStage1へ遷移しなかったため、Releaseでの壁越し表示・鏡のマウス操作は未確認。ShellからStage1を直接起動した試行ではゲームWindowが現れず、検証用プロセスを終了した。これを描画不具合の証拠にはしない。
 - 欠損画像を実際に追加した時のUI表示は未確認。Title初期画像の読込失敗経路は今回の変更対象外。
 
@@ -112,10 +112,10 @@
 - Development x64：最初は検証用ゲームの実行ファイルロックでLNK1104。終了後の再ビルド成功。Visual StudioのF5でもビルド後に起動できた。
 - .vcxprojのClCompile／ClInclude：ワイルドカードなし。
 - TitleObjectManager.cpp／.h：.vcxprojと.filtersへ各1件の明示登録を確認。
-- 分離前Development通常起動：Titleの初期画像、背景、平面を確認。比較画像は`resources/Captures/Screenshots/CG2_20260928_020707_862.png`。
-- 分離後Development F5起動：Title初期画面を確認。比較画像は`resources/Captures/Screenshots/CG2_20260928_021142_929.png`。ウィンドウサイズが異なるため画素一致の比較ではない。
+- 分離前Development通常起動：Titleの初期画像、背景、平面を確認。比較画像は`resources/Captures/Screenshots/ribonin_challenge_20260928_020707_862.png`。
+- 分離後Development F5起動：Title初期画面を確認。比較画像は`resources/Captures/Screenshots/ribonin_challenge_20260928_021142_929.png`。ウィンドウサイズが異なるため画素一致の比較ではない。
 - Title Edit View：AnimatedCube_BaseColor.pngを追加。Inspectorで位置180,160、サイズ180x180、Anchor 0.5,0.5と実描画を確認。
-- 同じTitleへmultiMesh.objとwalk.gltfを追加し、通常モデル・Animation・Spriteの同時描画を確認。walkの再生時刻と姿勢の変化も確認。画像は`resources/Captures/Screenshots/CG2_20260928_021338_127.png`。
+- 同じTitleへmultiMesh.objとwalk.gltfを追加し、通常モデル・Animation・Spriteの同時描画を確認。walkの再生時刻と姿勢の変化も確認。画像は`resources/Captures/Screenshots/ribonin_challenge_20260928_021338_127.png`。
 - Restart Current SceneでTitleを再起動し、追加数0と初期背景・画像への復帰を確認。
 - Scene一覧でSTAGE1へ切り替え、開始演出中と通常Cameraへの復帰後の白い携帯Mirrorを確認。JSONやモデルの保存・変更はしていない。
 - 未確認：Clear Title Addedの実操作、Gamepad、追加画像の5枚目以降の折返し、欠損素材時の動作。
@@ -132,7 +132,7 @@
 - `.vcxproj`のClCompile／ClIncludeにワイルドカードなし。StageMirrorFactory.cpp／.hはプロジェクトと.filtersへそれぞれ1件ずつ登録。
 - DevelopmentのF5起動でTitleの初期画像・背景・平面を確認。Scene一覧からStage1へ入り、開始演出中とEdit Viewで白い携帯鏡を確認した。
 - 固定鏡は初期Playerから離れた座標にあるため、保存せず編集CameraをX=0、Z=-5へ移動して確認。元のStageMirror配置で鏡面と反射像を確認した。
-- InspectorのStageMirrorのXを0.026から2へ一時変更し、`Edited in memory`表示、鏡面・反射像・Collider枠の移動を確認。保存画像：`resources/Captures/Screenshots/CG2_20260928_104144_389.png`。これは編集経路の確認であり、配置変更による不具合修正ではない。
+- InspectorのStageMirrorのXを0.026から2へ一時変更し、`Edited in memory`表示、鏡面・反射像・Collider枠の移動を確認。保存画像：`resources/Captures/Screenshots/ribonin_challenge_20260928_104144_389.png`。これは編集経路の確認であり、配置変更による不具合修正ではない。
 - Restart Current Sceneで一時編集を破棄し、初期化とJSON再読込を確認。その後ゲームを終了した。JSONは保存せず、検証前後のstage1.jsonのSHA256は`EC63BC9BC4E7D4626B88F198540EED531D38A4138DA552F823A413AEBF7457F1`で一致。
 - Debug／Development本編Smoke：両方で終了コード0、SUCCESS。Collider、Enemy生成、鏡の所持・解除・遮蔽・Laser反射、Door、Camera、落下の必須判定は通過した。ただし両方の`hazardReflection=0`は成功条件に含まれていないため、この機能は確認済みとしない。
 - 未確認：EnterによるTitle→Loading→Stage1（自動入力で遷移を確認できず）、固定鏡の枚数変更、読込失敗時の実画面、BOX指定なしの実編集、幅・高さ・回転の全組合せ。配置の平行移動だけで全ての反射精度が正しいとは判断しない。
@@ -172,7 +172,7 @@
 - Release・携帯鏡・配置編集の変更後、ゲーム本体のDebug／Development／Release x64ビルドが成功。これだけでは鏡の操作やShaderの実表示が正しい証拠にはしない。
 - DevelopmentをVisual StudioのF5から起動し、TitleのSprite・SkyBox・平面の表示を確認。Loadingの白画面を捉えたのはVisual Studio側のキャプチャなので、Releaseの赤い余白修正の検証には数えない。
 - Title Edit ViewでSpriteのXを0→100へ直接入力し、Inspectorの100表示と画像の移動を確認。Copy Placement C++を押し、クリップボードがSetPosition({100.000000f,0.000000f})、Size 512x512、Anchor 0,0、Rotation 0のコードになったことを確認した。実行中の編集のみで素材や配置ファイルへ保存していない。
-- EnterによるTitle→Stage1は今回も自動操作で確認できなかった。起動手順全体は未確認のまま。後の照合ではゲームプロセスもCG2ウィンドウも終了しており、古い画面座標を使った操作は停止した。
+- EnterによるTitle→Stage1は今回も自動操作で確認できなかった。起動手順全体は未確認のまま。後の照合ではゲームプロセスもriboninCharengeウィンドウも終了しており、古い画面座標を使った操作は停止した。
 - AudioApiSmoke：Debug／Developmentとも27項目PASS、SUCCESS: failures=0、終了コード0。無効ID・停止済みID、音源読込の再利用、Pause／Resume、BGMフェード停止、SE登録を確認。聴感、故障時、再生中Mixer変更は対象外。
 - テストのWarningLevel 4でAudio::LoadFileのReadSampleにC4245が出た。特殊ストリーム番号をDWORDへ明示変換して3か所で共有し、変数名streamIndexも訂正。音源や再生順は変えず、再ビルド・再テストではこの警告が消えた。
 - この型指定修正後も、ゲーム本体をDevelopment→Release→Debug x64の順で再ビルドし、全て終了コード0。出力にプロジェクト設定由来の警告・エラーなし。最後のDebug x64ビルドまで完了。
@@ -188,8 +188,8 @@
 - 修正：通常経路でもSetCommonDrawSettingを呼び、その後でObject専用の行列・Light・Textureを渡す。新しいクラスは作らず、もともと頂点形式を選ぶObject3d::Drawへ責任をそろえた。DrawMirror・DrawOccludedSilhouetteは独立した専用経路のまま。Shader、モデル、配置は今回変更していない。
 - DebugSceneRendererにあった武器直前だけの設定し直しを外した。これにより既存Debug Sceneが「Animationモデル→通常の武器モデル」をObject3d::Drawだけで描く回帰確認経路になる。描画順は維持。
 - Development、Release、最後にDebug x64をビルドし、すべて終了コード0。出力にプロジェクト設定由来の警告・エラーなし。メインvcxprojのワイルドカード0、重複0、filtersとの差0。
-- Developmentの既存walk-scene自動テストは終了コード0。`CG2_walk_scene_frame30_20260928_212104_166.bmp`と`CG2_walk_scene_frame90_20260928_212105_198.bmp`を実際に開き、walkの人物・通常モデルの球体武器・背景地形が描かれていることを確認した。保存成功だけを表示確認にはしていない。2枚はAnimationの周期が近いため、これだけで歩行の全動作を保証しない。
-- 画面操作用スキルで、Releaseの通常起動後のTitleと、検証用CG2_START_SCENE=STAGE1で入った本編の携帯鏡表示を確認。設定は起動プロセスだけに指定し、JSON・素材は保存していない。検証用ゲームは終了済み。
+- Developmentの既存walk-scene自動テストは終了コード0。`ribonin_challenge_walk_scene_frame30_20260928_212104_166.bmp`と`ribonin_challenge_walk_scene_frame90_20260928_212105_198.bmp`を実際に開き、walkの人物・通常モデルの球体武器・背景地形が描かれていることを確認した。保存成功だけを表示確認にはしていない。2枚はAnimationの周期が近いため、これだけで歩行の全動作を保証しない。
+- 画面操作用スキルで、Releaseの通常起動後のTitleと、検証用RIBONIN_CHALLENGE_START_SCENE=STAGE1で入った本編の携帯鏡表示を確認。設定は起動プロセスだけに指定し、JSON・素材は保存していない。検証用ゲームは終了済み。
 - 修正後のStage1GameplaySmokeもRelease／Debugで終了コード0、SUCCESS。所持・解除、横持ち、傾き、Laser、Collider、Door、Camera、落下の必須判定を通過した。両構成のhazardReflection=0は合格条件に含まれていないため、危険Light反射全体を確認済みとはしない。直接Updateへ引数を渡す試験なので、実Mouse入力経路の証明にもならない。
 - 未確認：TitleのEnter遷移、Releaseの白いLoadingの全フレーム、E取得とMouseでの縦横切替・表裏・回転。自動キー入力ではEnter・Eに画面変化が確認できなかったため、入力操作の検証成功には数えない。反射Cameraから通常Cameraへ戻る共有GPUデータの寿命は別途点検が必要。
 
@@ -199,7 +199,7 @@
 - CreateCarryableMirror／CreateMirrorFloorは成功時にunique_ptr、失敗時にnullptrを返す。Stage1が所有し、Factoryは更新・描画やScene進行へ依存しない。携帯鏡失敗時の初期化中断と、鏡床失敗時の部品なし続行は従来通り。
 - 維持：plane.obj、初期座標、幅・高さ、未所持状態、鏡床Yaw=0・Pitch=-1.57079633・反射Texture256、Collider同期→両面反射設定の順。JSON反映・Player生成・開始演出の順は変えていない。
 - Development→Release→Debug x64のビルド成功。最後もDebug x64。メインvcxprojのワイルドカード0・重複0・filtersとの差0、git diff --check成功。新規ファイル登録は不要。
-- Developmentの既存Capture Smokeは終了コード0、12枚保存。実画像`CG2_20260929_022607_933.png`と`CG2_20260929_022613_354.png`を開き、開始演出中のPlayerと通常Cameraでの携帯鏡表示を確認。画像保存数や非黒画素だけで可視性を判定していない。
+- Developmentの既存Capture Smokeは終了コード0、12枚保存。実画像`ribonin_challenge_20260929_022607_933.png`と`ribonin_challenge_20260929_022613_354.png`を開き、開始演出中のPlayerと通常Cameraでの携帯鏡表示を確認。画像保存数や非黒画素だけで可視性を判定していない。
 - Release／DebugのStage1GameplaySmokeは終了コード0、必須判定SUCCESS。携帯鏡の取得・解除・横持ち・反射、鏡床の両面Laser反射、Collider、Door、Camera、落下を確認。hazardReflection=0は以前と同じで成功条件に含まれないため、危険Light反射全体は確認済みとしない。
 - ガイドにFactory呼出例・所有者・配置の調整箇所を追記。Sceneの新規登録先も、現在のgame/GameSceneRegistration.cppへ訂正した。
 - 未確認：この変更後のF5→Title→Enter→Stage1、実Mouse操作、鏡床の反射像の目視、欠損モデル時の実行。今回はScene指定で起動したため、通常起動経路の検証成功とは扱わない。前ターンの描画修正や既存の未保存変更も維持した。
@@ -211,7 +211,7 @@
 - StageMapChipFactoryへB0の`block.obj`・配置名・1×1×1 BOX Collider値の変換を移した。MapChipFieldはCSV解析と座標、StageMapRuntimeは実モデル・Colliderの所有、Stage1は登録と更新順を担当する。
 - MapChipField::LoadCsv(std::istream&)を追加し、ファイル版も同じ解析へ委譲。ゲームにCSVを作らず、独立LevelApiSmokeの文字列ストリームで空欄、P/E/B/G/C/Lの番号別実行、B1と未登録B2の差、B0の座標・Colliderを検証した。Debug／Developmentとも終了コード0、`SUCCESS: failures=0`。このテストは敵・ゴールを実際に生成するものではない。
 - 本編のDevelopment→Release→Debug x64ビルド成功。DebugのStage1GameplaySmokeはCSVなしで終了コード0、鏡・Camera・Collider等の必須判定がSUCCESS。hazardReflection=0は既存通り成功条件外。
-- DevelopmentのCapture SmokeはCSVなしのStage1で終了コード0、12枚保存。実画像`CG2_20260929_025914_485.png`を開き、Player・携帯鏡・部屋の表示を確認。保存件数だけで表示成功と判断しない。
+- DevelopmentのCapture SmokeはCSVなしのStage1で終了コード0、12枚保存。実画像`ribonin_challenge_20260929_025914_485.png`を開き、Player・携帯鏡・部屋の表示を確認。保存件数だけで表示成功と判断しない。
 - `.vcxproj`と`.filters`へ新しいcpp/hをそれぞれ1件ずつ明示登録。メインと独立テストのワイルドカード0・重複0・filtersとの差0、git diff --check成功。
 - 撮影画像はゲームが実行時に作るため、`.gitignore`でScreenshots内の画像を無視し、既存`.gitkeep`は共有する。画像を削除・移動したわけではない。
 - 未確認：実CSVをStage1へ置いた場合の画面・Hot Reload、F5→Loading→Title→Enter→Stage1。ユーザーはStage1へCSVを置かない運用を希望しているため、今回は新規CSVを作っていない。全体の責任分担点検は継続する。

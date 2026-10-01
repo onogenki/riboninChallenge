@@ -1,4 +1,4 @@
-# CG2 クラス構成メモ
+# riboninCharenge クラス構成メモ
 
 ## Scene
 
@@ -862,9 +862,9 @@ Stage1はJSON保存と、`ApplyStageMapData()`による実行中モデル・Coll
 
 | 確認対象 | 環境変数 | 確認する内容 |
 | --- | --- | --- |
-| Debug UI | `CG2_START_SCENE=DEBUG` と `CG2_DEBUG_UI_SMOKE=1` | Model Shelf、追加、Inspector、Game View保存 |
-| Stage1本編 | `CG2_START_SCENE=STAGE1` と `CG2_STAGE1_GAMEPLAY_SMOKE=1` | Collider、EnemyManager、Mirror、Laser、Door、Camera、落下 |
-| Title再起動 | `CG2_START_SCENE=TITLE`、`CG2_SCENE_STRESS_SCENE=TITLE`、`CG2_SCENE_STRESS_RESTARTS=2` | Titleの初期化、描画、破棄を二回繰り返す |
+| Debug UI | `RIBONIN_CHALLENGE_START_SCENE=DEBUG` と `RIBONIN_CHALLENGE_DEBUG_UI_SMOKE=1` | Model Shelf、追加、Inspector、Game View保存 |
+| Stage1本編 | `RIBONIN_CHALLENGE_START_SCENE=STAGE1` と `RIBONIN_CHALLENGE_STAGE1_GAMEPLAY_SMOKE=1` | Collider、EnemyManager、Mirror、Laser、Door、Camera、落下 |
+| Title再起動 | `RIBONIN_CHALLENGE_START_SCENE=TITLE`、`RIBONIN_CHALLENGE_SCENE_STRESS_SCENE=TITLE`、`RIBONIN_CHALLENGE_SCENE_STRESS_RESTARTS=2` | Titleの初期化、描画、破棄を二回繰り返す |
 
 Stage1確認の成功ログには`SUCCESS`、`sphereColliderApi=1`、`enemyManager=1`が出ます。
 Title再起動確認は終了コード0で成功です。どの確認もゲーム本編のデータを保存・変更しません。

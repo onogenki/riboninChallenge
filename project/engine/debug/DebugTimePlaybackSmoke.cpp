@@ -34,7 +34,7 @@ void DebugTimePlaybackSmoke::Start(
 		return;
 	}
 	if (isUiSmokeEnabled) {
-		Finish(state, false, "CG2_DEBUG_UI_SMOKE cannot run at the same time.");
+		Finish(state, false, "RIBONIN_CHALLENGE_DEBUG_UI_SMOKE cannot run at the same time.");
 		return;
 	}
 	if (!context.objectPlane || !context.objectAxis || !context.objectAxis->IsAnimating()) {
