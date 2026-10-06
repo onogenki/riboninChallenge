@@ -3,6 +3,7 @@
 #include <Windows.h>
 #include <cstdint>
 
+// ゲーム用Windowsウィンドウの生成、メッセージ処理、表示モードを管理します。
 class WinApp
 {
 public:

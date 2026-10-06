@@ -124,6 +124,7 @@ private:
 	void EndActiveVideo();
 	// リングバッファ内の直近フレームを動画ファイルとして保存する。
 	bool SaveReplayClip();
+	// 専用スレッドから渡されたフレーム一覧を値として受け、保存中の所有権を保ちます。
 	bool SaveReplayFrames(std::vector<ReplayFrame> frames);
 	void WaitForReplaySave();
 	void FinishReplaySaveIfReady();
@@ -131,6 +132,7 @@ private:
 	// 次の描画完了後に保存するスクリーンショットを一枚予約する。
 	void QueuePhotoCapture();
 	void ProcessCompletedCaptures(bool waitForGpu = false);
+	// 読み戻した画素を受け取り、写真の保存後は必要に応じて録画用の共有画素へ移します。
 	void ProcessCapturedFrame(
 		const PendingCaptureRequest& request,
 		std::vector<unsigned char> pixels,

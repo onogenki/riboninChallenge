@@ -13,7 +13,7 @@
 
 class SpriteCommon;
 
-//スプライト1枚分
+// 1枚の2D画像の位置・色・切り出し範囲と、その描画用GPUデータを所有します。
 class Sprite
 {
 public:
@@ -44,8 +44,10 @@ public:
 	Sprite() = default;
 	~Sprite() = default;
 
-	void Initialize(SpriteCommon* spriteCommon,std::string textureFilePath);
+	// 共通描画部品を借り、画像パスを複製せずに頂点・マテリアルを準備します。
+	void Initialize(SpriteCommon* spriteCommon, const std::string& textureFilePath);
 
+	// 現在の位置・サイズ・切り出し設定から、行列と頂点の値を更新します。
 	void Update();
 
 	void Draw();
@@ -106,8 +108,6 @@ private:
 
 	Transform uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
-	//テクスチャ番号
-	//uint32_t textureIndex_ = 0;
 	std::string textureFilePath_;
 
 	//基準点

@@ -1,12 +1,11 @@
 #pragma once
 #include <string>
-#include "DirectXCommon.h"
 
-	namespace Logger
-	{
-		// ログファイルのパスを設定する
-		void SetLogPath(const std::string& filePath);
+namespace Logger
+{
+	// 起動時に決めたログの保存先を設定し、以後のLogで使用します。
+	void SetLogPath(const std::string& filePath);
 
-		// ログを出力する
-		void Log(const std::string& message);
-	};
+	// デバッグ出力に記録し、保存先が設定済みならファイルにも追記します。
+	void Log(const std::string& message);
+}

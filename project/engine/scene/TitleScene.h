@@ -7,6 +7,8 @@
 
 class SkyBox;
 
+// TitleのSprite表示、段階的な3D準備、演出とScene切替を順に進めます。
+// モデルとSpriteの生成・所有はTitleObjectManagerへ任せます。
 class TitleScene : public BaseScene
 {
 public:
@@ -23,7 +25,7 @@ public:
 	// 毎フレーム、Titleの3Dモデル・Sprite・ImGuiを描画します。
 	void Draw() override;
 
-	// trueなら、このSceneを終了して次のSceneへ切り替えられます。
+	// 既存の状態照会APIです。現行の切替は入力時のChangeSceneで行います。
 	bool IsFinished() const { return isFinished_; }
 
 private:
@@ -41,6 +43,16 @@ private:
 	void StartTitleNoise();
 	// ノイズでの切替、後退、斜め下への向き変更を順番に進めます。
 	void UpdateTitlePresentation(float deltaTime);
+	// 3Dの準備が終わるまで12枚の導入画像を周回します。
+	void UpdateTitleFrames(float deltaTime);
+	// ノイズを表示し終えたら、監視画面とCamera後退へ移ります。
+	void UpdateNoiseCover(float deltaTime);
+	// 3Dの監視画面でも同じ12枚の映像を更新します。
+	void UpdateMonitorFrames(float deltaTime);
+	// 監視画面からCameraを後退させ、ノイズを消します。
+	void UpdatePullBack(float deltaTime);
+	// 後退した位置でCameraを下へ向け、入力できる状態へ移ります。
+	void UpdateTiltDown(float deltaTime);
 	// SkyBox Textureが読めた時だけ、SkyBoxとEditor用Resource一覧を準備します。
 	bool InitializeSkyBoxAndEditorResources();
 	// Camera・Light・3Dモデル・Sprite・SkyBoxを、このフレームの状態へ更新します。

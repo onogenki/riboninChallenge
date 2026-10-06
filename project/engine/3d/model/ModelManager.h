@@ -6,37 +6,39 @@
 #include <string>
 #include <memory>
 #include <filesystem>
-//テクスチャマネージャー
+// 読み込んだモデルを一元所有し、Object3dへ所有権のない参照を渡します。
 class ModelManager
 {
 public:
 	//シングルインスタンスの取得
 	static ModelManager* GetInstance();
 
+	// 初期化済みDirectXを借り、モデル読込が使う共通部を作ります。
 	void Initialize(DirectXCommon* dxCommon);
 
-	//終了
+	// Managerが所有するモデルと共通部を解放します。
 	void Finalize();
 
-	//モデルファイルの読み込み
+	// resources以下のfileNameを読み、成功または読込済みならtrueを返します。
 	bool LoadModel(const std::string& fileName);
 	// 保存時刻が変わったモデルだけを、Object3dが持つポインタを保ったまま再読込します。
 	void UpdateHotReload();
 	// 保存時刻に関係なく、現在読み込み済みの全モデルを再読込します。
 	void ReloadAllLoadedModels();
 
-	//モデルファイルパス
+	// 登録済みのfileNameを探し、なければnullptrを返します。空の登録は作りません。
 	Model* FindModel(const std::string& fileName);
 
 private:
-	static ModelManager* instance;
-
 	ModelManager() = default;
 	~ModelManager();
 	ModelManager(const ModelManager&) = delete;
 	ModelManager& operator =(const ModelManager&) = delete;
 
-	ModelCommon* modelCommon = nullptr;
+	// ModelManagerだけが所有し、Modelには生存中の参照だけを渡します。
+	std::unique_ptr<ModelCommon> modelCommon;
+	// 既存のModelのアドレスを保ったまま中身を読み直し、成功時だけ差し替えます。
+	bool ReloadModel(const std::string& fileName, Model& model);
 
 	//モデルデータ
 	std::map<std::string, std::unique_ptr<Model>>models;

@@ -3,18 +3,11 @@
 #include <cassert>
 #include <filesystem>
 
-TextureManager* TextureManager::instance = nullptr;
-
-//ImGuiで0番を使用するため、1番から使用
-//uint32_t TextureManager::kSRVIndexTop = 1;
-
+// Manager本体は関数内で所有し、登録Textureの寿命だけをFinalizeで区切ります。
 TextureManager* TextureManager::GetInstance()
 {
-	if (instance == nullptr)
-	{
-		instance = new TextureManager;
-	}
-	return instance;
+	static TextureManager instance;
+	return &instance;
 }
 
 void TextureManager::Initialize(DirectXCommon* dxCommon,SrvManager* srvManager)
@@ -33,8 +26,9 @@ void TextureManager::Finalize()
 		}
 	}
 	textureDatas.clear();
-	delete instance;
-	instance = nullptr;
+	// 借りたManagerへの参照を残さず、再初期化前の誤使用を防ぎます。
+	dxCommon_ = nullptr;
+	srvManager_ = nullptr;
 }
 
 bool TextureManager::LoadTexture(const std::string& filePath)
@@ -42,7 +36,7 @@ bool TextureManager::LoadTexture(const std::string& filePath)
 	//読み込みテクスチャを検索
 	if (textureDatas.contains(filePath))
 	{
-		//読み込み済みなら早朝return 
+		// 読み込み済みなら、SRV番号を変えずにそのまま使います。
 		return true;
 	}
 
@@ -64,14 +58,7 @@ void TextureManager::UpdateHotReload()
 			continue;
 		}
 
-		// 既存のSRV番号を引き継ぐため、SpriteやObject3dが持つ番号は変わりません。
-		TextureData reloadedTexture{};
-		reloadedTexture.srvIndex = textureData.srvIndex;
-		reloadedTexture.srvHandleCPU = textureData.srvHandleCPU;
-		reloadedTexture.srvHandleGPU = textureData.srvHandleGPU;
-		if (CreateTextureData(filePath, reloadedTexture, false)) {
-			textureData = std::move(reloadedTexture);
-		}
+		ReloadTexture(filePath, textureData);
 	}
 }
 
@@ -79,13 +66,19 @@ void TextureManager::UpdateHotReload()
 void TextureManager::ReloadAllLoadedTextures()
 {
 	for (auto& [filePath, textureData] : textureDatas) {
-		TextureData reloadedTexture{};
-		reloadedTexture.srvIndex = textureData.srvIndex;
-		reloadedTexture.srvHandleCPU = textureData.srvHandleCPU;
-		reloadedTexture.srvHandleGPU = textureData.srvHandleGPU;
-		if (CreateTextureData(filePath, reloadedTexture, false)) {
-			textureData = std::move(reloadedTexture);
-		}
+		ReloadTexture(filePath, textureData);
+	}
+}
+
+// 参照元が保持するSRV番号を変えないため、同じ番号の一時データを作ってから差し替えます。
+void TextureManager::ReloadTexture(const std::string& filePath, TextureData& textureData)
+{
+	TextureData reloadedTexture{};
+	reloadedTexture.srvIndex = textureData.srvIndex;
+	reloadedTexture.srvHandleCPU = textureData.srvHandleCPU;
+	reloadedTexture.srvHandleGPU = textureData.srvHandleGPU;
+	if (CreateTextureData(filePath, reloadedTexture, false)) {
+		textureData = std::move(reloadedTexture);
 	}
 }
 

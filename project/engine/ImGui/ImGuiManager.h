@@ -44,6 +44,7 @@ struct LevelEditorResult
 	bool removeSelectedRequested = false;
 };
 
+// Sceneの編集UIを集約し、ImGuiフレームの開始から描画までを管理します。
 class ImGuiManager
 {
 public:

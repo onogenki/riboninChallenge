@@ -11,6 +11,7 @@ class DirectXCommon;
 class Camera;
 class Object3dCommon;
 
+// キューブマップを背景として描画し、Cameraの向きに合わせて見える面を更新します。
 class SkyBox {
 public:
     struct VertexData {

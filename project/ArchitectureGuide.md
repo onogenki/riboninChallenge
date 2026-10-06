@@ -530,6 +530,40 @@ Scene側でCamera・Light設定のループを書き直しません。
 単位ベクトルへそろえます。方向が0なら安全な下向きを設定するため、Title・DebugなどのSceneで
 同じ正規化処理を書き直しません。
 
+### Stage1のライトが画面に届くまで
+
+`Stage1::InitializeDefaultLighting()`でJSON未設定時の初期値を作ります。
+`LevelLoader::Load()`は`resources/levels/stage1.json`の開始演出・Lighting・配置物を順に読み、
+Lightingの平行光・点光源・SpotLightの項目は`LevelLoader.cpp`内の`LoadLighting()`が変換します。
+その結果を`Stage1::ApplyStageLighting()`がSceneの照明へ反映します。
+編集結果を保存する時は`LevelLoader::Save()`が`SaveLighting()`へ照明のJSON組立を任せます。
+Engine座標はそのまま、Blender座標は読込時と逆にY/Zを入れ替え、再読込後も同じ照明値にします。
+平行光と点光源は`Stage1`が保持し、JSONのキー・フィル・バックライトは`stageSpotLights_`へ最大3灯だけ保持します。
+
+毎フレームの`Stage1::Update()`では、Mirror・Puzzle・危険Lightを更新した**後**に
+`Stage1::UpdateLaserSpotLights()`を呼びます。これにより、そのフレームの反射後の線分を照明に使えます。
+`spotLights_`を一度空にしてからJSONのSpotLightを先に入れ、残った枠へPuzzleと危険Lightの線分を順番に変換します。
+配列は最大16灯なので、線分が多い時は後から来た線分の照明を追加しません。Laser自体の線分描画とは別の処理です。
+
+その後、`Object3dRenderContext::UpdateObject()`が平行光・点光源・SpotLight配列を
+各`Object3d`の`Object3dGpuData`へコピーします。`Object3d::Draw()`では
+`Object3dGpuData::BindForObjectDraw()`がConstant Bufferを結び付け、
+`resources/shaders/Object3d.PS.hlsl`が各ピクセルで環境光・平行光・点光源・SpotLightを足します。
+SpotLightの未使用枠は`intensity == 0`としてShader側で飛ばします。
+
+```text
+stage1.json → LevelLoader::Load / LoadLighting → ApplyStageLighting → directionalLight_ / pointLight_
+                                                            → stageSpotLights_
+stageSpotLights_ + Puzzle・危険Lightの反射後線分 → UpdateLaserSpotLights → spotLights_
+三種類のLight → Object3dRenderContext → Object3dGpuData → Object3d.PS.hlsl
+```
+
+調整場所は、部屋の基本照明が`stage1.json`の`lighting`、
+Laser線分から作る色・強さ・距離・円錐角が`Stage1Lighting.cpp`、
+モデル表面での光の計算が`Object3d.PS.hlsl`です。
+平行光の`direction`は「面から光源を見る方向」ですが、SpotLightの`direction`は「光源から照射先へ向かう方向」です。
+二つを同じ意味として設定すると明暗が逆になるため、編集時に注意します。
+
 `Object3dCollection`
 
 一つのSceneが所有する通常3D Objectの生成・一覧・解放だけを担当します。
@@ -900,6 +934,7 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | Shader・Descriptor・Texture/Buffer Resourceの作成と転送 | DirectXCommonResources |
 | Particle Groupの生成、通常Emit、更新、GPU描画 | ParticleManager |
 | Hit・Ring・Lightなど既成演出の粒子発生 | ParticleManagerEffects |
+| Compute Shaderで動かす粒子のバッファ・Emitter・描画 | GPUParticle |
 | 頂点・材質のGPU Resource作成と通常・Skinning描画 | Model |
 | Skeleton構築、Animation読込、Keyframe補間と適用 | ModelAnimation |
 | SkinClusterのGPU Resource、Compute Skinning、骨ありモデル描画 | ModelSkinning |

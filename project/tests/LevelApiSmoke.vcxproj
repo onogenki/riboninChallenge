@@ -37,10 +37,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="LevelApiSmoke.cpp" />
+    <ClCompile Include="..\engine\level\LevelLoader.cpp" />
     <ClCompile Include="..\engine\level\MapChipField.cpp" />
     <ClCompile Include="..\engine\level\MapChipRegistry.cpp" />
     <ClCompile Include="..\engine\level\StageMapObjectIndex.cpp" />
     <ClCompile Include="..\game\stage1\StageMapChipFactory.cpp" />
+    <ClInclude Include="..\engine\level\LevelLoader.h" />
     <ClInclude Include="..\engine\level\MapChipField.h" />
     <ClInclude Include="..\engine\level\MapChipRegistry.h" />
     <ClInclude Include="..\engine\level\StageMapObjectIndex.h" />

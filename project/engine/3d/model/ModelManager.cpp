@@ -2,27 +2,26 @@
 
 #include <filesystem>
 
-ModelManager* ModelManager::instance = nullptr;
-
+// 所有者を関数内の静的変数に限定し、呼び出し元には従来どおりポインタを貸します。
 ModelManager* ModelManager::GetInstance()
 {
-	if (instance == nullptr)
-	{
-		instance = new ModelManager();
-	}
-	return instance;
+	static ModelManager instance;
+	return &instance;
 }
 
 void ModelManager::Initialize(DirectXCommon* dxCommon)
 {
-	modelCommon = new ModelCommon;
+	// Model共通部はManagerが所有し、モデルにはその参照を渡します。
+	modelCommon = std::make_unique<ModelCommon>();
 	modelCommon->Initialize(dxCommon);
 }
 
 void ModelManager::Finalize()
 {
-	delete instance;
-	instance = nullptr;
+	// モデルが借りる共通部を先に解放する従来の順序を保ちます。
+	modelCommon.reset();
+	models.clear();
+	modelWriteTimes_.clear();
 }
 
 bool ModelManager::LoadModel(const std::string& fileName)
@@ -34,7 +33,7 @@ bool ModelManager::LoadModel(const std::string& fileName)
 
 	//モデルと生成とファイル読み込み、初期化
 	std::unique_ptr<Model> model = std::make_unique<Model>();
-	if (!model->Initialize(modelCommon, "resources", fileName)) {
+	if (!model->Initialize(modelCommon.get(), "resources", fileName)) {
 		return false;
 	}
 
@@ -81,9 +80,7 @@ void ModelManager::UpdateHotReload()
 
 		// Object3dはModelのアドレスを保持しているため、unique_ptr自体は入れ替えません。
 		// 新しいModelの中身だけを同じアドレスへ移し、既存の描画Objectからも反映されます。
-		Model reloadedModel{};
-		if (reloadedModel.Initialize(modelCommon, "resources", fileName)) {
-			*model = std::move(reloadedModel);
+		if (ReloadModel(fileName, *model)) {
 			previousWriteTime->second = currentWriteTime;
 		}
 	}
@@ -100,14 +97,23 @@ void ModelManager::ReloadAllLoadedModels()
 		if (!model) {
 			continue;
 		}
-		Model reloadedModel{};
-		if (reloadedModel.Initialize(modelCommon, "resources", fileName)) {
-			*model = std::move(reloadedModel);
+		if (ReloadModel(fileName, *model)) {
 			std::error_code error;
 			modelWriteTimes_[fileName] = std::filesystem::last_write_time(
 				std::filesystem::path("resources") / fileName, error);
 		}
 	}
+}
+
+// Object3dがModelのアドレスを保持するため、読込成功後に同じインスタンスへ移します。
+bool ModelManager::ReloadModel(const std::string& fileName, Model& model)
+{
+	Model reloadedModel{};
+	if (!reloadedModel.Initialize(modelCommon.get(), "resources", fileName)) {
+		return false;
+	}
+	model = std::move(reloadedModel);
+	return true;
 }
 
 Model* ModelManager::FindModel(const std::string& fileName)
@@ -122,10 +128,7 @@ Model* ModelManager::FindModel(const std::string& fileName)
 
 ModelManager::~ModelManager()
 {
-	// モデル共通部の解放
-	if (modelCommon) {
-		delete modelCommon;
-		modelCommon = nullptr;
-	}
+	// 従来どおり、モデル格納コンテナより先に共通部を解放します。
+	modelCommon.reset();
 	// map内のunique_ptrは自動的に解放されるため、明示的なdeleteは不要
 }

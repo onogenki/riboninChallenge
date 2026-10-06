@@ -10,6 +10,7 @@
 #include "Input.h"
 #include "ImGuiManager.h"
 #include "LevelLoader.h"
+#include "Logger.h"
 #include "Object3dCommon.h"
 #include "Object3dFactory.h"
 #include "Object3dRenderContext.h"
@@ -17,6 +18,8 @@
 #include "PostEffect.h"
 #include "SceneRenderPipeline.h"
 #include "SceneManager.h"
+#include "Sprite.h"
+#include "SpriteCommon.h"
 #include "SrvManager.h"
 #include "StageMapObjectIndex.h"
 #include "MapChipRegistry.h"
@@ -24,11 +27,13 @@
 #include "StageMirrorFactory.h"
 #include "StageReflectionRenderer.h"
 #include "StageSceneRenderer.h"
+#include "TextureManager.h"
 #include "debug/StagePuzzleDebugUi.h"
 #include <algorithm>
 #include <cmath>
 #include <dinput.h>
 #include <functional>
+#include <numbers>
 
 using namespace MyMath;
 
@@ -45,16 +50,119 @@ namespace
 	constexpr float kStageMapChipFloorY = -2.5f;
 	// Playerの球Colliderが床上面へ接する開始高さです。
 	constexpr float kStageMapChipPlayerY = -0.8f;
+	// 提出用Titleだけが使う、Edit Viewで決めた固定Cameraの位置と角度です。
+	const Vector3 kTemporaryTitleCameraPosition{ 16.703f, 0.689f, 37.457f };
+	const Vector3 kTemporaryTitleCameraRotationDegrees{ 0.335f, -183.0f, 0.0f };
+	constexpr const char* kTemporaryTitleTexture = "resources/font/title.png";
+	constexpr const char* kTemporaryEnterTexture = "resources/font/ENTER.png";
+	constexpr float kTitleFadeSeconds = 2.0f;
+	constexpr float kEnterVisibleSeconds = 5.0f;
+	constexpr float kEnterHiddenSeconds = 1.0f;
 }
 
-// 前方宣言したunique_ptrの型を、この実装ファイルで生成できるようにします。
-Stage1::Stage1() = default;
+// 提出用Titleの二枚だけを所有し、元のTitleSceneの12枚には触れません。
+class StageTitleOverlay
+{
+public:
+	// 二枚とも読めた場合だけSpriteを生成し、失敗時に空の登録を残しません。
+	bool Initialize(SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
+	{
+		if (!spriteCommon || !directXCommon) {
+			return false;
+		}
+		spriteCommon->Initialize(directXCommon);
+		TextureManager* textureManager = TextureManager::GetInstance();
+		if (!textureManager->LoadTexture(kTemporaryTitleTexture) ||
+			!textureManager->LoadTexture(kTemporaryEnterTexture)) {
+			return false;
+		}
+		auto titleSprite = std::make_unique<Sprite>();
+		titleSprite->Initialize(spriteCommon, kTemporaryTitleTexture);
+		// 透過余白を除いた画像部分だけを、画面上側へ配置します。
+		titleSprite->SetTextureLeftTop({ 129.0f, 597.0f });
+		titleSprite->SetTextureSize({ 1784.0f, 713.0f });
+		sprites_.push_back(std::move(titleSprite));
+
+		auto enterSprite = std::make_unique<Sprite>();
+		enterSprite->Initialize(spriteCommon, kTemporaryEnterTexture);
+		enterSprite->SetTextureLeftTop({ 379.0f, 757.0f });
+		enterSprite->SetTextureSize({ 1283.0f, 419.0f });
+		sprites_.push_back(std::move(enterSprite));
+		Update(0.0f,
+			static_cast<float>(directXCommon->GetClientWidth()),
+			static_cast<float>(directXCommon->GetClientHeight()));
+		return true;
+	}
+
+	// Titleは一度だけ濃くし、Enterは5秒表示と1秒非表示を繰り返します。
+	void Update(float deltaTime, float clientWidth, float clientHeight)
+	{
+		if (sprites_.size() != 2 || clientWidth <= 0.0f || clientHeight <= 0.0f) {
+			return;
+		}
+		const float elapsed = (std::max)(deltaTime, 0.0f);
+		fadeElapsed_ = (std::min)(fadeElapsed_ + elapsed, kTitleFadeSeconds);
+		blinkElapsed_ = std::fmod(
+			blinkElapsed_ + elapsed, kEnterVisibleSeconds + kEnterHiddenSeconds);
+
+		Sprite* titleSprite = sprites_[0].get();
+		const Vector2 titleTextureSize{ 1784.0f, 713.0f };
+		const float titleWidth = (std::min)(
+			clientWidth * 0.8f,
+			clientHeight * 0.38f * titleTextureSize.x / titleTextureSize.y);
+		const float titleHeight = titleWidth * titleTextureSize.y / titleTextureSize.x;
+		titleSprite->SetPosition({ (clientWidth - titleWidth) * 0.5f, clientHeight * 0.05f });
+		titleSprite->SetSize({ titleWidth, titleHeight });
+		titleSprite->SetColor({ 1.0f, 1.0f, 1.0f, fadeElapsed_ / kTitleFadeSeconds });
+		titleSprite->Update();
+
+		Sprite* enterSprite = sprites_[1].get();
+		const Vector2 enterTextureSize{ 1283.0f, 419.0f };
+		const float enterWidth = (std::min)(
+			clientWidth * 0.45f,
+			clientHeight * 0.22f * enterTextureSize.x / enterTextureSize.y);
+		const float enterHeight = enterWidth * enterTextureSize.y / enterTextureSize.x;
+		enterSprite->SetPosition({
+			(clientWidth - enterWidth) * 0.5f,
+			clientHeight * 0.95f - enterHeight,
+		});
+		enterSprite->SetSize({ enterWidth, enterHeight });
+		enterSprite->SetColor({
+			1.0f, 1.0f, 1.0f,
+			blinkElapsed_ < kEnterVisibleSeconds ? 1.0f : 0.0f,
+		});
+		enterSprite->Update();
+	}
+
+	// Scene終了時だけGPU完了を待ったうえで、二枚のSpriteを解放します。
+	void Finalize()
+	{
+		sprites_.clear();
+	}
+
+	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const { return sprites_; }
+
+private:
+	std::vector<std::unique_ptr<Sprite>> sprites_;
+	float fadeElapsed_ = 0.0f;
+	float blinkElapsed_ = 0.0f;
+};
+
+// 通常のStage1直起動は変えず、Titleとして生成された時だけ待機画面を使います。
+Stage1::Stage1(bool startsWithTemporaryTitle)
+	: startsWithTemporaryTitle_(startsWithTemporaryTitle)
+{
+	if (startsWithTemporaryTitle_) {
+		stageTitleOverlay_ = std::make_unique<StageTitleOverlay>();
+	}
+}
 
 // Stage1が所有するPlayer・Mirror・Rendererを、完全な型を知る場所で破棄します。
 Stage1::~Stage1() = default;
 
 void Stage1::Initialize()
 {
+	isTemporaryTitleActive_ = startsWithTemporaryTitle_;
 	hasStageFrameBeenDrawn_ = false;
 	hasStageBgmStarted_ = false;
 	InitializeRenderSystems();
@@ -70,6 +178,11 @@ void Stage1::Initialize()
 	}
 	if (!InitializePlayerAndCamera()) {
 		return;
+	}
+	if (isTemporaryTitleActive_ &&
+		!stageTitleOverlay_->Initialize(SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
+		// 素材が欠けても空のSpriteを描かず、原因をログへ残します。
+		Logger::Log("Temporary title initialization failed: title or ENTER texture could not be loaded.");
 	}
 	InitializeGameplaySmoke();
 }
@@ -241,17 +354,41 @@ bool Stage1::InitializePlayerAndCamera()
 	// 建物の外壁だけは越えないようにし、室内壁の向こうはシルエット表示を優先します。
 	cameraController_->SetWallAvoidanceEnabled(true);
 
-	// 通常Cameraの完成位置を保存してから、開始演出用の前上方Cameraへ切り替えます。
+	// 本編Cameraの完成位置を保存し、Title中は登場演出をまだ進めません。
 	stageStart_ = std::make_unique<StageStart>();
+	stageStartGameplayCameraPosition_ = mainCamera->GetTranslate();
+	stageStartGameplayCameraRotate_ = mainCamera->GetRotate();
+	if (isTemporaryTitleActive_) {
+		constexpr float kDegreeToRadian = std::numbers::pi_v<float> / 180.0f;
+		mainCamera->SetTranslate(kTemporaryTitleCameraPosition);
+		mainCamera->SetRotate({
+			kTemporaryTitleCameraRotationDegrees.x * kDegreeToRadian,
+			kTemporaryTitleCameraRotationDegrees.y * kDegreeToRadian,
+			kTemporaryTitleCameraRotationDegrees.z * kDegreeToRadian,
+		});
+	} else {
+		BeginStageStart();
+	}
+	stageEditor_.Initialize();
+	return true;
+}
+
+// Title中は開始せず、Enter後に本編と同じ設定でPlayer登場演出を開始します。
+void Stage1::BeginStageStart()
+{
+	if (!stageStart_ || !player_ || !mainCamera) {
+		return;
+	}
+	const Vector3 playerStartPosition = hasStagePlayerStart_
+		? stagePlayerStartPosition_
+		: Vector3{ 0.0f, -0.8f, 5.0f };
 	stageStart_->Begin(
 		*player_,
 		*mainCamera,
 		playerStartPosition,
-		mainCamera->GetTranslate(),
-		mainCamera->GetRotate(),
+		stageStartGameplayCameraPosition_,
+		stageStartGameplayCameraRotate_,
 		stageStartSettings_);
-	stageEditor_.Initialize();
-	return true;
 }
 
 // 自動動作確認に必要なStage固有データだけを渡します。
@@ -280,6 +417,9 @@ void Stage1::Finalize()
 {
 	// unique_ptr がオブジェクトを自動的に解放します。
 	// SceneManager がこの関数の前に GPU の処理完了を待機します。
+	if (stageTitleOverlay_) {
+		stageTitleOverlay_->Finalize();
+	}
 	stageCameraEvents_.Clear(cameraManager.get());
 	stageEditor_.Finalize();
 	sceneObjects_.Clear();
@@ -305,6 +445,41 @@ void Stage1::Finalize()
 
 void Stage1::Update()
 {
+	// 提出用TitleではStageの描画だけを準備し、Player・Camera追従・BGMは進めません。
+	if (isTemporaryTitleActive_) {
+		DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+		const float deltaTime = dxCommon->GetDeltaTime();
+		stageTitleOverlay_->Update(
+			deltaTime,
+			static_cast<float>(dxCommon->GetClientWidth()),
+			static_cast<float>(dxCommon->GetClientHeight()));
+		// Pink/Yellowの危険Lightは本編と同じ軌道・反射・SpotLightを使い、Cameraだけ固定します。
+		hazardLights_.Update(
+			deltaTime,
+			nullptr,
+			[this](const std::vector<LaserSegment>& sourceSegments)
+			{
+				return ReflectHazardLightSegments(sourceSegments);
+			});
+		UpdateLaserSpotLights();
+		const bool startRequested =
+			ImGuiManager::GetInstance()->IsGameViewActive() &&
+			(Input::GetInstance()->TriggerKey(DIK_RETURN) ||
+				Input::GetInstance()->IsPadButtonPressed(0, 3));
+		if (!startRequested) {
+			cameraManager->Update();
+			UpdateReflectionCameras();
+			// DevelopmentではBegin/EndしたFrameだけGame Viewへ描画結果を渡せます。
+			ImGuiManager::GetInstance()->Begin("Stage1");
+			ImGuiManager::GetInstance()->End();
+			PrepareStageRenderObjects();
+			return;
+		}
+		// Sceneの再読込を挟まず、このフレームから従来のStageStartへ引き渡します。
+		isTemporaryTitleActive_ = false;
+		BeginStageStart();
+		Logger::Log("Temporary title: Enter started Stage1 gameplay.");
+	}
 	// ---------- Stage1マップのホットリロード ----------
 	UpdateStageMapHotReload();
 	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
@@ -353,7 +528,17 @@ void Stage1::Update()
 	DrawStageEditorUi();
 	ImGuiManager::GetInstance()->End();
 
-	// ---------- 3D オブジェクトの描画準備 ----------
+	PrepareStageRenderObjects();
+	// Game ViewのBackSpaceだけで戻り、Stage1の解放中は共通Loading画面を表示します。
+	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
+		Input::GetInstance()->TriggerKey(DIK_BACK)) {
+		SceneManager::GetInstance()->ChangeSceneWithLoading("TITLE");
+	}
+}
+
+// Titleと本編が同じCamera・Light・モデルの描画準備を使い、表示差を作りません。
+void Stage1::PrepareStageRenderObjects()
+{
 	// Stage1全体で同じCamera・Lightを一回だけまとめ、全Objectへ適用します。
 	Object3dRenderContext renderContext(
 		cameraManager ? cameraManager->GetActiveCamera() : nullptr,
@@ -375,11 +560,6 @@ void Stage1::Update()
 	}
 	if (player_) {
 		renderContext.UpdateObject(player_->GetObject());
-	}
-	// Game ViewのBackSpaceだけで戻り、Stage1の解放中は共通Loading画面を表示します。
-	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
-		Input::GetInstance()->TriggerKey(DIK_BACK)) {
-		SceneManager::GetInstance()->ChangeSceneWithLoading("TITLE");
 	}
 }
 
@@ -415,6 +595,11 @@ void Stage1::Draw()
 	sceneRendererContext.lightPuzzle = &lightPuzzle_;
 	sceneRendererContext.hazardLights = &hazardLights_;
 	StageSceneRenderer::Draw(sceneRendererContext);
+	if (isTemporaryTitleActive_) {
+		// 3Dの後に透過Spriteを重ね、指定したStage1の景色を隠さずにTitleを見せます。
+		SceneRenderPipeline::DrawSprites(
+			SpriteCommon::GetInstance(), stageTitleOverlay_->GetSprites());
+	}
 
 	// PostEffect・SwapChain・ImGui・Presentは、全Scene共通のPipelineへ任せます。
 	SceneRenderPipeline::End(

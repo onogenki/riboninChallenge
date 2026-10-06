@@ -6,6 +6,7 @@
 
 using namespace MyMath;
 
+// 粒子の保存先、Shader用View、Pipeline、描画用データを順に作ってから初期化Computeを実行します。
 void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 {
 	assert(dxCommon);
@@ -14,78 +15,53 @@ void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 
 	dxCommon_ = dxCommon;
 	srvManager_ = srvManager;
+	CreateParticleBuffers();
+	CreateParticleDescriptors();
+	CreateComputePipeline();
+	CreateGraphicsPipeline();
+	CreateDrawAndControlBuffers();
+	InitializeParticles();
+}
 
+// Compute Shaderが更新する粒子と空き枠・描画Indexの保存先を作ります。
+void GPUParticle::CreateParticleBuffers()
+{
+	CreateParticleBufferResource(sizeof(Particle) * kMaxParticles, particleResource_);
+	CreateParticleBufferResource(sizeof(int32_t), freeListIndexResource_);
+	CreateParticleBufferResource(sizeof(int32_t) * kMaxParticles, freeListResource_);
+	CreateParticleBufferResource(sizeof(uint32_t) * kMaxParticles, activeParticleIndicesResource_);
+	CreateParticleBufferResource(sizeof(uint32_t) * 4, drawArgumentsResource_);
+}
+
+// UAVとして使う粒子バッファの共通設定を一か所に保ち、種類ごとの設定ずれを防ぎます。
+void GPUParticle::CreateParticleBufferResource(
+	uint64_t sizeInBytes,
+	Microsoft::WRL::ComPtr<ID3D12Resource>& resource) const
+{
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
 	D3D12_RESOURCE_DESC resourceDesc{};
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resourceDesc.Width = sizeof(Particle) * kMaxParticles;
+	resourceDesc.Width = sizeInBytes;
 	resourceDesc.Height = 1;
 	resourceDesc.DepthOrArraySize = 1;
 	resourceDesc.MipLevels = 1;
 	resourceDesc.SampleDesc.Count = 1;
 	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	HRESULT hr = dxCommon_->GetDevice()->CreateCommittedResource(
+	const HRESULT hr = dxCommon_->GetDevice()->CreateCommittedResource(
 		&heapProperties,
 		D3D12_HEAP_FLAG_NONE,
 		&resourceDesc,
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		nullptr,
-		IID_PPV_ARGS(&particleResource_));
+		IID_PPV_ARGS(&resource));
 	assert(SUCCEEDED(hr));
+}
 
-	D3D12_RESOURCE_DESC freeListIndexResourceDesc{};
-	freeListIndexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	freeListIndexResourceDesc.Width = sizeof(int32_t);
-	freeListIndexResourceDesc.Height = 1;
-	freeListIndexResourceDesc.DepthOrArraySize = 1;
-	freeListIndexResourceDesc.MipLevels = 1;
-	freeListIndexResourceDesc.SampleDesc.Count = 1;
-	freeListIndexResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	freeListIndexResourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-	hr = dxCommon_->GetDevice()->CreateCommittedResource(
-		&heapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&freeListIndexResourceDesc,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-		nullptr,
-		IID_PPV_ARGS(&freeListIndexResource_));
-	assert(SUCCEEDED(hr));
-
-	D3D12_RESOURCE_DESC freeListResourceDesc = freeListIndexResourceDesc;
-	freeListResourceDesc.Width = sizeof(int32_t) * kMaxParticles;
-	hr = dxCommon_->GetDevice()->CreateCommittedResource(
-		&heapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&freeListResourceDesc,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-		nullptr,
-		IID_PPV_ARGS(&freeListResource_));
-	assert(SUCCEEDED(hr));
-
-	D3D12_RESOURCE_DESC activeParticleIndicesResourceDesc = freeListIndexResourceDesc;
-	activeParticleIndicesResourceDesc.Width = sizeof(uint32_t) * kMaxParticles;
-	hr = dxCommon_->GetDevice()->CreateCommittedResource(
-		&heapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&activeParticleIndicesResourceDesc,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-		nullptr,
-		IID_PPV_ARGS(&activeParticleIndicesResource_));
-	assert(SUCCEEDED(hr));
-
-	D3D12_RESOURCE_DESC drawArgumentsResourceDesc = freeListIndexResourceDesc;
-	drawArgumentsResourceDesc.Width = sizeof(uint32_t) * 4;
-	hr = dxCommon_->GetDevice()->CreateCommittedResource(
-		&heapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&drawArgumentsResourceDesc,
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-		nullptr,
-		IID_PPV_ARGS(&drawArgumentsResource_));
-	assert(SUCCEEDED(hr));
-
+// 粒子バッファをCompute Shaderから読み書きできるよう、SRV/UAVを登録します。
+void GPUParticle::CreateParticleDescriptors()
+{
 	particleSrvIndex_ = srvManager_->Allocate();
 	activeParticleIndicesSrvIndex_ = srvManager_->Allocate();
 	particleUavIndex_ = srvManager_->Allocate();
@@ -100,10 +76,11 @@ void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	srvManager_->CreateUAVforStructuredBuffer(freeListUavIndex_, freeListResource_.Get(), kMaxParticles, sizeof(int32_t));
 	srvManager_->CreateUAVforStructuredBuffer(activeParticleIndicesUavIndex_, activeParticleIndicesResource_.Get(), kMaxParticles, sizeof(uint32_t));
 	srvManager_->CreateUAVforStructuredBuffer(drawArgumentsUavIndex_, drawArgumentsResource_.Get(), 4, sizeof(uint32_t));
+}
 
-	CreateComputePipeline();
-	CreateGraphicsPipeline();
-
+// 板ポリゴンとCamera・Emitter・時間・外力・Lightの初期値をGPUへ渡します。
+void GPUParticle::CreateDrawAndControlBuffers()
+{
 	vertexResource_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * 6);
 	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
 	vertexBufferView_.SizeInBytes = sizeof(VertexData) * 6;
@@ -146,8 +123,6 @@ void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
 	directionalLightData_->intensity = 1.0f;
-
-	InitializeParticles();
 }
 
 void GPUParticle::SetEmitterTranslate(uint32_t emitterIndex, const Vector3& translate)
@@ -189,10 +164,18 @@ void GPUParticle::SetDirectionalLight(const Vector4& color, const Vector3& direc
 	directionalLightData_->intensity = intensity;
 }
 
+// 時間とEmitter状態を確定してからGPUを更新し、描画で読む状態へ戻します。
 void GPUParticle::Update(float deltaTime)
 {
 	perFrameData_->time += deltaTime;
 	perFrameData_->deltaTime = deltaTime;
+	UpdateEmitterTiming(deltaTime);
+	DispatchParticleSimulation();
+}
+
+// 各Emitterの経過時間を進め、今回のフレームで粒子を出すか決めます。
+void GPUParticle::UpdateEmitterTiming(float deltaTime)
+{
 	for (uint32_t emitterIndex = 0; emitterIndex < kMaxEmitters; ++emitterIndex)
 	{
 		Emitter& emitter = *emitterData_[emitterIndex];
@@ -210,7 +193,11 @@ void GPUParticle::Update(float deltaTime)
 			emitter.emit = 0;
 		}
 	}
+}
 
+// 発生・更新Computeを実行し、粒子バッファを次の描画で読める状態へ戻します。
+void GPUParticle::DispatchParticleSimulation()
+{
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 	srvManager_->PreDraw();
 	D3D12_RESOURCE_BARRIER transitionToUav[3] = {};

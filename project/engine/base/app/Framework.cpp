@@ -156,6 +156,7 @@ void Framework::Update()
 	SceneManager::GetInstance()->Update();
 }
 
+// Sceneが使う共通資源を残したままSceneを終了し、その後で各Managerを片付けます。
 void Framework::Finalize()
 {
 
@@ -170,7 +171,7 @@ void Framework::Finalize()
 	GPUParticle::GetInstance()->Finalize();
 	Audio::GetInstance()->Unload();
 
-	xAudio2_.Reset();
+	// Audio::Initializeで開始したMedia Foundationは、音源の解放後に終了します。
 	MFShutdown();
 
 	if (winApp_) {

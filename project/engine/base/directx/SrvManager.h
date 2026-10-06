@@ -5,6 +5,7 @@
 #include <cstdint>
 #include<queue>
 
+// SRV・UAV用ディスクリプタ番号を割り当て、解放後の番号を再利用します。
 class SrvManager
 {
 public:

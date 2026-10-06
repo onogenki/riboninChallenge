@@ -259,51 +259,72 @@ void TitleScene::UpdateSceneContent()
 	}
 }
 
-// 準備が終わるまで12枚を周回し、終わった周回の最終コマから監視画面の演出へ移ります。
+// 演出の現在段階だけを更新し、画像・ノイズ・Cameraの順番を維持します。
 void TitleScene::UpdateTitlePresentation(float deltaTime)
 {
 	if (presentationStep_ == PresentationStep::kFrames) {
-		titleFrameTimer_ += deltaTime;
-		if (titleFrameTimer_ < kFrameSeconds) {
-			return;
-		}
-		titleFrameTimer_ -= kFrameSeconds;
-		if (titleFrameIndex_ == TitleObjectManager::kTitleFrameCount - 1 &&
-			isInitialized_ && hasDrawnPreparedScene_) {
-			StartTitleNoise();
-			return;
-		}
-		titleFrameIndex_ = (titleFrameIndex_ + 1) % TitleObjectManager::kTitleFrameCount;
-		if (!titleObjects_.SetTitleFrame(titleFrameIndex_)) {
-			Logger::Log("Title frame texture could not be loaded.");
-			presentationStep_ = PresentationStep::kFailed;
-		}
+		UpdateTitleFrames(deltaTime);
 		return;
 	}
 	if (presentationStep_ == PresentationStep::kFailed) {
 		return;
 	}
 
-	// 最初は映像だけを完全なノイズで覆い、2D Spriteから3Dの板への変更を隠します。
 	if (presentationStep_ == PresentationStep::kNoiseCover) {
-		presentationTimer_ += deltaTime;
-		if (presentationTimer_ >= kNoiseCoverSeconds) {
-			presentationStep_ = PresentationStep::kPullBack;
-			presentationTimer_ = 0.0f;
-			titleFrameTimer_ = 0.0f;
-			titleFrameIndex_ = 0;
-			if (!titleObjects_.SetTitleFrame(titleFrameIndex_)) {
-				Logger::Log("Title presentation failed: the first monitor frame could not be loaded.");
-				PostEffect::GetInstance()->SetRandomNoise(false);
-				presentationStep_ = PresentationStep::kFailed;
-				return;
-			}
-			Logger::Log("Title presentation: camera pull-back started.");
-		}
+		UpdateNoiseCover(deltaTime);
 		return;
 	}
 
-	// 3Dの監視画面も同じ12枚を繰り返し、映像が停止した板に見えないようにします。
+	UpdateMonitorFrames(deltaTime);
+	if (presentationStep_ == PresentationStep::kPullBack) {
+		UpdatePullBack(deltaTime);
+	} else if (presentationStep_ == PresentationStep::kTiltDown) {
+		UpdateTiltDown(deltaTime);
+	}
+}
+
+// 準備が終わるまで12枚を周回し、最後の画像を描いた後だけノイズへ進みます。
+void TitleScene::UpdateTitleFrames(float deltaTime)
+{
+	titleFrameTimer_ += deltaTime;
+	if (titleFrameTimer_ < kFrameSeconds) {
+		return;
+	}
+	titleFrameTimer_ -= kFrameSeconds;
+	if (titleFrameIndex_ == TitleObjectManager::kTitleFrameCount - 1 &&
+		isInitialized_ && hasDrawnPreparedScene_) {
+		StartTitleNoise();
+		return;
+	}
+	titleFrameIndex_ = (titleFrameIndex_ + 1) % TitleObjectManager::kTitleFrameCount;
+	if (!titleObjects_.SetTitleFrame(titleFrameIndex_)) {
+		Logger::Log("Title frame texture could not be loaded.");
+		presentationStep_ = PresentationStep::kFailed;
+	}
+}
+
+// 最初は映像だけをノイズで覆い、2D Spriteから3Dの板への切替を隠します。
+void TitleScene::UpdateNoiseCover(float deltaTime)
+{
+	presentationTimer_ += deltaTime;
+	if (presentationTimer_ >= kNoiseCoverSeconds) {
+		presentationStep_ = PresentationStep::kPullBack;
+		presentationTimer_ = 0.0f;
+		titleFrameTimer_ = 0.0f;
+		titleFrameIndex_ = 0;
+		if (!titleObjects_.SetTitleFrame(titleFrameIndex_)) {
+			Logger::Log("Title presentation failed: the first monitor frame could not be loaded.");
+			PostEffect::GetInstance()->SetRandomNoise(false);
+			presentationStep_ = PresentationStep::kFailed;
+			return;
+		}
+		Logger::Log("Title presentation: camera pull-back started.");
+	}
+}
+
+// 3Dの監視画面も同じ12枚を繰り返し、停止した板に見えないようにします。
+void TitleScene::UpdateMonitorFrames(float deltaTime)
+{
 	titleFrameTimer_ += deltaTime;
 	if (titleFrameTimer_ >= kFrameSeconds) {
 		titleFrameTimer_ -= kFrameSeconds;
@@ -312,34 +333,39 @@ void TitleScene::UpdateTitlePresentation(float deltaTime)
 			Logger::Log("Title monitor frame texture could not be loaded.");
 		}
 	}
-	if (presentationStep_ == PresentationStep::kPullBack) {
-		// 途中で止まらず遠くの停止位置まで後退し、ノイズだけ先に消します。
-		presentationTimer_ += deltaTime;
-		const float t = std::clamp(presentationTimer_ / kPullBackSeconds, 0.0f, 1.0f);
-		const float eased = 1.0f - (1.0f - t) * (1.0f - t);
-		mainCamera->SetTranslate(Lerp(kCameraStart, kCameraPulledBack, eased));
-		const float noiseFade = std::clamp(
-			(kNoiseFadeSeconds - presentationTimer_) / kNoiseFadeSeconds, 0.0f, 1.0f);
-		PostEffect::GetInstance()->SetRandomNoiseIntensity(noiseFade);
-		if (noiseFade <= 0.0f) {
-			PostEffect::GetInstance()->SetRandomNoise(false);
-		}
-		if (t >= 1.0f) {
-			presentationStep_ = PresentationStep::kTiltDown;
-			presentationTimer_ = 0.0f;
-			Logger::Log("Title presentation: downward camera turn started.");
-		}
-	} else if (presentationStep_ == PresentationStep::kTiltDown) {
-		// 停止位置を固定したまま斜め下へ回し、画面の板を視野から外します。
-		presentationTimer_ += deltaTime;
-		const float t = std::clamp(presentationTimer_ / kTiltDownSeconds, 0.0f, 1.0f);
-		const float eased = t * t * (3.0f - 2.0f * t);
-		mainCamera->SetTranslate(kCameraPulledBack);
-		mainCamera->SetRotate(Lerp({ 0.0f, 0.0f, 0.0f }, kCameraLookDown, eased));
-		if (t >= 1.0f) {
-			presentationStep_ = PresentationStep::kReady;
-			Logger::Log("Title presentation: camera stopped; Enter is enabled.");
-		}
+}
+
+// 途中で止まらず後退し、先にノイズを消してから下向き回転へ進みます。
+void TitleScene::UpdatePullBack(float deltaTime)
+{
+	presentationTimer_ += deltaTime;
+	const float t = std::clamp(presentationTimer_ / kPullBackSeconds, 0.0f, 1.0f);
+	const float eased = 1.0f - (1.0f - t) * (1.0f - t);
+	mainCamera->SetTranslate(Lerp(kCameraStart, kCameraPulledBack, eased));
+	const float noiseFade = std::clamp(
+		(kNoiseFadeSeconds - presentationTimer_) / kNoiseFadeSeconds, 0.0f, 1.0f);
+	PostEffect::GetInstance()->SetRandomNoiseIntensity(noiseFade);
+	if (noiseFade <= 0.0f) {
+		PostEffect::GetInstance()->SetRandomNoise(false);
+	}
+	if (t >= 1.0f) {
+		presentationStep_ = PresentationStep::kTiltDown;
+		presentationTimer_ = 0.0f;
+		Logger::Log("Title presentation: downward camera turn started.");
+	}
+}
+
+// 停止位置を固定して斜め下へ回し、回転終了後だけEnterを受け付けます。
+void TitleScene::UpdateTiltDown(float deltaTime)
+{
+	presentationTimer_ += deltaTime;
+	const float t = std::clamp(presentationTimer_ / kTiltDownSeconds, 0.0f, 1.0f);
+	const float eased = t * t * (3.0f - 2.0f * t);
+	mainCamera->SetTranslate(kCameraPulledBack);
+	mainCamera->SetRotate(Lerp({ 0.0f, 0.0f, 0.0f }, kCameraLookDown, eased));
+	if (t >= 1.0f) {
+		presentationStep_ = PresentationStep::kReady;
+		Logger::Log("Title presentation: camera stopped; Enter is enabled.");
 	}
 }
 

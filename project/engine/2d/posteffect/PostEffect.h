@@ -24,7 +24,7 @@ public:
 	PostEffect(const PostEffect&) = delete;
 	PostEffect& operator=(const PostEffect&) = delete;
 
-	// 共通のルートシグネチャと各ポストエフェクト用のPSOを生成する。
+	// 描画資源とマスク画像を順に準備し、画像を読めない場合は初期化を止める。
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 	// RenderTextureをそのままSwapChainへ転送する。
 	void Draw();

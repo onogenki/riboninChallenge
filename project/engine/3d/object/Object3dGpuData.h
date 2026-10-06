@@ -31,6 +31,7 @@ public:
 		const Matrix4x4& reflectionViewProjection,
 		const Vector4& tint) const;
 
+	// Sceneが決めた平行光・点光源を、このObject専用のGPU用バッファへコピーします。
 	void SetDirectionalLight(const Object3d::DirectionalLight& light) { *directionalLightData_ = light; }
 	void SetPointLight(const Object3d::PointLight& light) { *pointLightData_ = light; }
 	void SetSpotLight(const Object3d::SpotLight& light);

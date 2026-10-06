@@ -19,6 +19,7 @@ struct SoundData {
 	std::vector<BYTE>buffer{};
 };
 
+// 読み込んだ音声データと再生中Voiceを管理し、BGM・SEの再生部品へ音を渡します。
 class Audio
 {
 
@@ -55,6 +56,7 @@ public:
 	bool ResumeWave(VoiceId voiceId);
 	// 未終了のVoiceが残っているかを返します。Pause中もtrueで、音が出ていることとは別です。
 	bool IsVoicePlaying(VoiceId voiceId) const;
+	// 再生Voiceを止めてから共有音源とXAudio2本体を解放し、再初期化できる状態に戻します。
 	void Unload();
 
 private:

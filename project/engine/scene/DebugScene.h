@@ -22,7 +22,8 @@ class ParticleEmitter;
 class SkyBox;
 class Sprite;
 
-//BaseSceneを継承する(publicをつけることで公認の親子関係)
+// Debug用のモデル・Sprite・Cameraを所有し、確認用UIと各部品の進行順を決めるSceneです。
+// モデル生成や個別の描画は専用部品へ任せ、Sceneには全体の流れだけを残します。
 class DebugScene : public BaseScene
 {
 public:

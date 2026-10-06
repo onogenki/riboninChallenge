@@ -1,26 +1,33 @@
 #pragma once
 #include "DirectXCommon.h"
 #include <wrl.h>
-//スプライト共通部
+
+// 全Spriteで共用するRoot Signatureと描画Pipelineを所有します。
+// Spriteごとの位置・色・Textureは持たず、Draw前の共通設定だけを行います。
 class SpriteCommon
 {
-	public:
+public:
 
-		static SpriteCommon* GetInstance() {
-			static SpriteCommon instance;
-			return &instance;
-		}
+	// Sceneが共有する本体への、所有権のないポインタを返します。
+	static SpriteCommon* GetInstance() {
+		static SpriteCommon instance;
+		return &instance;
+	}
 
-		SpriteCommon(const SpriteCommon&) = delete;
-		SpriteCommon& operator=(const SpriteCommon&) = delete;
+	SpriteCommon(const SpriteCommon&) = delete;
+	SpriteCommon& operator=(const SpriteCommon&) = delete;
 
+	// SceneからDirectX操作窓口を借り、全Spriteで使う描画設定を作ります。
 	void Initialize(DirectXCommon* dxCommon);
 
+	// Sprite::Drawより先に共通Pipelineと三角形描画を設定します。
 	void SetCommonDrawSetting();
 
+	// GPU資源作成用のDeviceと、描画命令を書き込むCommand Listを返します。
 	ID3D12Device* GetDevice() const { return dxCommon_->GetDevice(); }
 	ID3D12GraphicsCommandList* GetCommandList() const { return dxCommon_->GetCommandList(); }
 
+	// Sceneから借りているDirectX操作窓口を、所有権のないポインタで返します。
 	DirectXCommon* GetDxCommon() const { return dxCommon_; }
 
 private:

@@ -163,7 +163,7 @@ void Audio::Update()
 	ReleaseFinishedVoices();
 }
 
-//音声データ解放
+// 再生中のVoiceを先に破棄し、その後で音源とXAudio2の所有資源を解放します。
 void Audio::Unload()
 {
 	std::vector<ActiveVoice> activeVoices;
@@ -182,6 +182,12 @@ void Audio::Unload()
 	}
 	//バッファのメモリを解放
 	soundDatas_.clear();
+	// SourceVoiceが残ったまま親Voiceを破棄しないよう、最後に音声装置を閉じます。
+	if (masterVoice_) {
+		masterVoice_->DestroyVoice();
+		masterVoice_ = nullptr;
+	}
+	xAudio2_.Reset();
 }
 
 // 単発の効果音は、従来どおり再生終了後に自動で破棄します。

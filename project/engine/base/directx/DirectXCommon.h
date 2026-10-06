@@ -12,6 +12,7 @@
 #include<chrono>
 #include "Vector4.h"
 
+// DirectX 12の初期化、描画先の切替、GPUへの転送とフレーム終了を管理します。
 class DirectXCommon
 {
 public:
@@ -168,8 +169,6 @@ private:
 
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc_{};
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_{};
-
-	//Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap;

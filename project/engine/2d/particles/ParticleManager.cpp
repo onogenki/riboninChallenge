@@ -11,7 +11,7 @@ ParticleManager* ParticleManager::GetInstance() {
     return &instance;
 }
 
-// 初期化処理
+// Pipelineと描画資源を元の順に作り、最初のUpdateより前に風と再生状態をそろえます。
 void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager) {
     // 引数でポインタを受け取ってメンバ変数に記録
     dxCommon_ = dxCommon;
@@ -21,8 +21,24 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     randomEngine_.seed(seed_gen());
 
     ID3D12Device* device = dxCommon_->GetDevice();
-    HRESULT hr = S_FALSE;
+    InitializeRootSignature(device);
+    InitializeGraphicsPipeline(device);
+    InitializeDefaultQuad();
+    InitializeMaterial();
 
+    //フィールドの設定
+    accelerationField_.acceleration = { 15.0f,0.0f,0.0f };
+    accelerationField_.area.min = { -1.0f,-1.0f,-1.0f };
+    accelerationField_.area.max = { 1.0f,1.0f,1.0f };
+
+    isField_ = true;
+	returnState_.Reset();
+}
+
+// 粒子のShaderが使う結合位置とSamplerを定義し、Pipelineより先に確定します。
+void ParticleManager::InitializeRootSignature(ID3D12Device* device)
+{
+    HRESULT hr = S_FALSE;
     D3D12_DESCRIPTOR_RANGE descriptorRangeForInstancing[1] = {};
     descriptorRangeForInstancing[0].BaseShaderRegister = 0;
     descriptorRangeForInstancing[0].NumDescriptors = 1;
@@ -71,7 +87,12 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     assert(SUCCEEDED(hr));
     hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature_));
     assert(SUCCEEDED(hr));
+}
 
+// 粒子用Shader・頂点形式・混合と深度の規則から描画Pipelineを作ります。
+void ParticleManager::InitializeGraphicsPipeline(ID3D12Device* device)
+{
+    HRESULT hr = S_FALSE;
     Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Particle.VS.hlsl", L"vs_6_0");
     Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Particle.PS.hlsl", L"ps_6_0");
 
@@ -130,7 +151,11 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 
     hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState_));
     assert(SUCCEEDED(hr));
+}
 
+// 通常粒子が使う二つの三角形を、従来と同じ頂点順でGPUへ書き込みます。
+void ParticleManager::InitializeDefaultQuad()
+{
     //頂点データの初期化
     vertexResource_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * 6);
     vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
@@ -146,7 +171,11 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     vertexData[3] = { {-1.0f,  1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, normal };
     vertexData[4] = { { 1.0f,  1.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, normal };
     vertexData[5] = { { 1.0f, -1.0f, 0.0f, 1.0f}, {1.0f, 1.0f}, normal };
+}
 
+// 共通色とUV変換を初期化し、最初の描画から定数バッファが定義済みになるようにします。
+void ParticleManager::InitializeMaterial()
+{
     // マテリアル（定数バッファ）の初期化
     materialResource_ = dxCommon_->CreateBufferResource(sizeof(Material));
     materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
@@ -154,27 +183,39 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     materialData_->enableLighting = 0;
     materialData_->uvTransform = MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f });
-
-    //フィールドの設定
-    accelerationField_.acceleration = { 15.0f,0.0f,0.0f };
-    accelerationField_.area.min = { -1.0f,-1.0f,-1.0f };
-    accelerationField_.area.max = { 1.0f,1.0f,1.0f };
-
-    isField_ = true;
-	returnState_.Reset();
 }
 
-// パーティクルグループの生成
+// 粒子の形状に関係なく使うGPUインスタンス領域とSRVを同じ順番で作ります。
+void ParticleManager::InitializeInstancingResources(ParticleGroup& group)
+{
+    group.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
+    group.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&group.mappedData));
+    group.instancingSrvIndex = srvManager_->Allocate();
+    srvManager_->CreateSRVforStructuredBuffer(
+        group.instancingSrvIndex,
+        group.instancingResource.Get(),
+        kNumMaxInstance,
+        sizeof(ParticleForGPU)
+    );
+}
+
+// 同名の粒子グループがあれば、古いSRVを返してから一覧から外します。
+void ParticleManager::RemoveExistingGroup(const std::string& name)
+{
+	if (auto it = particleGroups_.find(name); it != particleGroups_.end()) {
+		if (srvManager_) {
+			srvManager_->Free(it->second.instancingSrvIndex);
+		}
+		particleGroups_.erase(it);
+	}
+}
+
+// 名前とTextureで通常粒子のグループを作り、Emitより先に描画領域を登録します。
 void ParticleManager::CreateParticleGroup(const std::string name, const std::string textureFilePath) {
 	if (!srvManager_ || !srvManager_->CanAllocate()) {
 		return;
 	}
-    if (auto it = particleGroups_.find(name); it != particleGroups_.end()) {
-        if (srvManager_) {
-            srvManager_->Free(it->second.instancingSrvIndex);
-        }
-        particleGroups_.erase(it);
-    }
+    RemoveExistingGroup(name);
     // 登録済みの名前かチェックしてassert
     assert(particleGroups_.find(name) == particleGroups_.end() && "その名前のグループは既に存在します");
 
@@ -183,52 +224,28 @@ void ParticleManager::CreateParticleGroup(const std::string name, const std::str
     // マテリアルデータにテクスチャファイルパスを設定
     newGroup.textureFilePath = textureFilePath;
 
-    // インスタンシング用リソースの生成 (上限を決めてリソースを作る)
-    newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
-
-    // ポインタを取得
-    newGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newGroup.mappedData));
-
-    // インスタンシング用にSRVを確保してSRVインデックスを記録
-    newGroup.instancingSrvIndex = srvManager_->Allocate();
-    srvManager_->CreateSRVforStructuredBuffer(
-        newGroup.instancingSrvIndex,
-        newGroup.instancingResource.Get(),
-        kNumMaxInstance,
-        sizeof(ParticleForGPU)
-    );
+    // 描画に必要なインスタンス領域を、通常粒子でもほかの形状と同じ手順で作ります。
+    InitializeInstancingResources(newGroup);
 
     // コンテナに登録
     particleGroups_[name] = newGroup;
 }
 
+// 名前とTextureでRingを作り、共通の描画領域を準備してから円環頂点を追加します。
 void ParticleManager::CreateRingParticleGroup(const std::string name, const std::string textureFilePath)
 {
 	if (!srvManager_ || !srvManager_->CanAllocate()) {
 		return;
 	}
-    if (auto it = particleGroups_.find(name); it != particleGroups_.end()) {
-        if (srvManager_) {
-            srvManager_->Free(it->second.instancingSrvIndex);
-        }
-        particleGroups_.erase(it);
-    }
+    RemoveExistingGroup(name);
     assert(particleGroups_.find(name) == particleGroups_.end() && "Particle group already exists");
 
     ParticleGroup newGroup{};
     newGroup.textureFilePath = textureFilePath;
     newGroup.useBillboard = false;
 
-    newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
-    newGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newGroup.mappedData));
-
-    newGroup.instancingSrvIndex = srvManager_->Allocate();
-    srvManager_->CreateSRVforStructuredBuffer(
-        newGroup.instancingSrvIndex,
-        newGroup.instancingResource.Get(),
-        kNumMaxInstance,
-        sizeof(ParticleForGPU)
-    );
+    // Ring固有の頂点を作る前に、通常粒子と同じ描画領域を準備します。
+    InitializeInstancingResources(newGroup);
 
     const uint32_t kRingDivide = 32;
     const float kOuterRadius = 1.0f;
@@ -265,6 +282,7 @@ void ParticleManager::CreateRingParticleGroup(const std::string name, const std:
     particleGroups_[name] = newGroup;
 }
 
+// 名前・Texture・寸法からCylinderを作り、共通の描画領域の後で側面頂点を追加します。
 void ParticleManager::CreateCylinderParticleGroup(
     const std::string name,
     const std::string textureFilePath,
@@ -276,12 +294,7 @@ void ParticleManager::CreateCylinderParticleGroup(
 	if (!srvManager_ || !srvManager_->CanAllocate()) {
 		return;
 	}
-    if (auto it = particleGroups_.find(name); it != particleGroups_.end()) {
-        if (srvManager_) {
-            srvManager_->Free(it->second.instancingSrvIndex);
-        }
-        particleGroups_.erase(it);
-    }
+    RemoveExistingGroup(name);
     assert(particleGroups_.find(name) == particleGroups_.end() && "Particle group already exists");
     assert(divide >= 3);
     assert(topRadius > 0.0f);
@@ -293,16 +306,8 @@ void ParticleManager::CreateCylinderParticleGroup(
     newGroup.useBillboard = false;
 	newGroup.updateCallback = UpdateCylinderParticle;
 
-    newGroup.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
-    newGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&newGroup.mappedData));
-
-    newGroup.instancingSrvIndex = srvManager_->Allocate();
-    srvManager_->CreateSRVforStructuredBuffer(
-        newGroup.instancingSrvIndex,
-        newGroup.instancingResource.Get(),
-        kNumMaxInstance,
-        sizeof(ParticleForGPU)
-    );
+    // Cylinder固有の頂点を作る前に、通常粒子と同じ描画領域を準備します。
+    InitializeInstancingResources(newGroup);
 
     const uint32_t verticesPerDivide = 6;
     const float radianPerDivide = 2.0f * std::numbers::pi_v<float> / float(divide);
@@ -358,7 +363,7 @@ void ParticleManager::ClearAllGroups()
 	returnState_.Reset();
 }
 
-void ParticleManager::ClearParticles(const std::string name)
+void ParticleManager::ClearParticles(const std::string& name)
 {
     auto it = particleGroups_.find(name);
     if (it == particleGroups_.end()) {
@@ -415,7 +420,8 @@ void ParticleManager::SetBillboardEnabled(const std::string& name, bool isEnable
     it->second.useBillboard = isEnabled;
 }
 
-bool ParticleManager::IsCollision(const AABB aabb, const Vector3& point)
+// 風の範囲を変更せずに点の包含だけを調べ、毎粒子の範囲コピーを避けます。
+bool ParticleManager::IsCollision(const AABB& aabb, const Vector3& point)
 {
     return (point.x >= aabb.min.x && point.x <= aabb.max.x) &&
         (point.y >= aabb.min.y && point.y <= aabb.max.y) &&
@@ -446,7 +452,7 @@ void ParticleManager::UpdateCylinderParticle(Particle& particle, float signedDel
 }
 
 // パーティクルの発生
-void ParticleManager::Emit(const std::string name, const Vector3& position, uint32_t count,bool receivesWind, float scaleMultiplier) {
+void ParticleManager::Emit(const std::string& name, const Vector3& position, uint32_t count,bool receivesWind, float scaleMultiplier) {
 	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
@@ -482,154 +488,162 @@ void ParticleManager::Emit(const std::string name, const Vector3& position, uint
     }
 }
 
-//ヒット(斬撃みたいな細長い円)エフェクト発生
-void ParticleManager::Update() {
-
-    if (!cameraManager_)return;
-    //毎フレーム今アクティブなカメラを取得する
-    Camera* activeCamera = cameraManager_->GetActiveCamera();
-    //万が一カメラがない場合は安全のために抜ける
-    if (!activeCamera)return;
-
-    const bool returning = returnState_.IsReturning();
-    const float signedDeltaTime = dxCommon_->GetDeltaTime() * (returning ? -1.0f : 1.0f);
-
-    //風タイマー
+// 粒子を進める前に風の状態を確定し、逆再生でも元の切替順を保ちます。
+void ParticleManager::UpdateWind(float signedDeltaTime, bool returning) {
     if (autoWindSwitch_) {
         windTimer_ += signedDeltaTime;
     }
     if (autoWindSwitch_ && returning && windTimer_ < 0.0f) {
         isField_ = !isField_;
-        windTimer_ += 5.0f;
+        windTimer_ += kWindSwitchInterval;
     }
-    else if (autoWindSwitch_ && windTimer_ >= 5.0f)
-    {//5秒経過したら
-        isField_ = !isField_;//trueとfalse切り替え
+    else if (autoWindSwitch_ && windTimer_ >= kWindSwitchInterval)
+    {
+        isField_ = !isField_;
         windTimer_ = 0.0f;
     }
+}
 
-    //取得したactiveカメラからビュー作成もらう
+// グループ固有の動きから風までを順に適用し、逆再生時は位置を先に戻します。
+void ParticleManager::UpdateParticleMotion(Particle& particle, ParticleGroup& group, float signedDeltaTime, bool returning) {
+    if (group.updateCallback) {
+        group.updateCallback(particle, signedDeltaTime, returning);
+    }
+
+    if (particle.isSpiral) {
+        particle.spiralAngle += particle.spiralAngularVelocity * signedDeltaTime;
+        particle.spiralRadius = (std::max)(kMinimumSpiralRadius, particle.spiralRadius + particle.spiralRadialVelocity * signedDeltaTime);
+
+        const float spiralX = std::cos(particle.spiralAngle) * particle.spiralRadius;
+        const float spiralY = std::sin(particle.spiralAngle) * particle.spiralRadius;
+        particle.transform.translate = {
+            particle.spiralCenter.x + particle.spiralRight.x * spiralX + particle.spiralUp.x * spiralY,
+            particle.spiralCenter.y + particle.spiralRight.y * spiralX + particle.spiralUp.y * spiralY,
+            particle.spiralCenter.z + particle.spiralRight.z * spiralX + particle.spiralUp.z * spiralY
+        };
+    }
+
+    // 速度を先に変える順方向の逆操作として、逆再生時は位置を先に戻します。
+    if (returning) {
+        particle.transform.translate.x += particle.velocity.x * signedDeltaTime;
+        particle.transform.translate.y += particle.velocity.y * signedDeltaTime;
+        particle.transform.translate.z += particle.velocity.z * signedDeltaTime;
+    }
+
+    const bool receivesActiveWind = isField_ && particle.receivesWind &&
+        IsCollision(accelerationField_.area, particle.transform.translate);
+    if (receivesActiveWind)
+    {
+        particle.velocity.x += accelerationField_.acceleration.x * signedDeltaTime;
+        particle.velocity.y += accelerationField_.acceleration.y * signedDeltaTime;
+        particle.velocity.z += accelerationField_.acceleration.z * signedDeltaTime;
+    }
+
+    if (!returning) {
+        particle.transform.translate.x += particle.velocity.x * signedDeltaTime;
+        particle.transform.translate.y += particle.velocity.y * signedDeltaTime;
+        particle.transform.translate.z += particle.velocity.z * signedDeltaTime;
+    }
+}
+
+// 寿命による透明度と、指定がある粒子だけの色・大きさを計算します。
+float ParticleManager::UpdateParticleAppearance(Particle& particle, float signedDeltaTime, bool returning) {
+    float alpha = particle.color.w;
+    if (!particle.isEndless) {
+        particle.currentTime += signedDeltaTime;
+        if (returning && particle.lifeTime > 0.0f) {
+            while (particle.currentTime < 0.0f) {
+                particle.currentTime += particle.lifeTime;
+            }
+        }
+        const float progress = std::clamp(particle.currentTime / particle.lifeTime, 0.0f, 1.0f);
+        if (particle.useColorAndScaleOverLife) {
+            particle.transform.scale = {
+                particle.startScale.x + (particle.endScale.x - particle.startScale.x) * progress,
+                particle.startScale.y + (particle.endScale.y - particle.startScale.y) * progress,
+                particle.startScale.z + (particle.endScale.z - particle.startScale.z) * progress
+            };
+            particle.color = {
+                particle.startColor.x + (particle.endColor.x - particle.startColor.x) * progress,
+                particle.startColor.y + (particle.endColor.y - particle.startColor.y) * progress,
+                particle.startColor.z + (particle.endColor.z - particle.startColor.z) * progress,
+                particle.startColor.w + (particle.endColor.w - particle.startColor.w) * progress
+            };
+            alpha = particle.color.w;
+        } else {
+            alpha = particle.color.w * (1.0f - progress);
+        }
+    }
+    return alpha;
+}
+
+// 更新後の姿勢を描画用行列へ変換し、グループのGPU領域へ格納します。
+void ParticleManager::WriteParticleGpuData(const Particle& particle, ParticleGroup& group,
+    const Matrix4x4& viewProjectionMatrix, const Matrix4x4& billboardMatrix, float alpha) {
+    Matrix4x4 scale = MakeScaleMatrix(particle.transform.scale);
+    Matrix4x4 rotateZ = MakeRotateZMatrix(particle.transform.rotate.z);
+    Matrix4x4 translate = MakeTranslateMatrix(particle.transform.translate);
+
+    Matrix4x4 rotateY = MakeRotateYMatrix(particle.transform.rotate.y);
+    Matrix4x4 rotateX = MakeRotateXMatrix(particle.transform.rotate.x);
+    Matrix4x4 rotate = Multiply(Multiply(rotateX, rotateY), rotateZ);
+    Matrix4x4 rotateOrBillboard = group.useBillboard ? Multiply(rotateZ, billboardMatrix) : rotate;
+    Matrix4x4 worldMatrix = Multiply(Multiply(scale, rotateOrBillboard), translate);
+
+    if (group.instanceCount < kNumMaxInstance) {
+        group.mappedData[group.instanceCount].WVP = viewProjectionMatrix;
+        group.mappedData[group.instanceCount].World = worldMatrix;
+        group.mappedData[group.instanceCount].color = particle.color;
+        group.mappedData[group.instanceCount].color.w = alpha;
+        group.instanceCount++;
+    }
+}
+
+// Camera確認後に風・粒子の動き・見た目・描画用データを元の順番で更新します。
+void ParticleManager::Update() {
+    if (!cameraManager_)return;
+    Camera* activeCamera = cameraManager_->GetActiveCamera();
+    if (!activeCamera)return;
+
+    const bool returning = returnState_.IsReturning();
+    const float signedDeltaTime = dxCommon_->GetDeltaTime() * (returning ? -1.0f : 1.0f);
+    UpdateWind(signedDeltaTime, returning);
+
     const Matrix4x4 viewProjectionMatrix = Multiply(activeCamera->GetViewMatrix(), activeCamera->GetProjectionMatrix());
     Matrix4x4 view = activeCamera->GetViewMatrix();
     view.m[3][0] = 0.0f; view.m[3][1] = 0.0f; view.m[3][2] = 0.0f;
     Matrix4x4 billboardMatrix = Inverse(view);
 
-    // 全てのパーティクルグループについて処理する
     for (auto& pair : particleGroups_) {
         ParticleGroup& group = pair.second;
-        // インスタンス数をリセット
         group.instanceCount = 0;
 
-        // グループ内の全てのパーティクルについて処理する
         for (auto it = group.particles.begin(); it != group.particles.end();) {
             Particle& particle = *it;
-
             if (!returning && !particle.isEndless && particle.currentTime >= particle.lifeTime) {
                 it = group.particles.erase(it);
                 continue;
             }
 
-            if (group.updateCallback) {
-                group.updateCallback(particle, signedDeltaTime, returning);
-            }
-
-            if (particle.isSpiral) {
-                particle.spiralAngle += particle.spiralAngularVelocity * signedDeltaTime;
-                particle.spiralRadius = (std::max)(0.05f, particle.spiralRadius + particle.spiralRadialVelocity * signedDeltaTime);
-
-                const float spiralX = std::cos(particle.spiralAngle) * particle.spiralRadius;
-                const float spiralY = std::sin(particle.spiralAngle) * particle.spiralRadius;
-                particle.transform.translate = {
-                    particle.spiralCenter.x + particle.spiralRight.x * spiralX + particle.spiralUp.x * spiralY,
-                    particle.spiralCenter.y + particle.spiralRight.y * spiralX + particle.spiralUp.y * spiralY,
-                    particle.spiralCenter.z + particle.spiralRight.z * spiralX + particle.spiralUp.z * spiralY
-                };
-            }
-
-            // Forward Euler first changes velocity and then position. Its inverse
-            // must restore position before restoring velocity to avoid drift.
-            if (returning) {
-                particle.transform.translate.x += particle.velocity.x * signedDeltaTime;
-                particle.transform.translate.y += particle.velocity.y * signedDeltaTime;
-                particle.transform.translate.z += particle.velocity.z * signedDeltaTime;
-            }
-
-            const bool receivesActiveWind = isField_ && particle.receivesWind &&
-                IsCollision(accelerationField_.area, particle.transform.translate);
-            if (receivesActiveWind)
-            {
-                particle.velocity.x += accelerationField_.acceleration.x * signedDeltaTime;
-                particle.velocity.y += accelerationField_.acceleration.y * signedDeltaTime;
-                particle.velocity.z += accelerationField_.acceleration.z * signedDeltaTime;
-            }
-
-            if (!returning) {
-                particle.transform.translate.x += particle.velocity.x * signedDeltaTime;
-                particle.transform.translate.y += particle.velocity.y * signedDeltaTime;
-                particle.transform.translate.z += particle.velocity.z * signedDeltaTime;
-            }
-
-            float alpha = particle.color.w;
-            if (!particle.isEndless) {
-                particle.currentTime += signedDeltaTime;
-                if (returning && particle.lifeTime > 0.0f) {
-                    while (particle.currentTime < 0.0f) {
-                        particle.currentTime += particle.lifeTime;
-                    }
-                }
-                const float progress = std::clamp(particle.currentTime / particle.lifeTime, 0.0f, 1.0f);
-                if (particle.useColorAndScaleOverLife) {
-                    particle.transform.scale = {
-                        particle.startScale.x + (particle.endScale.x - particle.startScale.x) * progress,
-                        particle.startScale.y + (particle.endScale.y - particle.startScale.y) * progress,
-                        particle.startScale.z + (particle.endScale.z - particle.startScale.z) * progress
-                    };
-                    particle.color = {
-                        particle.startColor.x + (particle.endColor.x - particle.startColor.x) * progress,
-                        particle.startColor.y + (particle.endColor.y - particle.startColor.y) * progress,
-                        particle.startColor.z + (particle.endColor.z - particle.startColor.z) * progress,
-                        particle.startColor.w + (particle.endColor.w - particle.startColor.w) * progress
-                    };
-                    alpha = particle.color.w;
-                } else {
-                    alpha = particle.color.w * (1.0f - progress);
-                }
-            }
-
-            Matrix4x4 scale = MakeScaleMatrix(particle.transform.scale);
-            Matrix4x4 rotateZ = MakeRotateZMatrix(particle.transform.rotate.z);
-            Matrix4x4 translate = MakeTranslateMatrix(particle.transform.translate);
-
-            Matrix4x4 rotateY = MakeRotateYMatrix(particle.transform.rotate.y);
-            Matrix4x4 rotateX = MakeRotateXMatrix(particle.transform.rotate.x);
-            Matrix4x4 rotate = Multiply(Multiply(rotateX, rotateY), rotateZ);
-            Matrix4x4 rotateOrBillboard = group.useBillboard ? Multiply(rotateZ, billboardMatrix) : rotate;
-            Matrix4x4 worldMatrix = Multiply(Multiply(scale, rotateOrBillboard), translate);
-
-            // 取得したactiveCameraからビュープロジェクション行列をもらう(カメラの向きを向く)
-            if (group.instanceCount < kNumMaxInstance) {
-                group.mappedData[group.instanceCount].WVP = viewProjectionMatrix;
-                group.mappedData[group.instanceCount].World = worldMatrix;
-                group.mappedData[group.instanceCount].color = particle.color;
-                group.mappedData[group.instanceCount].color.w = alpha;
-                group.instanceCount++;
-            }
+            UpdateParticleMotion(particle, group, signedDeltaTime, returning);
+            const float alpha = UpdateParticleAppearance(particle, signedDeltaTime, returning);
+            WriteParticleGpuData(particle, group, viewProjectionMatrix, billboardMatrix, alpha);
             ++it;
         }
     }
 }
 
-// 描画処理
+// Updateが書き込んだ粒子だけを、各グループの頂点形状とTextureで描画します。
 void ParticleManager::Draw() {
 
     ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 
-    // 1〜4. パイプラインと頂点データの設定
+    // 粒子専用Pipelineと三角形描画を、全グループに共通して設定します。
     commandList->SetGraphicsRootSignature(rootSignature_.Get());
     commandList->SetPipelineState(graphicsPipelineState_.Get());
     commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-    // マテリアル定数バッファ
+    // 粒子に共通する色とUV変換をShaderへ渡します。
     commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 
     for (auto& pair : particleGroups_) {
@@ -640,14 +654,14 @@ void ParticleManager::Draw() {
         D3D12_VERTEX_BUFFER_VIEW vertexBufferView = group.vertexResource ? group.vertexBufferView : vertexBufferView_;
         commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 
-        // 5. インスタンシング用 SRV
+        // このグループの位置・色を保持するインスタンシングSRVを使います。
         srvManager_->SetGraphicsRootDescriptorTable(1, group.instancingSrvIndex);
 
-        // 6. テクスチャ用 SRV
+        // グループのTextureを読み取り、別グループの画像を使い回さないようにします。
         D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(group.textureFilePath);
         commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 
-        // 7. インスタンシング描画
+        // Updateで数えた有効な粒子だけを描画します。
         commandList->DrawInstanced(group.vertexCount, group.instanceCount, 0, 0);
     }
 }

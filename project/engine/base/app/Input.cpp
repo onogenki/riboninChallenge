@@ -3,15 +3,24 @@
 #include "Input.h"
 #include <vector>
 #include <wrl.h>
+#include <cmath>
 #include "Logger.h"
 #pragma comment(lib,"dinput8.lib")
 #pragma comment(lib,"dxguid.lib")
 
 std::unique_ptr <Input> Input::instance = nullptr;
 
-// 共通の定数
-const float STICK_MAX = 32768.0f;
-const float DEAD_ZONE = 0.1f; // 10%以下の傾きは無視する
+namespace {
+constexpr float kStickMax = 32768.0f;
+constexpr float kDeadZone = 0.1f;
+
+// DirectInputで設定した軸範囲を-1～1へ直し、10%未満の揺れを入力にしません。
+float NormalizePadAxis(LONG rawAxis)
+{
+	const float value = static_cast<float>(rawAxis) / kStickMax;
+	return (std::abs(value) < kDeadZone) ? 0.0f : value;
+}
+}
 
 // DirectInputの各装置を準備し、失敗時もReleaseで空の装置を参照しないようにします。
 void Input::Initialize(WinApp* winApp)
@@ -326,35 +335,34 @@ bool Input::IsPadButtonPressed(int padIndex, int button) {
 	return false;
 }
 
-// ゲームパッドの軸の値を取得
+// 左スティックの横方向を読み、共通の範囲と遊び幅で判定します。
 float Input::GetPadLeftAxisX(int padIndex) {
 	if (padIndex >= 0 && padIndex < static_cast<int>(padStates.size())) {
-		float val = static_cast<float>(padStates[padIndex].lX) / STICK_MAX;
-		return (abs(val) < DEAD_ZONE) ? 0.0f : val;
+		return NormalizePadAxis(padStates[padIndex].lX);
 	}
 	return 0.0f;
 }
+// 左スティックの縦方向を読み、横方向と同じ遊び幅で判定します。
 float Input::GetPadLeftAxisY(int padIndex) {
 	if (padIndex >= 0 && padIndex < static_cast<int>(padStates.size())) {
-		// Y軸は上がマイナスで返ってくることが多いため、ゲームに合わせて反転させることもある
-		float val = static_cast<float>(padStates[padIndex].lY) / STICK_MAX;
-		return (abs(val) < DEAD_ZONE) ? 0.0f : val;
+		// 符号はここで反転せず、DirectInputから取得した向きをそのまま返します。
+		return NormalizePadAxis(padStates[padIndex].lY);
 	}
 	return 0.0f;
 }
 
+// 右スティックの横方向を読み、左スティックと同じ基準で判定します。
 float Input::GetPadRightAxisX(int padIndex) {
 	if (padIndex >= 0 && padIndex < static_cast<int>(padStates.size())) {
-		float val = static_cast<float>(padStates[padIndex].lRx) / STICK_MAX;
-		return (abs(val) < DEAD_ZONE) ? 0.0f : val;
+		return NormalizePadAxis(padStates[padIndex].lRx);
 	}
 	return 0.0f;
 }
 
+// 右スティックの縦方向を読み、他の軸と同じ基準で判定します。
 float Input::GetPadRightAxisY(int padIndex) {
 	if (padIndex >= 0 && padIndex < static_cast<int>(padStates.size())) {
-		float val = static_cast<float>(padStates[padIndex].lRy) / STICK_MAX;
-		return (abs(val) < DEAD_ZONE) ? 0.0f : val;
+		return NormalizePadAxis(padStates[padIndex].lRy);
 	}
 	return 0.0f;
 }

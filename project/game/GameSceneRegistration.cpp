@@ -12,6 +12,8 @@ void RegisterGameScenes(SceneFactory& sceneFactory)
 {
 	// 起動時も本編開始時も、一つのLoadingSceneを共通して使います。
 	sceneFactory.RegisterScene("LOADING", []() { return std::make_unique<LoadingScene>(); });
+	// 提出用TitleはStage1を固定Cameraで表示し、Enter後は同じSceneで本編へ進みます。
+	sceneFactory.RegisterScene("TITLE", []() { return std::make_unique<Stage1>(true); });
 	sceneFactory.RegisterScene("STAGE1", []() { return std::make_unique<Stage1>(); });
 }
 
