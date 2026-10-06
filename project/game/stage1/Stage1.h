@@ -25,13 +25,14 @@ class CameraController;
 class CarryableMirror;
 class FixedMirror;
 class Player;
+class StageTitleOverlay;
 
 // 鏡パズル、開始演出、Cameraをまとめて実行するStage1本編のSceneです。
 class Stage1 : public BaseScene
 {
 public:
 	// 前方宣言した所有型を安全に生成するため、実装はStage1.cppに置きます。
-	Stage1();
+	explicit Stage1(bool startsWithTemporaryTitle = false);
 	// 前方宣言した所有型を安全に破棄するため、実装はStage1.cppに置きます。
 	~Stage1() override;
 
@@ -63,6 +64,8 @@ private:
 	bool InitializeStageMap();
 	// Player、通常追従Camera、開始演出Cameraを順に作成します。
 	bool InitializePlayerAndCamera();
+	// 提出用Titleを終えた時にも、従来のPlayer登場演出を同じ設定で開始します。
+	void BeginStageStart();
 	// 本編を所有しない自動動作確認へ、必要なStage固有データだけを渡します。
 	void InitializeGameplaySmoke();
 
@@ -92,6 +95,8 @@ private:
 	void UpdateMainCamera();
 	// 開始演出・通常追従・Event Cameraの優先順位で、Stage1のCameraを更新します。
 	void UpdateStageCamera(float deltaTime, bool isStageStartPlaying);
+	// 固定CameraのTitle中と本編の双方で、同じRenderContextへ描画対象を渡します。
+	void PrepareStageRenderObjects();
 	// Stage1の最初の描画後に、BGMの読込・開始・フェード更新を行います。
 	void UpdateStageBgm(float deltaTime);
 	// カメラが現在見ている正面方向を取得します。
@@ -185,6 +190,12 @@ private:
 	std::unique_ptr<CameraController> cameraController_;
 	// 本編開始時だけPlayerとCameraを動かす、開始演出の操作役です。
 	std::unique_ptr<StageStart> stageStart_;
+	// 提出用Titleだけで使う固定視点とSpriteを、本編のCameraとは分けて保持します。
+	const bool startsWithTemporaryTitle_ = false;
+	bool isTemporaryTitleActive_ = false;
+	Vector3 stageStartGameplayCameraPosition_{};
+	Vector3 stageStartGameplayCameraRotate_{};
+	std::unique_ptr<StageTitleOverlay> stageTitleOverlay_;
 	// stage1.jsonのstage_startから読み込む、開始演出の調整値です。
 	StageStart::Settings stageStartSettings_{};
 	// Loading完了後のStage1画面が出てから再生する、Stage1用のループBGMです。

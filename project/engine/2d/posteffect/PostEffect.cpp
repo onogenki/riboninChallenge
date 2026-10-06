@@ -1,8 +1,10 @@
 #include "PostEffect.h"
 
+#include "Logger.h"
 #include "TextureManager.h"
 
 #include <cassert>
+#include <stdexcept>
 
 void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 {
@@ -31,12 +33,22 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 
 	const std::string dissolveMaskFilePath = "Resources/debug/noise0.png";
 	const bool isLoaded = TextureManager::GetInstance()->LoadTexture(dissolveMaskFilePath);
-	assert(isLoaded);
+	// 読み込み失敗時に無効なSRV番号を使わないよう、原因の画像名を記録して初期化を止めます。
+	if (!isLoaded) {
+		const std::string message = "PostEffect: dissolve mask load failed: " + dissolveMaskFilePath;
+		Logger::Log(message);
+		throw std::runtime_error(message);
+	}
 	dissolveMaskSrvIndex_ = TextureManager::GetInstance()->GetSrvIndex(dissolveMaskFilePath);
 
 	const std::string dissolveMaskNoise1FilePath = "Resources/debug/noise1.png";
 	const bool isNoise1Loaded = TextureManager::GetInstance()->LoadTexture(dissolveMaskNoise1FilePath);
-	assert(isNoise1Loaded);
+	// 2枚目も同じ順序で確認し、未登録の画像を取得しないようにします。
+	if (!isNoise1Loaded) {
+		const std::string message = "PostEffect: dissolve mask load failed: " + dissolveMaskNoise1FilePath;
+		Logger::Log(message);
+		throw std::runtime_error(message);
+	}
 	dissolveMaskNoise1SrvIndex_ = TextureManager::GetInstance()->GetSrvIndex(dissolveMaskNoise1FilePath);
 }
 

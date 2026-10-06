@@ -46,7 +46,7 @@ Get-Content logs/startup_route_smoke.log
 
 ## CSVの番号別処理
 
-`LevelApiSmoke.vcxproj`は、CSVファイルを追加せずに`MapChipField`・`MapChipRegistry`・`StageMapChipFactory`を確認する独立プロジェクトです。ゲーム本体のSceneや保存中のstage1.jsonは変更しません。
+`LevelApiSmoke.vcxproj`は、`MapChipField`・`MapChipRegistry`・`StageMapChipFactory`と`LevelLoader`を確認する独立プロジェクトです。JSONの型検査と照明のEngine／Blender座標での保存・再読込には専用の一時フォルダを使い、ゲーム本体のSceneや保存中のstage1.jsonは変更しません。
 
 ```powershell
 # Debugと同じ手順でDevelopmentにも切り替えられます。

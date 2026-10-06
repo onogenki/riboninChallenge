@@ -11,6 +11,7 @@
 
 class Camera;
 
+// Compute Shaderで粒子を更新し、描画用バッファとEmitter設定を管理します。
 class GPUParticle
 {
 public:
@@ -32,20 +33,31 @@ public:
 		Trail,
 	};
 
+	// FrameworkとDebug Sceneで共有する本体への、所有権のないポインタを返します。
 	static GPUParticle* GetInstance() {
 		static GPUParticle instance;
 		return &instance;
 	}
 
+	// Frameworkが初期化した二つの窓口を借り、粒子用資源を作ります。SRVの空きが7枠必要です。
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+	// deltaTime秒だけEmitterを進め、発生とGPU上の粒子更新をこの順に行います。
 	void Update(float deltaTime);
+	// 指定Cameraで粒子を描きます。cameraがnullptrなら描画しません。
 	void Draw(const Camera* camera);
+	// emitterIndex番の発生位置をワールド座標で指定します。範囲外の番号は無視します。
 	void SetEmitterTranslate(uint32_t emitterIndex, const Vector3& translate);
+	// emitterIndex番の発生を有効・無効にします。範囲外の番号は無視します。
 	void SetEmitterEnabled(uint32_t emitterIndex, bool isEnabled);
+	// emitterIndex番の発生形状を指定します。範囲外の番号は無視します。
 	void SetEmitterType(uint32_t emitterIndex, EmitterType type);
+	// emitterIndex番が作る粒子の描画種類を指定します。範囲外の番号は無視します。
 	void SetEmitterParticleType(uint32_t emitterIndex, ParticleType type);
+	// 初期化後、全粒子に適用する加速度をGPU用データへ書き込みます。
 	void SetFieldAcceleration(const Vector3& acceleration) { fieldData_->acceleration = acceleration; }
+	// 初期化後、粒子Shaderへ渡す光の色・方向・強さを設定します。方向は呼び出し元の値をそのまま使います。
 	void SetDirectionalLight(const Vector4& color, const Vector3& direction, float intensity);
+	// Framework終了時に、粒子が使ったSRV番号とGPU資源を返却します。
 	void Finalize();
 
 private:
@@ -129,9 +141,18 @@ private:
 	GPUParticle(const GPUParticle&) = delete;
 	GPUParticle& operator=(const GPUParticle&) = delete;
 
+	// 粒子計算用バッファ、Shaderから見るSRV/UAV、描画・制御用バッファを依存順に準備します。
+	void CreateParticleBuffers();
+	// 五種類の粒子バッファを、同じDefault Heap・UAV状態で容量だけ変えて作ります。
+	void CreateParticleBufferResource(uint64_t sizeInBytes, Microsoft::WRL::ComPtr<ID3D12Resource>& resource) const;
+	void CreateParticleDescriptors();
+	void CreateDrawAndControlBuffers();
 	void CreateComputePipeline();
 	void CreateGraphicsPipeline();
 	void InitializeParticles();
+	// CPUでEmitterの発生時刻を決め、確定した値を使ってGPU計算を進めます。
+	void UpdateEmitterTiming(float deltaTime);
+	void DispatchParticleSimulation();
 
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;

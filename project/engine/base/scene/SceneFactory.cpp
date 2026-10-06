@@ -8,7 +8,8 @@
 SceneFactory::SceneFactory()
 {
 	// 新しいシーンは生成関数と名前をここへ登録する。
-	RegisterScene("TITLE", []() { return std::make_unique<TitleScene>(); });
+	// 12枚の画像から始まる従来のTitleは消さず、提出後も呼び戻せる名前で残します。
+	RegisterScene("TITLE_ORIGINAL", []() { return std::make_unique<TitleScene>(); });
 	// 現在の構成ではUSE_IMGUIがDebug/Developmentにだけあり、Releaseには登録しません。
 #ifdef USE_IMGUI
 	RegisterScene("DEBUG", []() { return std::make_unique<DebugScene>(); });

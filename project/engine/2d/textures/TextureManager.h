@@ -12,17 +12,20 @@
 class DirectXCommon;
 class SrvManager;
 
-//テクスチャマネージャー
+// TextureとSRV番号を一元管理し、SpriteやModelへ読込済みTextureを渡します。
 class TextureManager
 {
 public:
 	//シングルトンインスタンスの取得
 	static TextureManager* GetInstance();
 
+	// 初期化済みのDirectXとSRV管理を借り、Texture登録を始めます。
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 
+	// 所有する全TextureのSRVを返却し、登録を消します。
 	void Finalize();
 
+	// filePathの読込に成功、または登録済みならtrueを返します。失敗時は登録しません。
 	bool LoadTexture(const std::string& filePath);
 	// 保存時刻が変わったTextureだけを、同じSRV番号のまま再読込します。
 	// Frameworkから毎フレーム呼んでも、ファイルが変わらない限りGPU処理は行いません。
@@ -43,16 +46,10 @@ public:
 	}
 
 private:
-
-	static TextureManager* instance;
-
 	TextureManager() = default;
 	~TextureManager() = default;
 	TextureManager(TextureManager&) = delete;
 	TextureManager& operator=(TextureManager&) = delete;
-
-	//SRVインデックスの開始番号
-	//static uint32_t kSRVIndexTop;
 
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
@@ -72,6 +69,8 @@ private:
 
 	// 画像読込・GPU転送・SRV作成をまとめ、初回読込と再読込で共有します。
 	bool CreateTextureData(const std::string& filePath, TextureData& textureData, bool allocateSrv);
+	// 既存のSRV番号を保って再読込し、成功時だけ登録内容を差し替えます。
+	void ReloadTexture(const std::string& filePath, TextureData& textureData);
 
 	//テクスチャデータ
 	std::unordered_map<std::string, TextureData>textureDatas;

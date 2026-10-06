@@ -5,7 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
-//このゲーム用のシーン工場
+// このゲームで使うScene名と生成関数を登録し、要求されたSceneを一体作ります。
+// Sceneの寿命は受け取ったSceneManagerが管理します。
 class SceneFactory : public AbstractSceneFactory
 {
 public:

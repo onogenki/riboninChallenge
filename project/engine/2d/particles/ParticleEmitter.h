@@ -3,6 +3,7 @@
 #include "MyMath.h"
 #include "Object3d.h"
 
+// 指定間隔でParticleManagerへ発生を依頼し、粒子そのものは所有しません。
 class ParticleEmitter
 {
 public:
@@ -10,7 +11,7 @@ public:
     // ほとんどのメンバ変数を引数として受け取り、メンバ変数に書き込む
     ParticleEmitter(const std::string& name, const Transform& transform, uint32_t count, float frequency,bool receivesWind);
 
-    // 更新処理
+    // 逆再生中は発生を止め、通常時は固定時間分だけ発生時刻を進めます。
     void Update();
 
     // パーティクルの発生

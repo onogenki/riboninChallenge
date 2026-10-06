@@ -9,7 +9,8 @@
 
 namespace
 {
-	// CSVのセル前後にある空白と改行コードを取り除きます。
+	// 呼び出し元から移したCSVセルの前後にある空白と改行コードを取り除きます。
+	// 値として受けるため、呼び出し元の文字列を参照し続けません。
 	std::string Trim(std::string value)
 	{
 		const auto first = std::find_if_not(

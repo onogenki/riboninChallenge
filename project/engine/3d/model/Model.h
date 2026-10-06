@@ -15,7 +15,7 @@
 
 struct aiNode;
 
-//見た目のモデル
+// モデルファイルから頂点・材質・骨とGPU資源を作り、Object3dへ描画データを貸します。
 class Model
 {
 public:
@@ -181,6 +181,7 @@ public:
 	//アニメーションの解析
 	static Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename);
 
+	// 頂点と材質画像を読み、指定済み画像の欠損も含め準備できなければfalseを返します。
 	bool Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename);
 	bool IsLoaded() const { return vertexResource != nullptr && indexResource != nullptr && materialResource != nullptr; }
 
@@ -198,6 +199,7 @@ public:
 	void DispatchSkinning(SkinCluster& skinCluster);
 	void DrawSkinned(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride = UINT32_MAX);
 
+	// 読み込みに成功した画像だけを全材質へ適用し、失敗時は以前の設定を保ちます。
 	void SetTexture(const std::string& filePath);
 	// 色付きLightの反射だけを弱め、Texture本来の色を見えやすくします。
 	void SetSpecularIntensity(float intensity) {
@@ -222,7 +224,8 @@ public:
 	void BuildAnimationMapping(Skeleton& skeleton, const Animation& animation);
 	void ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime);
 
-	ModelData& GetModelData() { return modelData; }
+	// 描画・当たり判定・骨生成が読込済みデータを参照します。外部から頂点や骨を書き換えないようにします。
+	const ModelData& GetModelData() const { return modelData; }
 private:
 	// ファイル読込とAnimation内部でだけ使う補助関数。
 	int32_t CreateJoint(const Node& node, const std::optional<int32_t>& parent, std::vector<Joint>& joints);

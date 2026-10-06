@@ -65,6 +65,8 @@ bool Object3dGpuData::BindForObjectDraw(ID3D12GraphicsCommandList* commandList)
 	DrawMatrices& matrices = frame.draws[frame.nextDraw++];
 	*matrices.transformData = *transformationMatrixData_;
 	*matrices.cameraData = *cameraData_;
+	// Root Parameter 3・5・6はPixel Shaderのb1・b3・b4へ対応し、三種類のLightを各Objectへ渡します。
+	// 行列とCamera位置だけは描画ごとに固定し、鏡Cameraで同じObjectを描いても値が混ざらないようにします。
 	commandList->SetGraphicsRootConstantBufferView(
 		1,
 		matrices.transformResource->GetGPUVirtualAddress());

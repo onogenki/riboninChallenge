@@ -87,6 +87,16 @@ int main(int argc, char** argv)
 	audio->Update();
 	audio->Unload();
 	MFShutdown();
+	// 解放した音声装置をもう一度作り、前のVoiceや音源を引きずらず再利用できるか確認します。
+	audio->Initialize();
+	Check(audio->LoadFile(filename), "reload after audio reinitialization", failures);
+	const Audio::VoiceId restartedVoiceId = audio->PlayWaveLoop(filename, 0.0f);
+	Check(restartedVoiceId != Audio::kInvalidVoiceId, "play after audio reinitialization", failures);
+	if (restartedVoiceId != Audio::kInvalidVoiceId) {
+		Check(audio->StopWave(restartedVoiceId), "stop reinitialized voice", failures);
+	}
+	audio->Unload();
+	MFShutdown();
 	CoUninitialize();
 	std::cout << (failures == 0 ? "SUCCESS" : "FAILURE") << ": failures=" << failures << '\n';
 	return failures == 0 ? 0 : 1;

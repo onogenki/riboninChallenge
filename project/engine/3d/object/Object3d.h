@@ -13,7 +13,7 @@ class Object3dGpuData;
 class Object3dFactory;
 class Camera;
 
-//3Dオブジェクト
+// 一体分のTransform・Animation・Light設定を所有し、共有Modelを借りて描画します。
 class Object3d
 {
 public:

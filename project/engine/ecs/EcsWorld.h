@@ -53,6 +53,7 @@ struct BoxColliderComponent {
 class TransformSyncSystem;
 class BoxCollisionSystem;
 
+// DebugSceneのEntityとComponentを保持し、描画物への参照を対応付けます。
 class World {
 public:
 	// Creates an entity and its mandatory name and transform components.

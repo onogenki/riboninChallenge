@@ -6,11 +6,13 @@
 #include <wrl.h>
 #include <string>
 
-//3Dオブジェクト共通部
+// 通常モデル・骨付きモデル・鏡・SkyBoxに共通の描画Pipelineを所有します。
+// 個々のObject3dの位置やAnimation状態は持たず、描画時に必要な設定を切り替えます。
 class Object3dCommon
 {
 public:
 
+	// Sceneが共有する描画設定本体への、所有権のないポインタを返します。
 	static Object3dCommon* GetInstance() {
 		static Object3dCommon instance;
 		return &instance;
@@ -19,32 +21,36 @@ public:
 	Object3dCommon(const Object3dCommon&) = delete;
 	Object3dCommon& operator=(const Object3dCommon&) = delete;
 
+	// SceneからDirectX操作窓口を借り、通常・骨付き・鏡・SkyBox用Pipelineを作ります。
 	void Initialize(DirectXCommon* dxCommon);
 
-
-	///getter
+	// GPU資源作成に使う、所有権のないDirectX操作窓口を返します。
 	DirectXCommon* GetDxCommon() const { return dxCommon_; }
+	// Sceneが設定した既定Cameraへの、所有権のないポインタを返します。
 	Camera* GetDefaultCamera() const { return defaultCamera_; }
+	// 環境反射に使用するTextureのパスを、変更せず参照できる形で返します。
 	const std::string& GetEnvironmentTexturePath() const { return environmentTexturePath_; }
 
-	//共通描画設定
+	// 通常モデル用のRoot Signature・Pipeline・三角形描画を設定します。
 	void SetCommonDrawSetting();
 	// 壁の奥だけにObjectの半透明シルエットを描く共通Pipelineを設定します。
 	void SetOccludedSilhouetteDrawSetting();
+	// 比較・検証用の骨変形Compute Pipelineを設定します。通常の骨付き描画では使いません。
 	void SetSkinningComputeSetting();
-	// 反射Textureを平面へ投影する固定鏡専用の描画設定
+	// 反射Textureを平面へ投影する固定鏡専用の描画設定へ切り替えます。
 	void SetMirrorDrawSetting();
 
-	//setter
+	// Scene所有のCameraを既定値として借ります。Cameraの寿命はScene側が管理します。
 	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
+	// 環境反射用Textureのパスを保存します。空文字ならObject3dは環境反射を指定しません。
 	void SetEnvironmentTexturePath(const std::string& path) {
 		environmentTexturePath_ = path;
 	}
 
-	//スキニング用の共通描画設定
+	// 骨付きモデルのVertex Shader描画用Pipelineへ切り替えます。
 	void SetSkinningCommonDrawSetting();
 
-	// Skybox用のルートシグネチャとパイプラインを取得するゲッター
+	// このクラスが所有するSkyBox用設定への、所有権のないポインタを返します。
 	ID3D12RootSignature* GetSkyboxRootSignature() const { return skyboxRootSignature_.Get(); }
 	ID3D12PipelineState* GetSkyboxPipelineState() const { return skyboxGraphicsPipelineState_.Get(); }
 

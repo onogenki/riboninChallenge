@@ -17,6 +17,29 @@
 
 # Build results
 generated/
+x64/
+**/DirectXTex/Bin/
+*.pch
+*.gch
+*.pzh
+*.pdb
+*.idb
+*.ilk
+*.exp
+*.map
+*.exe
+*.app
+*.out
+*.dll
+*.so
+*.dylib
+*.o
+*.a
+*.lib
+*.ipch
+*.iobj
+*.ipdb
+*.tlog
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/
@@ -79,14 +102,14 @@ ipch/
 # TFS 2012 Local Workspace
 $tf/
 
-# assimpの配布ライブラリは、Debug/Releaseの除外ルールから外して共有する。
+# assimpの配布ライブラリは、成果物の拡張子除外から外して共有する。
 !project/externals/assimp/lib/
 !project/externals/assimp/lib/Debug/
 !project/externals/assimp/lib/Debug/**
 !project/externals/assimp/lib/Release/
 !project/externals/assimp/lib/Release/**
 
-# OBJモデルは、配置場所を問わず共有する。
+# OBJモデルは、配置場所を問わず共有する。ビルド中間ファイルは出力フォルダで除外する。
 !*.obj
 
 # Guidance Automation Toolkit
@@ -335,4 +358,3 @@ project/imgui_docking.ini
 # 実行時の撮影画像は各自のローカル記録です。フォルダの.gitkeepだけ共有します。
 project/resources/Captures/Screenshots/*
 !project/resources/Captures/Screenshots/.gitkeep
-generated/

@@ -1,5 +1,6 @@
 #include "Model.h"
 #include "DirectXCommon.h"
+#include "Logger.h"
 #include "TextureManager.h"
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
@@ -34,6 +35,7 @@ Model::Node Model::ReadNode(aiNode* node)
 	return result;
 }
 
+// モデル本体と材質画像を順に準備し、画像を読めないモデルは登録させないようにします。
 bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename)
 {
 
@@ -52,14 +54,24 @@ bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 	for (MaterialData& material : modelData.materials)
 	{
 		const std::filesystem::path texturePath = material.textureFilePath;
+		// 画像指定のない材質だけ、従来どおり確認用画像を使います。
 		if (material.textureFilePath.empty() ||
 			material.textureFilePath.find("None") != std::string::npos ||
-			material.textureFilePath.front() == '*' ||
-			!std::filesystem::exists(texturePath))
+			material.textureFilePath.front() == '*')
 		{
 			material.textureFilePath = "Resources/debug/uvChecker.png";
+		} else {
+			// 指定された画像の欠損は代替画像で隠さず、モデルの読込失敗として伝えます。
+			std::error_code error;
+			if (!std::filesystem::exists(texturePath, error)) {
+				Logger::Log("Model: referenced texture unavailable: " + material.textureFilePath);
+				return false;
+			}
 		}
-		TextureManager::GetInstance()->LoadTexture(material.textureFilePath);
+		if (!TextureManager::GetInstance()->LoadTexture(material.textureFilePath)) {
+			Logger::Log("Model: texture load failed: " + material.textureFilePath);
+			return false;
+		}
 	}
 	return true;
 }
@@ -102,9 +114,13 @@ void Model::DrawGeometry()
 	}
 }
 
+// 画像を読み込めた時だけ全材質を差し替え、失敗時は既存の画像パスを残します。
 void Model::SetTexture(const std::string& filePath)
-{//新しいテクスチャを読み込んで
-	TextureManager::GetInstance()->LoadTexture(filePath);
+{
+	if (!TextureManager::GetInstance()->LoadTexture(filePath)) {
+		Logger::Log("Model: texture load failed: " + filePath);
+		return;
+	}
 	for (MaterialData& material : modelData.materials)
 	{
 		material.textureFilePath = filePath;

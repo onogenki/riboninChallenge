@@ -34,13 +34,15 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 	animationReturnState_.Reset();
 }
 
+// 一体のTransform履歴・Animation・描画行列を、フレームの経過時間で順に更新します。
 void Object3d::Update()
 {
 	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
 	transformPlayback_.Update(transform, deltaTime);
 
 	if (model_ && isAnimating_ && currentAnimation_.duration > 0.0f)
-	{// 実時間を 1/60 秒ずつ進める
+	{
+		// 固定の1/60秒ではなく、今回のフレームで測った時間だけ再生位置を進めます。
 		if (animationReturnState_.IsReturning()) {
 			animationTime_ -= deltaTime;
 			if (animationTime_ <= 0.0f) {
@@ -300,10 +302,13 @@ const Object3d::DirectionalLight& Object3d::GetDirectionalLight() const
 // SkeletalモデルだけにSkinClusterとSkeletonを作り、Animation再生できる状態へ初期化します。
 void Object3d::InitializeAnimation()
 {
-	//既に同じモデルがセットされている場合は、再生成を防ぐために何もせず抜ける
-	if (!model_)return;
+	// モデルが未設定なら骨を作れないため、既存のAnimation状態を触らずに戻ります。
+	if (!model_) {
+		return;
+	}
+	const Model::ModelData& modelData = model_->GetModelData();
 	ReleaseSkinClusterDescriptors();
-	if (model_->GetModelData().skinClusterData.empty()) {
+	if (modelData.skinClusterData.empty()) {
 		skeleton_ = {};
 		skinCluster_ = {};
 		isSkeletal_ = false;
@@ -312,7 +317,7 @@ void Object3d::InitializeAnimation()
 	}
 
 	//モデルの階層構造からスケルトンを生成
-	skeleton_ = model_->CreateSkeleton(model_->GetModelData().rootNode);
+	skeleton_ = model_->CreateSkeleton(modelData.rootNode);
 	//ジョイントがあればスケルトンモデルとして扱う
 	isSkeletal_ = !skeleton_.joints.empty();
 
@@ -331,7 +336,7 @@ void Object3d::InitializeAnimation()
 		auto srvHeap = SrvManager::GetInstance()->GetDescriptorHeap();
 		uint32_t descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		skinCluster_ = model_->CreateSkinCluster(device, skeleton_, model_->GetModelData(), srvHeap, descriptorSize);
+		skinCluster_ = model_->CreateSkinCluster(device, skeleton_, modelData, srvHeap, descriptorSize);
 		model_->Update(skeleton_);
 		model_->Update(skinCluster_, skeleton_);
 	}

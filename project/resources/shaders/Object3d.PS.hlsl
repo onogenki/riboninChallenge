@@ -97,7 +97,7 @@ PixelShaderOutput main(
     ///
     ///平行光源
     ///
-    // ライト方向
+    // directionは面から光源へ向かう向きです。法線との内積で、面に届く割合を求めます。
     
     float32_t3 L = gDirectionalLight.direction;
     float cosDirectional = saturate(dot(N, L));
@@ -126,7 +126,7 @@ PixelShaderOutput main(
     ///点光源の計算
     ///
     
-    //入射光の方向
+    // 点光源は位置を持つため、光源からピクセルへの向きと距離を毎回求めます。
     
     float32_t3 pointLightDirection = normalize(input.worldPosition - gPointLight.position);
     
@@ -162,7 +162,8 @@ PixelShaderOutput main(
             continue;
         }
 
-        // ライトから頂点への方向、距離、円錐の内側にいる割合を求めます。
+        // ライトからピクセルへの方向、距離、円錐の内側にいる割合を求めます。
+        // intensityかdistanceが0の枠は未使用として飛ばし、16枠の配列を毎回安全に走査します。
         float32_t3 spotLightDirectionOnSurface = normalize(input.worldPosition - spotLight.position);
         float distanceSpot = length(spotLight.position - input.worldPosition);
         float attenuationFactor = pow(saturate(-distanceSpot / spotLight.distance + 1.0f), spotLight.decay);

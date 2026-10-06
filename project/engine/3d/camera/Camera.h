@@ -2,6 +2,7 @@
 #include "Transform.h"
 #include "Matrix4x4.h"
 
+// 位置と向きから、描画に必要なビュー行列と透視投影行列を更新します。
 class Camera
 {
 public:

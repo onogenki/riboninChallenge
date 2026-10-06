@@ -14,6 +14,7 @@ enum class InputDevice
 	Gamepad
 };
 
+// キーボード・マウス・ゲームパッドの状態をフレームごとに取得します。
 class Input
 {
 public:

@@ -46,10 +46,11 @@ void LoadingScene::InitializeLoadingSprite()
 // 次Sceneの初期化中も、直前に描いた白画面がウィンドウへ残ります。
 void LoadingScene::Update()
 {
-	if (!hasRequestedNextScene_) {
+	SceneManager* sceneManager = SceneManager::GetInstance();
+	// 切替待機中は予約できないため、Loadingを描画しながら次の受付フレームを待ちます。
+	if (!hasRequestedNextScene_ && !sceneManager->HasPendingScene()) {
 		// 通常起動はTitleへ、本編開始ではSceneManagerが指定したStage1などへ進みます。
-		hasRequestedNextScene_ = SceneManager::GetInstance()->ChangeScene(
-			nextSceneName_);
+		hasRequestedNextScene_ = sceneManager->ChangeScene(nextSceneName_);
 	}
 
 	if (loadingSprite_) {

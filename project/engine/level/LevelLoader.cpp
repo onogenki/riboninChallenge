@@ -1,6 +1,5 @@
 #include "LevelLoader.h"
 #include <fstream>
-#include <cassert>
 #include <filesystem>
 #include <iomanip>
 #include <memory>
@@ -37,6 +36,96 @@ namespace
 			value[2].get<float>(),
 			value[1].get<float>(),
 		};
+	}
+
+	// LightingをJSONに書かれた順に読み、座標系ごとのVector3変換を共通の関数へ任せます。
+	// 型が不正なら例外を呼び出し元のLoadへ渡し、Stageの不完全な再読込を防ぎます。
+	void LoadLighting(
+		const nlohmann::json& lighting,
+		LevelLoader::LightingData& lightingData,
+		bool usesEngineCoordinates)
+	{
+		if (lighting.contains("directional")) {
+			const nlohmann::json& directional = lighting["directional"];
+			lightingData.directionalColor = LoadVector3(directional["color"], usesEngineCoordinates);
+			lightingData.directionalDirection = LoadVector3(directional["direction"], usesEngineCoordinates);
+			lightingData.directionalIntensity = directional.value("intensity", 0.3f);
+			if (directional.contains("ambient")) {
+				const nlohmann::json& ambient = directional["ambient"];
+				lightingData.ambientColor = LoadVector3(ambient["color"], usesEngineCoordinates);
+				lightingData.ambientIntensity = ambient.value("intensity", 0.0f);
+			}
+		}
+		if (lighting.contains("point")) {
+			const nlohmann::json& point = lighting["point"];
+			lightingData.pointColor = LoadVector3(point["color"], usesEngineCoordinates);
+			lightingData.pointPosition = LoadVector3(point["position"], usesEngineCoordinates);
+			lightingData.pointIntensity = point.value("intensity", 5.0f);
+			lightingData.pointRadius = point.value("radius", 20.0f);
+			lightingData.pointDecay = point.value("decay", 1.0f);
+		}
+		if (lighting.contains("spot_lights")) {
+			for (const nlohmann::json& spotLight : lighting["spot_lights"]) {
+				LevelLoader::SpotLightData spotLightData{};
+				spotLightData.name = spotLight.value("name", "SpotLight");
+				spotLightData.color = LoadVector3(spotLight["color"], usesEngineCoordinates);
+				spotLightData.position = LoadVector3(spotLight["position"], usesEngineCoordinates);
+				spotLightData.intensity = spotLight.value("intensity", 0.0f);
+				spotLightData.direction = LoadVector3(spotLight["direction"], usesEngineCoordinates);
+				spotLightData.distance = spotLight.value("distance", 0.0f);
+				spotLightData.decay = spotLight.value("decay", 1.0f);
+				spotLightData.cosAngle = spotLight.value("cos_angle", 0.5f);
+				spotLightData.cosFalloffStart = spotLight.value("cos_falloff_start", 0.8f);
+				lightingData.spotLights.push_back(std::move(spotLightData));
+			}
+		}
+	}
+
+	// 読込時のY/Z入替を保存時に戻し、Blender座標の照明も再読込で同じ値にします。
+	nlohmann::json SaveLightingVector3(const Vector3& value, bool usesEngineCoordinates)
+	{
+		if (usesEngineCoordinates) {
+			return SaveVector3(value);
+		}
+		return SaveVector3({ value.x, value.z, value.y });
+	}
+
+	// Stageの照明設定を、Engine座標では従来と同じ値、Blender座標では逆変換した値で保存します。
+	// Save本体はファイル保存の順番だけを管理できるようにします。
+	nlohmann::json SaveLighting(const LevelLoader::LightingData& lightingData, bool usesEngineCoordinates)
+	{
+		nlohmann::json lighting;
+		lighting["directional"] = {
+			{ "color", SaveLightingVector3(lightingData.directionalColor, usesEngineCoordinates) },
+			{ "direction", SaveLightingVector3(lightingData.directionalDirection, usesEngineCoordinates) },
+			{ "intensity", lightingData.directionalIntensity },
+			{ "ambient", {
+				{ "color", SaveLightingVector3(lightingData.ambientColor, usesEngineCoordinates) },
+				{ "intensity", lightingData.ambientIntensity },
+			} },
+		};
+		lighting["point"] = {
+			{ "color", SaveLightingVector3(lightingData.pointColor, usesEngineCoordinates) },
+			{ "position", SaveLightingVector3(lightingData.pointPosition, usesEngineCoordinates) },
+			{ "intensity", lightingData.pointIntensity },
+			{ "radius", lightingData.pointRadius },
+			{ "decay", lightingData.pointDecay },
+		};
+		lighting["spot_lights"] = nlohmann::json::array();
+		for (const LevelLoader::SpotLightData& spotLight : lightingData.spotLights) {
+			lighting["spot_lights"].push_back({
+				{ "name", spotLight.name },
+				{ "color", SaveLightingVector3(spotLight.color, usesEngineCoordinates) },
+				{ "position", SaveLightingVector3(spotLight.position, usesEngineCoordinates) },
+				{ "intensity", spotLight.intensity },
+				{ "direction", SaveLightingVector3(spotLight.direction, usesEngineCoordinates) },
+				{ "distance", spotLight.distance },
+				{ "decay", spotLight.decay },
+				{ "cos_angle", spotLight.cosAngle },
+				{ "cos_falloff_start", spotLight.cosFalloffStart },
+			});
+		}
+		return lighting;
 	}
 
 	nlohmann::json SaveObjectData(
@@ -156,6 +245,7 @@ namespace
 	}
 }
 
+// 編集中の不完全なJSONでも現在のStageを壊さないよう、読めないデータはnullptrで返します。
 std::unique_ptr<LevelLoader::LevelData> LevelLoader::Load(const std::string& fileName)
 {
 	const std::string fullpath = "resources/levels/" + fileName + ".json";
@@ -179,23 +269,18 @@ std::unique_ptr<LevelLoader::LevelData> LevelLoader::Load(const std::string& fil
 	}
 
 	if (!deserialized.is_object() || !deserialized.contains("name") ||
-		deserialized.value("name", "") != "scene" ||
+		!deserialized["name"].is_string() || deserialized["name"] != "scene" ||
 		!deserialized.contains("objects") || !deserialized["objects"].is_array()) {
 		return nullptr;
 	}
 
-	//正しいレベルエディタファイルかチェック
-	assert(deserialized.is_object());
-	assert(deserialized.contains("name"));
-	assert(deserialized["name"].get<std::string>() == "scene");
-	assert(deserialized.contains("objects"));
-
 	//レベルエディタ格納インスタンスを生成
 	auto levelData = std::make_unique<LevelData>();
-	levelData->coordinateSystem = deserialized.value("coordinate_system", "blender");
-	const bool usesEngineCoordinates = levelData->coordinateSystem == "engine";
 
 	try {
+		// 座標系もJSON由来なので、型が不正なら他の読込項目と同じ失敗として扱います。
+		levelData->coordinateSystem = deserialized.value("coordinate_system", "blender");
+		const bool usesEngineCoordinates = levelData->coordinateSystem == "engine";
 		if (deserialized.contains("stage_start")) {
 			const nlohmann::json& stageStart = deserialized["stage_start"];
 			levelData->hasStageStart = true;
@@ -209,40 +294,7 @@ std::unique_ptr<LevelLoader::LevelData> LevelLoader::Load(const std::string& fil
 		if (deserialized.contains("lighting")) {
 			const nlohmann::json& lighting = deserialized["lighting"];
 			levelData->hasLighting = true;
-			if (lighting.contains("directional")) {
-				const nlohmann::json& directional = lighting["directional"];
-				levelData->lighting.directionalColor = LoadVector3(directional["color"], usesEngineCoordinates);
-				levelData->lighting.directionalDirection = LoadVector3(directional["direction"], usesEngineCoordinates);
-				levelData->lighting.directionalIntensity = directional.value("intensity", 0.3f);
-				if (directional.contains("ambient")) {
-					const nlohmann::json& ambient = directional["ambient"];
-					levelData->lighting.ambientColor = LoadVector3(ambient["color"], usesEngineCoordinates);
-					levelData->lighting.ambientIntensity = ambient.value("intensity", 0.0f);
-				}
-			}
-			if (lighting.contains("point")) {
-				const nlohmann::json& point = lighting["point"];
-				levelData->lighting.pointColor = LoadVector3(point["color"], usesEngineCoordinates);
-				levelData->lighting.pointPosition = LoadVector3(point["position"], usesEngineCoordinates);
-				levelData->lighting.pointIntensity = point.value("intensity", 5.0f);
-				levelData->lighting.pointRadius = point.value("radius", 20.0f);
-				levelData->lighting.pointDecay = point.value("decay", 1.0f);
-			}
-			if (lighting.contains("spot_lights")) {
-				for (const nlohmann::json& spotLight : lighting["spot_lights"]) {
-					SpotLightData spotLightData{};
-					spotLightData.name = spotLight.value("name", "SpotLight");
-					spotLightData.color = LoadVector3(spotLight["color"], usesEngineCoordinates);
-					spotLightData.position = LoadVector3(spotLight["position"], usesEngineCoordinates);
-					spotLightData.intensity = spotLight.value("intensity", 0.0f);
-					spotLightData.direction = LoadVector3(spotLight["direction"], usesEngineCoordinates);
-					spotLightData.distance = spotLight.value("distance", 0.0f);
-					spotLightData.decay = spotLight.value("decay", 1.0f);
-					spotLightData.cosAngle = spotLight.value("cos_angle", 0.5f);
-					spotLightData.cosFalloffStart = spotLight.value("cos_falloff_start", 0.8f);
-					levelData->lighting.spotLights.push_back(std::move(spotLightData));
-				}
-			}
+			LoadLighting(lighting, levelData->lighting, usesEngineCoordinates);
 		}
 		LoadObjects(deserialized["objects"], levelData->objects, usesEngineCoordinates);
 	} catch (const nlohmann::json::exception&) {
@@ -252,6 +304,7 @@ std::unique_ptr<LevelLoader::LevelData> LevelLoader::Load(const std::string& fil
 	return levelData;
 }
 
+// 開始演出・照明・配置物を従来の順にJSONへまとめ、一時ファイル経由で保存します。
 bool LevelLoader::Save(const std::string& fileName, const LevelData& levelData)
 {
 	const std::string fullPath = "resources/levels/" + fileName + ".json";
@@ -272,38 +325,7 @@ bool LevelLoader::Save(const std::string& fileName, const LevelData& levelData)
 		};
 	}
 	if (levelData.hasLighting) {
-		nlohmann::json lighting;
-		lighting["directional"] = {
-			{ "color", SaveVector3(levelData.lighting.directionalColor) },
-			{ "direction", SaveVector3(levelData.lighting.directionalDirection) },
-			{ "intensity", levelData.lighting.directionalIntensity },
-			{ "ambient", {
-				{ "color", SaveVector3(levelData.lighting.ambientColor) },
-				{ "intensity", levelData.lighting.ambientIntensity },
-			} },
-		};
-		lighting["point"] = {
-			{ "color", SaveVector3(levelData.lighting.pointColor) },
-			{ "position", SaveVector3(levelData.lighting.pointPosition) },
-			{ "intensity", levelData.lighting.pointIntensity },
-			{ "radius", levelData.lighting.pointRadius },
-			{ "decay", levelData.lighting.pointDecay },
-		};
-		lighting["spot_lights"] = nlohmann::json::array();
-		for (const SpotLightData& spotLight : levelData.lighting.spotLights) {
-			lighting["spot_lights"].push_back({
-				{ "name", spotLight.name },
-				{ "color", SaveVector3(spotLight.color) },
-				{ "position", SaveVector3(spotLight.position) },
-				{ "intensity", spotLight.intensity },
-				{ "direction", SaveVector3(spotLight.direction) },
-				{ "distance", spotLight.distance },
-				{ "decay", spotLight.decay },
-				{ "cos_angle", spotLight.cosAngle },
-				{ "cos_falloff_start", spotLight.cosFalloffStart },
-			});
-		}
-		serialized["lighting"] = std::move(lighting);
+		serialized["lighting"] = SaveLighting(levelData.lighting, usesEngineCoordinates);
 	}
 	serialized["objects"] = nlohmann::json::array();
 	for (const ObjectData& objectData : levelData.objects) {

@@ -45,7 +45,7 @@ void SceneManager::ApplyPendingSceneChange()
 	currentSceneName_ = pendingSceneName_;
 	pendingSceneName_.clear();
 	scene_->Initialize();
-	sceneChangeCooldownFrames_ = 6;
+	sceneChangeCooldownFrames_ = kSceneChangeCooldownFrames;
 	isChangingScene_ = false;
 }
 

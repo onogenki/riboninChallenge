@@ -1,12 +1,144 @@
+#include "LevelLoader.h"
 #include "MapChipField.h"
 #include "MapChipRegistry.h"
 #include "StageMapObjectIndex.h"
 #include "StageMapChipFactory.h"
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 
-// CSVを作らず、空白マス・番号別振分け・B0のCollider値を一緒に確認します。
+namespace
+{
+	// JSONから読み込んだVector3の各成分を、軸入替も含めて比較します。
+	bool MatchesVector3(const Vector3& actual, const Vector3& expected)
+	{
+		return actual.x == expected.x && actual.y == expected.y && actual.z == expected.z;
+	}
+
+	// Blender座標の照明を読み取った後、各Lightの値が期待通りか比較します。
+	bool MatchesExpectedLighting(const LevelLoader::LightingData& light)
+	{
+		if (light.spotLights.size() != 1) {
+			return false;
+		}
+		const LevelLoader::SpotLightData& spot = light.spotLights.front();
+		return MatchesVector3(light.directionalColor, { 1.0f, 3.0f, 2.0f }) &&
+			MatchesVector3(light.directionalDirection, { 4.0f, 6.0f, 5.0f }) &&
+			light.directionalIntensity == 0.25f &&
+			MatchesVector3(light.ambientColor, { 7.0f, 9.0f, 8.0f }) &&
+			light.ambientIntensity == 0.125f &&
+			MatchesVector3(light.pointColor, { 10.0f, 12.0f, 11.0f }) &&
+			MatchesVector3(light.pointPosition, { 13.0f, 15.0f, 14.0f }) &&
+			light.pointIntensity == 2.5f && light.pointRadius == 16.0f && light.pointDecay == 0.75f &&
+			spot.name == "Key" &&
+			MatchesVector3(spot.color, { 16.0f, 18.0f, 17.0f }) &&
+			MatchesVector3(spot.position, { 19.0f, 21.0f, 20.0f }) &&
+			spot.intensity == 3.0f &&
+			MatchesVector3(spot.direction, { 22.0f, 24.0f, 23.0f }) &&
+			spot.distance == 25.0f &&
+			spot.decay == 0.5f && spot.cosAngle == 0.75f && spot.cosFalloffStart == 0.875f;
+	}
+
+	// 一時フォルダだけを使い、JSONの型検査・照明読込・Engine座標での保存を確認します。
+	bool CheckLevelJsonValidationAndLighting()
+	{
+		namespace fs = std::filesystem;
+		std::error_code error;
+		const fs::path originalDirectory = fs::current_path(error);
+		if (error) {
+			return false;
+		}
+		const fs::path temporaryDirectory = fs::temp_directory_path(error) /
+			("ribonin_level_smoke_" +
+				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		if (error || !fs::create_directory(temporaryDirectory, error)) {
+			return false;
+		}
+
+		const fs::path resourcesDirectory = temporaryDirectory / "resources";
+		const fs::path levelsDirectory = resourcesDirectory / "levels";
+		const fs::path jsonPath = levelsDirectory / "Smoke.json";
+		const fs::path temporaryJsonPath = levelsDirectory / "Smoke.json.tmp";
+		bool passed = false;
+		try {
+			fs::create_directories(levelsDirectory);
+			fs::current_path(temporaryDirectory);
+			const auto loadMatches = [&](const char* jsonText, bool shouldLoad)
+			{
+				std::ofstream file(jsonPath, std::ios::trunc);
+				file << jsonText;
+				file.close();
+				if (!file) {
+					return false;
+				}
+				return static_cast<bool>(LevelLoader::Load("Smoke")) == shouldLoad;
+			};
+
+			passed = loadMatches(R"({"name":17,"objects":[]})", false) &&
+				loadMatches(R"({"name":"scene","coordinate_system":17,"objects":[]})", false) &&
+				loadMatches(R"({"name":"scene","coordinate_system":"engine","objects":[]})", true);
+			// 照明を独立して読み、Blender座標系のY/Z変換と数値の保持を確認します。
+			std::ofstream lightingFile(jsonPath, std::ios::trunc);
+			lightingFile << R"({
+				"name": "scene", "objects": [],
+				"lighting": {
+					"directional": {
+						"color": [1, 2, 3], "direction": [4, 5, 6], "intensity": 0.25,
+						"ambient": {"color": [7, 8, 9], "intensity": 0.125}
+					},
+					"point": {
+						"color": [10, 11, 12], "position": [13, 14, 15],
+						"intensity": 2.5, "radius": 16, "decay": 0.75
+					},
+					"spot_lights": [{
+						"name": "Key", "color": [16, 17, 18], "position": [19, 20, 21],
+						"intensity": 3, "direction": [22, 23, 24], "distance": 25,
+						"decay": 0.5, "cos_angle": 0.75, "cos_falloff_start": 0.875
+					}]
+				}
+			})";
+			lightingFile.close();
+			const std::unique_ptr<LevelLoader::LevelData> loaded = LevelLoader::Load("Smoke");
+			if (!lightingFile || !loaded || !loaded->hasLighting || !MatchesExpectedLighting(loaded->lighting)) {
+				passed = false;
+			} else {
+				// Stage1と同じEngine座標で保存し、全Lightの値を再読込でも保持します。
+				LevelLoader::LevelData engineLevel;
+				engineLevel.coordinateSystem = "engine";
+				engineLevel.hasLighting = true;
+				engineLevel.lighting = loaded->lighting;
+				const bool saved = LevelLoader::Save("Smoke", engineLevel);
+				const std::unique_ptr<LevelLoader::LevelData> reloaded = saved ? LevelLoader::Load("Smoke") : nullptr;
+				passed = passed && saved && reloaded && reloaded->hasLighting &&
+					MatchesExpectedLighting(reloaded->lighting);
+				// Blender座標で読み込んだ照明も、保存・再読込後に同じ値へ戻る必要があります。
+				const bool blenderSaved = LevelLoader::Save("Smoke", *loaded);
+				const std::unique_ptr<LevelLoader::LevelData> blenderReloaded =
+					blenderSaved ? LevelLoader::Load("Smoke") : nullptr;
+				passed = passed && blenderSaved && blenderReloaded && blenderReloaded->hasLighting &&
+					MatchesExpectedLighting(blenderReloaded->lighting);
+			}
+		} catch (...) {
+			passed = false;
+		}
+
+		fs::current_path(originalDirectory, error);
+		const bool restoredDirectory = !error;
+		bool cleanedUp = true;
+		// 作成した既知のパスだけを内側から消し、ほかの一時ファイルには触れません。
+		for (const fs::path& path : { temporaryJsonPath, jsonPath, levelsDirectory, resourcesDirectory, temporaryDirectory }) {
+			error.clear();
+			fs::remove(path, error);
+			cleanedUp = !error && cleanedUp;
+		}
+		return passed && restoredDirectory && cleanedUp;
+	}
+}
+
+// CSVの番号別処理とレベルJSONの失敗契約を、Sceneを起動せずに確認します。
 int main()
 {
 	int failures = 0;
@@ -82,6 +214,8 @@ int main()
 	}
 	check(index.GetPlayerStart() && index.GetPlayerStart()->translation.x == 7.0f,
 		"editing PlayerStart updates the LevelData read by the stage");
+	check(CheckLevelJsonValidationAndLighting(),
+		"invalid JSON is rejected; lighting survives Engine and Blender saves");
 	std::cout << (failures == 0 ? "SUCCESS" : "FAILURE") << ": failures=" << failures << '\n';
 	return failures == 0 ? 0 : 1;
 }

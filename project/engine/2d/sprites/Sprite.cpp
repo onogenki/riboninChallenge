@@ -20,7 +20,8 @@ void Sprite::AdjustTextureSize()
 
 }
 
-void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
+// 画像パスはSetTextureで参照するだけなので、初期化時の不要なコピーを避けます。
+void Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFilePath)
 {	 
 	position = { 0.0f, 0.0f };
 	rotation = 0.0f;
@@ -35,9 +36,9 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	//頂点リソースを作る
 	vertexResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(VertexData) * 4);
 
-	//リリースの先頭のアドレスから使う
+	//頂点リソースの先頭のGPUアドレスを描画に使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
-	//使用するリソースのサイズは頂点3つ分のサイズ
+	//四角形を共有頂点4つで表すため、その4つ分のサイズを指定する
 	vertexBufferView.SizeInBytes = sizeof(VertexData) * 4;
 	//1頂点あたりのサイズ
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
@@ -45,22 +46,10 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	//書き込むためのアドレスを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
-	//1枚目の三角形
-	//左下
-	//vertexData[0].position = { 0.0f,1.0f,0.0f,1.0f };
-	//vertexData[0].texcoord = { 0.0f,1.0f };
+	//各頂点の法線を初期化します。座標とUVはUpdateでサイズに合わせて更新します。
 	vertexData[0].normal = { 0.0f,0.0f,-1.0f };
-	//左上
-	//vertexData[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	//vertexData[1].texcoord = { 0.0f,0.0f };
 	vertexData[1].normal = { 0.0f,0.0f,-1.0f };
-	//右下
-	//vertexData[2].position = { 1.0f,1.0f,0.0f,1.0f };
-	//vertexData[2].texcoord = { 1.0f,1.0f };
 	vertexData[2].normal = { 0.0f,0.0f,-1.0f };
-	//右上
-	//vertexData[3].position = { 1.0f, 0.0f, 0.0f, 1.0f };
-	//vertexData[3].texcoord = { 1.0f,0.0f };
 	vertexData[3].normal = { 0.0f,0.0f,-1.0f };
 
 	indexResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * 6);
@@ -76,12 +65,12 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 	indexData[0] = 0;  indexData[1] = 1;   indexData[2] = 2;
 	indexData[3] = 1;  indexData[4] = 3;   indexData[5] = 2;
 
-	//マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
+	//色とUV変換を保持するMaterial全体のリソースを作る
 	materialResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(Material));
 	//書き込むためのアドレスを取得
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
 
-	//今回は赤を書き込んでみる
+	//Texture本来の色を使えるよう、乗算色を白にしておく
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	materialData->enableLighting = false;
 	materialData->uvTransform = MakeIdentity4x4();
@@ -101,9 +90,6 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 
 	uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
-
-	//単位行列を書き込んでおく
-	//textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
 
 	SetTexture(textureFilePath);
 }

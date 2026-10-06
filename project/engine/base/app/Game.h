@@ -4,6 +4,7 @@
 #include "StartupRouteSmoke.h"
 #include <string>
 
+// Frameworkの開始・更新・描画順に、Sceneと起動確認を組み込みます。
 class Game : public Framework
 {
 public:

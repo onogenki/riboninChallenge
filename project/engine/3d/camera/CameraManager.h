@@ -2,6 +2,8 @@
 #include <string>
 #include "Camera.h"
 #include <unordered_map>
+// Sceneが所有するCameraを名前で登録し、描画に使うCameraを選びます。
+// 登録ポインタの所有権は受け取らず、Camera本体はScene側が管理します。
 class CameraManager
 {
 

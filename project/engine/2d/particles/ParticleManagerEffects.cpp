@@ -10,7 +10,7 @@ using namespace MyMath;
 
 // Hit、Ring、Lightなど、既成パーティクル演出の発生処理をまとめる。
 // 粒子の更新・GPU描画とは分け、演出を追加する時に探しやすくする。
-void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier) {
+void ParticleManager::EmitHitEffect(const std::string& name, uint32_t count, const Vector3& translate, float scaleMultiplier) {
 	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
     if (groupIt == particleGroups_.end()) {
@@ -38,7 +38,7 @@ void ParticleManager::EmitHitEffect(const std::string name, uint32_t count, cons
 }
 
 //インパクト(円)エフェクト発生
-void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
+void ParticleManager::EmitRingEffect(const std::string& name, uint32_t count, const Vector3& translate, float scaleMultiplier)
 {
 	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
@@ -67,7 +67,7 @@ void ParticleManager::EmitRingEffect(const std::string name, uint32_t count, con
 }
 
 //ポータル(円柱)エフェクト発生
-void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
+void ParticleManager::EmitCylinderEffect(const std::string& name, uint32_t count, const Vector3& translate, float scaleMultiplier)
 {
 	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
@@ -95,7 +95,7 @@ void ParticleManager::EmitCylinderEffect(const std::string name, uint32_t count,
     }
 }
 
-void ParticleManager::EmitPillarSparkle(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
+void ParticleManager::EmitPillarSparkle(const std::string& name, uint32_t count, const Vector3& position, float scaleMultiplier)
 {
 	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
@@ -153,7 +153,7 @@ void ParticleManager::EmitPillarSparkle(const std::string name, uint32_t count, 
     }
 }
 
-void ParticleManager::EmitLightCore(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
+void ParticleManager::EmitLightCore(const std::string& name, uint32_t count, const Vector3& position, float scaleMultiplier)
 {
 	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
@@ -194,7 +194,7 @@ void ParticleManager::EmitLightCore(const std::string name, uint32_t count, cons
     }
 }
 
-void ParticleManager::EmitLightRain(const std::string name, uint32_t count, const Vector3& position, float scaleMultiplier)
+void ParticleManager::EmitLightRain(const std::string& name, uint32_t count, const Vector3& position, float scaleMultiplier)
 {
 	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
@@ -244,7 +244,7 @@ void ParticleManager::EmitLightRain(const std::string name, uint32_t count, cons
     }
 }
 
-void ParticleManager::EmitLightSpiral(const std::string name, uint32_t count, const Vector3& translate, float scaleMultiplier)
+void ParticleManager::EmitLightSpiral(const std::string& name, uint32_t count, const Vector3& translate, float scaleMultiplier)
 {
 	if (returnState_.IsReturning()) return;
     auto groupIt = particleGroups_.find(name);
