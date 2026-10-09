@@ -1,20 +1,30 @@
 #include "GPUParticle.h"
 #include "Camera.h"
+#include "Logger.h"
 #include "MyMath.h"
 #include "TextureManager.h"
-#include <cassert>
+#include <stdexcept>
+#include <string>
 
 using namespace MyMath;
 
-// 粒子の保存先、Shader用View、Pipeline、描画用データを順に作ってから初期化Computeを実行します。
+namespace
+{
+	constexpr const char* kParticleTexturePath = "Resources/debug/circle2.png";
+}
+
+// 粒子のGPU資源を順に作り、Sceneが後から固定画像を準備できる状態にします。
 void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 {
-	assert(dxCommon);
-	assert(srvManager);
-	assert(srvManager->CanAllocate(7));
+	// 未完成のDescriptorを使ってGPU命令へ進まないよう、必要な依存と7枠を先に確認します。
+	if (!dxCommon || !dxCommon->GetDevice() || !dxCommon->GetCommandList() || !srvManager ||
+		!srvManager->CanAllocate(7)) {
+		throw std::runtime_error("GPUParticle: DirectX resources or seven SRV slots are unavailable");
+	}
 
 	dxCommon_ = dxCommon;
 	srvManager_ = srvManager;
+	isTextureReady_ = false;
 	CreateParticleBuffers();
 	CreateParticleDescriptors();
 	CreateComputePipeline();
@@ -23,20 +33,31 @@ void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	InitializeParticles();
 }
 
+// Debug Scene開始時に固定画像を読み、失敗時は未登録SRVをDrawで取得しないようにします。
+bool GPUParticle::PrepareTexture()
+{
+	isTextureReady_ = TextureManager::GetInstance()->LoadTexture(kParticleTexturePath);
+	if (!isTextureReady_) {
+		Logger::Log("GPUParticle: particle texture could not be loaded: " + std::string(kParticleTexturePath));
+	}
+	return isTextureReady_;
+}
+
 // Compute Shaderが更新する粒子と空き枠・描画Indexの保存先を作ります。
 void GPUParticle::CreateParticleBuffers()
 {
-	CreateParticleBufferResource(sizeof(Particle) * kMaxParticles, particleResource_);
-	CreateParticleBufferResource(sizeof(int32_t), freeListIndexResource_);
-	CreateParticleBufferResource(sizeof(int32_t) * kMaxParticles, freeListResource_);
-	CreateParticleBufferResource(sizeof(uint32_t) * kMaxParticles, activeParticleIndicesResource_);
-	CreateParticleBufferResource(sizeof(uint32_t) * 4, drawArgumentsResource_);
+	CreateParticleBufferResource(sizeof(Particle) * kMaxParticles, particleResource_, "particle");
+	CreateParticleBufferResource(sizeof(int32_t), freeListIndexResource_, "free list index");
+	CreateParticleBufferResource(sizeof(int32_t) * kMaxParticles, freeListResource_, "free list");
+	CreateParticleBufferResource(sizeof(uint32_t) * kMaxParticles, activeParticleIndicesResource_, "active indices");
+	CreateParticleBufferResource(sizeof(uint32_t) * 4, drawArgumentsResource_, "draw arguments");
 }
 
 // UAVとして使う粒子バッファの共通設定を一か所に保ち、種類ごとの設定ずれを防ぎます。
 void GPUParticle::CreateParticleBufferResource(
 	uint64_t sizeInBytes,
-	Microsoft::WRL::ComPtr<ID3D12Resource>& resource) const
+	Microsoft::WRL::ComPtr<ID3D12Resource>& resource,
+	const char* resourceName) const
 {
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -56,7 +77,9 @@ void GPUParticle::CreateParticleBufferResource(
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 		nullptr,
 		IID_PPV_ARGS(&resource));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !resource) {
+		throw std::runtime_error(std::string("GPUParticle: ") + resourceName + " buffer creation failed");
+	}
 }
 
 // 粒子バッファをCompute Shaderから読み書きできるよう、SRV/UAVを登録します。
@@ -69,6 +92,16 @@ void GPUParticle::CreateParticleDescriptors()
 	freeListUavIndex_ = srvManager_->Allocate();
 	activeParticleIndicesUavIndex_ = srvManager_->Allocate();
 	drawArgumentsUavIndex_ = srvManager_->Allocate();
+	// 一つでも確保できなければDescriptorを登録せず、取得済み番号はFinalizeで返します。
+	if (particleSrvIndex_ == SrvManager::kInvalidSrvIndex ||
+		activeParticleIndicesSrvIndex_ == SrvManager::kInvalidSrvIndex ||
+		particleUavIndex_ == SrvManager::kInvalidSrvIndex ||
+		freeListIndexUavIndex_ == SrvManager::kInvalidSrvIndex ||
+		freeListUavIndex_ == SrvManager::kInvalidSrvIndex ||
+		activeParticleIndicesUavIndex_ == SrvManager::kInvalidSrvIndex ||
+		drawArgumentsUavIndex_ == SrvManager::kInvalidSrvIndex) {
+		throw std::runtime_error("GPUParticle: seven SRV/UAV slots could not be allocated");
+	}
 	srvManager_->CreateSRVforStructuredBuffer(particleSrvIndex_, particleResource_.Get(), kMaxParticles, sizeof(Particle));
 	srvManager_->CreateSRVforStructuredBuffer(activeParticleIndicesSrvIndex_, activeParticleIndicesResource_.Get(), kMaxParticles, sizeof(uint32_t));
 	srvManager_->CreateUAVforStructuredBuffer(particleUavIndex_, particleResource_.Get(), kMaxParticles, sizeof(Particle));
@@ -81,12 +114,23 @@ void GPUParticle::CreateParticleDescriptors()
 // 板ポリゴンとCamera・Emitter・時間・外力・Lightの初期値をGPUへ渡します。
 void GPUParticle::CreateDrawAndControlBuffers()
 {
-	vertexResource_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * 6);
+	// 各Upload Bufferの生成とMapを同じ順序で確認し、空ポインタへの書込みを避けます。
+	auto createMappedBuffer = [this](size_t sizeInBytes, auto& resource, auto*& mappedData, const char* resourceName)
+	{
+		resource = dxCommon_->CreateBufferResource(sizeInBytes);
+		if (!resource) {
+			throw std::runtime_error(std::string("GPUParticle: ") + resourceName + " buffer creation failed");
+		}
+		const HRESULT mapResult = resource->Map(0, nullptr, reinterpret_cast<void**>(&mappedData));
+		if (FAILED(mapResult) || !mappedData) {
+			throw std::runtime_error(std::string("GPUParticle: ") + resourceName + " buffer mapping failed");
+		}
+	};
+	VertexData* vertexData = nullptr;
+	createMappedBuffer(sizeof(VertexData) * 6, vertexResource_, vertexData, "vertex");
 	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
 	vertexBufferView_.SizeInBytes = sizeof(VertexData) * 6;
 	vertexBufferView_.StrideInBytes = sizeof(VertexData);
-	VertexData* vertexData = nullptr;
-	vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 	vertexData[0] = { { -1.0f, -1.0f, 0.0f, 1.0f }, { 0.0f, 1.0f } };
 	vertexData[1] = { { -1.0f,  1.0f, 0.0f, 1.0f }, { 0.0f, 0.0f } };
 	vertexData[2] = { {  1.0f, -1.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } };
@@ -94,12 +138,10 @@ void GPUParticle::CreateDrawAndControlBuffers()
 	vertexData[4] = { {  1.0f,  1.0f, 0.0f, 1.0f }, { 1.0f, 0.0f } };
 	vertexData[5] = { {  1.0f, -1.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } };
 
-	perViewResource_ = dxCommon_->CreateBufferResource(sizeof(PerView));
-	perViewResource_->Map(0, nullptr, reinterpret_cast<void**>(&perViewData_));
+	createMappedBuffer(sizeof(PerView), perViewResource_, perViewData_, "per-view");
 	for (uint32_t emitterIndex = 0; emitterIndex < kMaxEmitters; ++emitterIndex)
 	{
-		emitterResources_[emitterIndex] = dxCommon_->CreateBufferResource(sizeof(Emitter));
-		emitterResources_[emitterIndex]->Map(0, nullptr, reinterpret_cast<void**>(&emitterData_[emitterIndex]));
+		createMappedBuffer(sizeof(Emitter), emitterResources_[emitterIndex], emitterData_[emitterIndex], "emitter");
 		emitterData_[emitterIndex]->translate = { 0.0f, 0.0f, 0.0f };
 		emitterData_[emitterIndex]->radius = 0.15f;
 		emitterData_[emitterIndex]->boxSize = { 0.15f, 0.20f, 0.15f };
@@ -110,16 +152,13 @@ void GPUParticle::CreateDrawAndControlBuffers()
 		emitterData_[emitterIndex]->type = static_cast<uint32_t>(EmitterType::Sphere);
 		emitterData_[emitterIndex]->particleType = static_cast<uint32_t>(ParticleType::Trail);
 	}
-	perFrameResource_ = dxCommon_->CreateBufferResource(sizeof(PerFrame));
-	perFrameResource_->Map(0, nullptr, reinterpret_cast<void**>(&perFrameData_));
+	createMappedBuffer(sizeof(PerFrame), perFrameResource_, perFrameData_, "per-frame");
 	perFrameData_->time = 0.0f;
 	perFrameData_->deltaTime = 0.0f;
-	fieldResource_ = dxCommon_->CreateBufferResource(sizeof(Field));
-	fieldResource_->Map(0, nullptr, reinterpret_cast<void**>(&fieldData_));
+	createMappedBuffer(sizeof(Field), fieldResource_, fieldData_, "field");
 	fieldData_->acceleration = { 0.0f, -0.5f, 0.0f };
 	fieldData_->drag = 0.0f;
-	directionalLightResource_ = dxCommon_->CreateBufferResource(sizeof(DirectionalLight));
-	directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
+	createMappedBuffer(sizeof(DirectionalLight), directionalLightResource_, directionalLightData_, "directional light");
 	directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
 	directionalLightData_->intensity = 1.0f;
@@ -282,9 +321,10 @@ void GPUParticle::DispatchParticleSimulation()
 	commandList->ResourceBarrier(_countof(transitionForDraw), transitionForDraw);
 }
 
+// Cameraと固定画像の両方が準備済みの時だけ、Compute結果を画面へ描きます。
 void GPUParticle::Draw(const Camera* camera)
 {
-	if (!camera) {
+	if (!camera || !isTextureReady_) {
 		return;
 	}
 
@@ -302,11 +342,12 @@ void GPUParticle::Draw(const Camera* camera)
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->SetGraphicsRootConstantBufferView(kGraphicsRootParameterPerView, perViewResource_->GetGPUVirtualAddress());
 	srvManager_->SetGraphicsRootDescriptorTable(kGraphicsRootParameterParticle, particleSrvIndex_);
-	commandList->SetGraphicsRootDescriptorTable(kGraphicsRootParameterTexture, TextureManager::GetInstance()->GetSrvHandleGPU("Resources/debug/circle2.png"));
+	commandList->SetGraphicsRootDescriptorTable(kGraphicsRootParameterTexture, TextureManager::GetInstance()->GetSrvHandleGPU(kParticleTexturePath));
 	commandList->SetGraphicsRootConstantBufferView(kGraphicsRootParameterDirectionalLight, directionalLightResource_->GetGPUVirtualAddress());
 	commandList->ExecuteIndirect(drawCommandSignature_.Get(), 1, drawArgumentsResource_.Get(), 0, nullptr, 0);
 }
 
+// Textureの解放はTextureManagerに任せ、Draw用の準備状態と自分のGPU資源を片付けます。
 void GPUParticle::Finalize()
 {
 	if (srvManager_) {
@@ -351,10 +392,14 @@ void GPUParticle::Finalize()
 	perFrameData_ = nullptr;
 	fieldData_ = nullptr;
 	directionalLightData_ = nullptr;
+	vertexBufferView_ = {};
+	isEmitterEnabled_.fill(false);
 	dxCommon_ = nullptr;
 	srvManager_ = nullptr;
+	isTextureReady_ = false;
 }
 
+// Compute用のRoot Signatureと三段階のPipelineを作り、未完成ならGPU更新を始めません。
 void GPUParticle::CreateComputePipeline()
 {
 	D3D12_DESCRIPTOR_RANGE descriptorRange{};
@@ -385,28 +430,39 @@ void GPUParticle::CreateComputePipeline()
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
 	HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !signatureBlob) {
+		throw std::runtime_error("GPUParticle: compute root signature serialization failed");
+	}
 	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&computeRootSignature_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !computeRootSignature_) {
+		throw std::runtime_error("GPUParticle: compute root signature creation failed");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> computeShaderBlob = dxCommon_->CompileShader(L"resources/shaders/InitializeParticle.CS.hlsl", L"cs_6_0");
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineStateDesc{};
 	pipelineStateDesc.pRootSignature = computeRootSignature_.Get();
 	pipelineStateDesc.CS = { computeShaderBlob->GetBufferPointer(), computeShaderBlob->GetBufferSize() };
 	hr = dxCommon_->GetDevice()->CreateComputePipelineState(&pipelineStateDesc, IID_PPV_ARGS(&initializePipelineState_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !initializePipelineState_) {
+		throw std::runtime_error("GPUParticle: initialization compute pipeline creation failed");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> emitShaderBlob = dxCommon_->CompileShader(L"resources/shaders/EmitParticle.CS.hlsl", L"cs_6_0");
 	pipelineStateDesc.CS = { emitShaderBlob->GetBufferPointer(), emitShaderBlob->GetBufferSize() };
 	hr = dxCommon_->GetDevice()->CreateComputePipelineState(&pipelineStateDesc, IID_PPV_ARGS(&emitPipelineState_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !emitPipelineState_) {
+		throw std::runtime_error("GPUParticle: emission compute pipeline creation failed");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> updateShaderBlob = dxCommon_->CompileShader(L"resources/shaders/UpdateParticle.CS.hlsl", L"cs_6_0");
 	pipelineStateDesc.CS = { updateShaderBlob->GetBufferPointer(), updateShaderBlob->GetBufferSize() };
 	hr = dxCommon_->GetDevice()->CreateComputePipelineState(&pipelineStateDesc, IID_PPV_ARGS(&updatePipelineState_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !updatePipelineState_) {
+		throw std::runtime_error("GPUParticle: update compute pipeline creation failed");
+	}
 }
 
+// 頂点・画像の結合と間接Drawの設定を作り、どちらかが欠けた時は描画を始めません。
 void GPUParticle::CreateGraphicsPipeline()
 {
 	D3D12_DESCRIPTOR_RANGE particleDescriptorRange{};
@@ -456,9 +512,13 @@ void GPUParticle::CreateGraphicsPipeline()
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
 	HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !signatureBlob) {
+		throw std::runtime_error("GPUParticle: graphics root signature serialization failed");
+	}
 	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&graphicsRootSignature_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !graphicsRootSignature_) {
+		throw std::runtime_error("GPUParticle: graphics root signature creation failed");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon_->CompileShader(L"resources/shaders/GPUParticle.VS.hlsl", L"vs_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon_->CompileShader(L"resources/shaders/GPUParticle.PS.hlsl", L"ps_6_0");
@@ -502,7 +562,9 @@ void GPUParticle::CreateGraphicsPipeline()
 	pipelineStateDesc.SampleDesc.Count = 1;
 	pipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 	hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&pipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !graphicsPipelineState_) {
+		throw std::runtime_error("GPUParticle: graphics pipeline creation failed");
+	}
 
 	D3D12_INDIRECT_ARGUMENT_DESC indirectArgumentDesc{};
 	indirectArgumentDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
@@ -511,12 +573,18 @@ void GPUParticle::CreateGraphicsPipeline()
 	commandSignatureDesc.NumArgumentDescs = 1;
 	commandSignatureDesc.pArgumentDescs = &indirectArgumentDesc;
 	hr = dxCommon_->GetDevice()->CreateCommandSignature(&commandSignatureDesc, nullptr, IID_PPV_ARGS(&drawCommandSignature_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !drawCommandSignature_) {
+		throw std::runtime_error("GPUParticle: indirect draw command signature creation failed");
+	}
 }
 
+// 全資源の準備後だけCompute命令を送り、初期粒子と空き枠をGPU上に作ります。
 void GPUParticle::InitializeParticles()
 {
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+	if (!commandList) {
+		throw std::runtime_error("GPUParticle: command list is unavailable during initialization");
+	}
 	srvManager_->PreDraw();
 	commandList->SetComputeRootSignature(computeRootSignature_.Get());
 	commandList->SetPipelineState(initializePipelineState_.Get());

@@ -9,6 +9,7 @@
 
 using namespace MyMath;
 
+// Modelと白い板画像をそろえ、欠損時は代替画像の鏡をStageへ渡さないようにします。
 bool CarryableMirror::Initialize(
 	Object3dCommon* object3dCommon,
 	const std::string& modelName,
@@ -22,8 +23,10 @@ bool CarryableMirror::Initialize(
 	if (!Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
 		return false;
 	}
-	// 持てるMirrorは景色を映さないLaser用の鏡です。UVチェッカーではなく、反射前の鏡らしい明るい板を表示します。
-	object_.SetTextureOverride("resources/debug/white.png");
+	// 持てるMirrorは景色を映さないLaser用の鏡です。白画像が欠けたままUVチェッカーで代用せず、生成失敗を伝えます。
+	if (!object_.SetTextureOverride("resources/debug/white.png")) {
+		return false;
+	}
 	// Laserを反射しない裏側だけを少し暗くし、持ち方にかかわらず表裏を区別します。
 	object_.SetBackFaceBrightness(0.35f);
 	// 小型Mirrorも表側だけLaserを反射します。

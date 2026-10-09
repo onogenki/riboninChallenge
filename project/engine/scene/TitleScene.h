@@ -6,6 +6,9 @@
 #include <memory>
 
 class SkyBox;
+class CameraManager;
+class Object3dCommon;
+class SpriteCommon;
 
 // TitleのSprite表示、段階的な3D準備、演出とScene切替を順に進めます。
 // モデルとSpriteの生成・所有はTitleObjectManagerへ任せます。
@@ -25,10 +28,16 @@ public:
 	// 毎フレーム、Titleの3Dモデル・Sprite・ImGuiを描画します。
 	void Draw() override;
 
-	// 既存の状態照会APIです。現行の切替は入力時のChangeSceneで行います。
-	bool IsFinished() const { return isFinished_; }
+	// 既存の状態照会APIです。現行の切替はChangeSceneで予約するため、常にfalseを返します。
+	bool IsFinished() const override { return false; }
 
 private:
+	// TitleScene専用のCameraを所有し、描画共通設定はManagerから借ります。
+	std::unique_ptr<CameraManager> cameraManager;
+	std::unique_ptr<Camera> mainCamera;
+	Object3dCommon* object3dCommon = nullptr;
+	SpriteCommon* spriteCommon = nullptr;
+
 	// ---------- 初期化の補助関数 ----------
 
 	// DirectX・Camera・Object3dを、TitleSceneが使える初期状態へそろえます。
@@ -109,8 +118,6 @@ private:
 		kFailed,
 	};
 	PresentationStep presentationStep_ = PresentationStep::kFrames;
-	// trueになると、SceneManagerがTitleSceneを終了できます。
-	bool isFinished_ = false;
 	// 必須モデル・画像・SkyBoxがそろわない時は、未生成の描画物を更新しません。
 	bool isInitialized_ = false;
 	// ノイズ・Camera移動の各段階での経過時間です。

@@ -59,22 +59,28 @@ bool TitleObjectManager::InitializeSprites(SpriteCommon* spriteCommon, DirectXCo
 	if (!spriteCommon || !directXCommon) {
 		return false;
 	}
-	spriteCommon->Initialize(directXCommon);
+	if (!spriteCommon->Initialize(directXCommon)) {
+		return false;
+	}
 	// どちらかの画像が欠けた場合は、半端なSpriteを一覧へ追加しません。
 	if (!TextureManager::GetInstance()->LoadTexture("Resources/debug/white.png") ||
 		!TextureManager::GetInstance()->LoadTexture("Resources/Title/2dTitle/2DTitle1.png")) {
 		return false;
 	}
 	auto backgroundSprite = std::make_unique<Sprite>();
-	backgroundSprite->Initialize(spriteCommon, "Resources/debug/white.png");
+	if (!backgroundSprite->Initialize(spriteCommon, "Resources/debug/white.png")) {
+		return false;
+	}
 	backgroundSprite->SetPosition({ 0.0f, 0.0f });
 	backgroundSprite->SetAnchorPoint({ 0.0f, 0.0f });
-	sprites_.push_back(std::move(backgroundSprite));
 
 	auto titleSprite = std::make_unique<Sprite>();
-	titleSprite->Initialize(spriteCommon, "Resources/Title/2dTitle/2DTitle1.png");
+	if (!titleSprite->Initialize(spriteCommon, "Resources/Title/2dTitle/2DTitle1.png")) {
+		return false;
+	}
 	titleSprite->SetPosition({ 0.0f, 0.0f });
 	titleSprite->SetAnchorPoint({ 0.0f, 0.0f });
+	sprites_.push_back(std::move(backgroundSprite));
 	sprites_.push_back(std::move(titleSprite));
 	ResizeTitleSprites();
 	baseSpriteCount_ = sprites_.size();
@@ -127,7 +133,9 @@ bool TitleObjectManager::SetTitleFrame(std::size_t frameIndex)
 	}
 
 	Sprite* titleSprite = sprites_[1].get();
-	titleSprite->SetTexture(texturePath);
+	if (!titleSprite->SetTexture(texturePath)) {
+		return false;
+	}
 	if (!normalObjects_.empty() && normalObjects_[0]) {
 		normalObjects_[0]->SetTextureOverride(texturePath);
 	}
@@ -182,7 +190,9 @@ bool TitleObjectManager::AddTexture(
 		return false;
 	}
 	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize(spriteCommon, textureFilePath);
+	if (!sprite->Initialize(spriteCommon, textureFilePath)) {
+		return false;
+	}
 	sprite->SetAnchorPoint({ 0.5f, 0.5f });
 	sprite->SetSize(size);
 	sprite->SetPosition(position);

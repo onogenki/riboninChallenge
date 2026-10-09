@@ -5,6 +5,7 @@
 - Debug / Development x64で、Audioの無効VoiceId、読込キャッシュ、停止、一時停止・再開、BgmPlayer、SoundEffectPlayerのAPIを確認する目的です。
 - 引数へ音声ファイルのパスを一つ渡します。音量0で実行するので、実際の音質・音量・BGMの開始タイミングは別途ゲームで確認が必要です。
 - 2026-09-28：承認チェックの利用制限解消後、Debug / Development x64の両方でビルド・実行成功（`SUCCESS: failures=0`）。`ReadSample`の符号変換警告を明示的なDWORD指定で解消した後も、両構成で再実行して成功しました。
+- 2026-10-07：音声でない実行ファイルを二度読み込み、どちらも拒否されることを追加確認しました。Debug / Development x64で32項目PASS、`SUCCESS: failures=0`。有効な音源の再生・停止・再初期化も従来どおり通過しました。
 
 リポジトリ直下から、Visual StudioのDeveloper PowerShellで実行する例です。DevelopmentはConfigurationと実行ファイルのDebug部分をDevelopmentへ置き換えます。
 
@@ -15,11 +16,11 @@ MSBuild project/tests/AudioApiSmoke.vcxproj /m /p:Configuration=Debug /p:Platfor
 ./generated/tests/Debug/AudioApiSmoke.exe project/resources/debug/Alarm01.wav
 ```
 
-合格範囲はAPIの戻り値・保持状態です。Mixer変更後の再生中Voiceの実音量、欠損音源、音声デバイス切断、全コーデック、BGMと画面表示の同期を保証するテストではありません。
+合格範囲はAPIの戻り値・保持状態です。Mixer変更後の再生中Voiceの実音量、欠損音源、Media Foundation内部の各失敗分岐、音声デバイス切断、全コーデック、BGMと画面表示の同期を保証するテストではありません。
 
 ## 通常起動のScene順
 
-`RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE=1`は撮影・録画をせず、`Loading → Title → Loading → Stage1`の更新と各SceneのDraw呼び出しを確認して終了します。`RIBONIN_CHALLENGE_START_SCENE`は指定しません。
+`RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE=1`は撮影・録画をせず、最初の`Loading → TITLE`に続き、テスト自身が`Loading → STAGE1`へのScene切替を予約して各SceneのDrawを確認します。予約前には未登録名と`LOADING`自身を行き先に指定して拒否され、白画面への切替も予約されないことを確認します。`RIBONIN_CHALLENGE_START_SCENE`は指定しません。現在の通常操作は`TITLE`の`Stage1(true)`内でEnter後に`BeginStageStart()`へ進むため、このSmokeはそのEnter経路を通りません。
 
 ```powershell
 # projectフォルダを作業ディレクトリとして、Release版の通常起動順を確認します。
@@ -29,7 +30,7 @@ Remove-Item Env:RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE
 Get-Content logs/startup_route_smoke.log
 ```
 
-ログの`SUCCESS`と、両方のLoading・Title・Stage1のDraw回数が1以上であることを確認します。これはSceneの実行順のテストで、白背景の見た目やマウス操作を保証しません。
+ログの`SUCCESS`と、両方のLoading・Title・Stage1のDraw回数が1以上であることを確認します。これはSceneManagerの切替順のテストで、白背景の見た目、Enter入力、同じScene内の登場演出、マウス操作は保証しません。
 
 ## 撮影Smokeの対応構成
 
@@ -43,6 +44,19 @@ Get-Content logs/startup_route_smoke.log
 - 画像：`project/resources/Captures/Screenshots/ribonin_challenge_walk_scene_frame<回数>_<日時>.bmp`
 - 2026-09-28：Development x64で実行成功。画像を開いてwalkの人物、Animationモデル直後に描く通常の球体武器、地形の表示を確認。
 - `SUCCESS`は追加・更新・画像保存の成功です。モデルの可視性は必ず画像を開いて確認してください。静止画2枚だけでは全Animation、鏡の反射、ユーザーのF5起動経路を保証できません。
+
+再読込も確認する時は、同じDebug Sceneで`RIBONIN_CHALLENGE_DEBUG_UI_SMOKE=walk-scene-reload`を指定します。frame30を保存した後、frame60で読込済みModelとTextureを再読込し、frame90を保存します。再読込前後のModelアドレス・環境反射率・手持ち球の画像パスを比較します。
+
+```powershell
+# projectフォルダから、DebugまたはDevelopmentの検証用実行ファイルを起動します。
+$env:RIBONIN_CHALLENGE_START_SCENE = 'DEBUG'
+$env:RIBONIN_CHALLENGE_DEBUG_UI_SMOKE = 'walk-scene-reload'
+$process = Start-Process -FilePath '../generated/outputs/Debug/riboninCharenge.exe' -WorkingDirectory . -WindowStyle Hidden -PassThru -Wait
+$process.ExitCode
+Remove-Item Env:RIBONIN_CHALLENGE_START_SCENE,Env:RIBONIN_CHALLENGE_DEBUG_UI_SMOKE
+```
+
+終了コード0と今回の`gameplay_ui_smoke_<日時>.log`の`RELOAD`・`SUCCESS`を確認し、二枚のBMPを開いて人物・通常モデル・照明の表示を見ます。ファイルの中身を実際に書き換えた時のHot Reloadや、全フレームでちらつかないことまでは、このテストだけで保証しません。
 
 ## CSVの番号別処理
 

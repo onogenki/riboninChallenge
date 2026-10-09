@@ -8,8 +8,8 @@ class Object3d;
 class Object3dCommon;
 class Object3dRenderContext;
 
-// EnemyManagerが所有する、一体分の敵の共通データです。
-// 敵ごとの追跡AIや攻撃は、将来このクラスを継承した個別Enemyへ追加します。
+// EnemyManagerが所有する一体分の敵です。見た目と球Colliderを持ち、位置を同期します。
+// 現在は追跡AIや攻撃を持たず、Sceneから渡された描画Contextで更新します。
 class Enemy
 {
 public:

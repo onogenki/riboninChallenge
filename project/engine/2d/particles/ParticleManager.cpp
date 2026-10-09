@@ -1,7 +1,12 @@
 #include "ParticleManager.h"
 #include "TextureManager.h"
 #include "CameraManager.h"
+#include "Logger.h"
 #include <algorithm>
+#include <cmath>
+#include <limits>
+#include <stdexcept>
+#include <utility>
 
 using namespace MyMath;
 
@@ -13,6 +18,11 @@ ParticleManager* ParticleManager::GetInstance() {
 
 // Pipelineと描画資源を元の順に作り、最初のUpdateより前に風と再生状態をそろえます。
 void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager) {
+    // Frameworkから借りるDeviceとSRV管理がなければ、後続のGPU生成へ進みません。
+    if (!dxCommon || !srvManager || !dxCommon->GetDevice()) {
+        Logger::Log("ParticleManager: DirectX device or SRV manager is unavailable");
+        throw std::runtime_error("ParticleManager: DirectX device or SRV manager is unavailable");
+    }
     // 引数でポインタを受け取ってメンバ変数に記録
     dxCommon_ = dxCommon;
     srvManager_ = srvManager;
@@ -33,6 +43,21 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 
     isField_ = true;
 	returnState_.Reset();
+}
+
+// Groupが借りるSRVを先に返し、生成途中の共通GPU資源も残さず解放します。
+void ParticleManager::Finalize()
+{
+    ClearAllGroups();
+    materialData_ = nullptr;
+    materialResource_.Reset();
+    vertexResource_.Reset();
+    vertexBufferView_ = {};
+    graphicsPipelineState_.Reset();
+    rootSignature_.Reset();
+    cameraManager_ = nullptr;
+    srvManager_ = nullptr;
+    dxCommon_ = nullptr;
 }
 
 // 粒子のShaderが使う結合位置とSamplerを定義し、Pipelineより先に確定します。
@@ -84,9 +109,15 @@ void ParticleManager::InitializeRootSignature(ID3D12Device* device)
     Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
     Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
     hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-    assert(SUCCEEDED(hr));
+    if (FAILED(hr) || !signatureBlob) {
+        Logger::Log("ParticleManager: root signature serialization failed");
+        throw std::runtime_error("ParticleManager: root signature serialization failed");
+    }
     hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&rootSignature_));
-    assert(SUCCEEDED(hr));
+    if (FAILED(hr) || !rootSignature_) {
+        Logger::Log("ParticleManager: root signature creation failed");
+        throw std::runtime_error("ParticleManager: root signature creation failed");
+    }
 }
 
 // 粒子用Shader・頂点形式・混合と深度の規則から描画Pipelineを作ります。
@@ -150,7 +181,10 @@ void ParticleManager::InitializeGraphicsPipeline(ID3D12Device* device)
     graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 
     hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineState_));
-    assert(SUCCEEDED(hr));
+    if (FAILED(hr) || !graphicsPipelineState_) {
+        Logger::Log("ParticleManager: graphics pipeline creation failed");
+        throw std::runtime_error("ParticleManager: graphics pipeline creation failed");
+    }
 }
 
 // 通常粒子が使う二つの三角形を、従来と同じ頂点順でGPUへ書き込みます。
@@ -158,12 +192,20 @@ void ParticleManager::InitializeDefaultQuad()
 {
     //頂点データの初期化
     vertexResource_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * 6);
+    if (!vertexResource_) {
+        Logger::Log("ParticleManager: default quad buffer creation failed");
+        throw std::runtime_error("ParticleManager: default quad buffer creation failed");
+    }
     vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
     vertexBufferView_.SizeInBytes = sizeof(VertexData) * 6;
     vertexBufferView_.StrideInBytes = sizeof(VertexData);
 
     VertexData* vertexData = nullptr;
-    vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+    const HRESULT mapResult = vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+    if (FAILED(mapResult) || !vertexData) {
+        Logger::Log("ParticleManager: default quad buffer mapping failed");
+        throw std::runtime_error("ParticleManager: default quad buffer mapping failed");
+    }
     Vector3 normal = { 0.0f, 0.0f, -1.0f };
     vertexData[0] = { {-1.0f, -1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}, normal };
     vertexData[1] = { {-1.0f,  1.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, normal };
@@ -178,28 +220,70 @@ void ParticleManager::InitializeMaterial()
 {
     // マテリアル（定数バッファ）の初期化
     materialResource_ = dxCommon_->CreateBufferResource(sizeof(Material));
-    materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+    if (!materialResource_) {
+        Logger::Log("ParticleManager: material buffer creation failed");
+        throw std::runtime_error("ParticleManager: material buffer creation failed");
+    }
+    const HRESULT mapResult = materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+    if (FAILED(mapResult) || !materialData_) {
+        Logger::Log("ParticleManager: material buffer mapping failed");
+        throw std::runtime_error("ParticleManager: material buffer mapping failed");
+    }
     memset(materialData_, 0, sizeof(Material));
     materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
     materialData_->enableLighting = 0;
     materialData_->uvTransform = MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f });
 }
 
-// 粒子の形状に関係なく使うGPUインスタンス領域とSRVを同じ順番で作ります。
-void ParticleManager::InitializeInstancingResources(ParticleGroup& group)
+// 未完成のGroupを一覧へ入れないため、GPU領域とSRVの両方の成功を確認します。
+bool ParticleManager::InitializeInstancingResources(ParticleGroup& group)
 {
     group.instancingResource = dxCommon_->CreateBufferResource(sizeof(ParticleForGPU) * kNumMaxInstance);
-    group.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&group.mappedData));
+    if (!group.instancingResource) {
+        Logger::Log("ParticleManager: instancing buffer could not be created");
+        return false;
+    }
+    const HRESULT mapResult = group.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&group.mappedData));
+    if (FAILED(mapResult) || !group.mappedData) {
+        Logger::Log("ParticleManager: instancing buffer could not be mapped");
+        group.instancingResource.Reset();
+        group.mappedData = nullptr;
+        return false;
+    }
     group.instancingSrvIndex = srvManager_->Allocate();
+    if (group.instancingSrvIndex == SrvManager::kInvalidSrvIndex) {
+        Logger::Log("ParticleManager: no SRV available for instancing buffer");
+        return false;
+    }
     srvManager_->CreateSRVforStructuredBuffer(
         group.instancingSrvIndex,
         group.instancingResource.Get(),
         kNumMaxInstance,
         sizeof(ParticleForGPU)
     );
+    return true;
 }
 
-// 同名の粒子グループがあれば、古いSRVを返してから一覧から外します。
+// 画像を読んでから粒子用SRVの空きを確かめ、失敗した名前を描画一覧へ登録しないようにします。
+bool ParticleManager::PrepareGroupResources(const std::string& textureFilePath)
+{
+	if (!srvManager_ || !srvManager_->CanAllocate()) {
+		Logger::Log("ParticleManager: no SRV available for particle group texture: " + textureFilePath);
+		return false;
+	}
+	if (!TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+		Logger::Log("ParticleManager: particle texture could not be loaded: " + textureFilePath);
+		return false;
+	}
+	// 新規Texture自身がSRVを使うため、粒子グループ用の空きも残っているか確認します。
+	if (!srvManager_->CanAllocate()) {
+		Logger::Log("ParticleManager: no SRV left for particle group after loading: " + textureFilePath);
+		return false;
+	}
+	return true;
+}
+
+// 新しいGroupが完成した後で、同名の古いGroupのSRVを返します。
 void ParticleManager::RemoveExistingGroup(const std::string& name)
 {
 	if (auto it = particleGroups_.find(name); it != particleGroups_.end()) {
@@ -210,14 +294,11 @@ void ParticleManager::RemoveExistingGroup(const std::string& name)
 	}
 }
 
-// 名前とTextureで通常粒子のグループを作り、Emitより先に描画領域を登録します。
-void ParticleManager::CreateParticleGroup(const std::string name, const std::string textureFilePath) {
-	if (!srvManager_ || !srvManager_->CanAllocate()) {
-		return;
+// 画像と描画領域がそろったグループだけ登録し、呼び出し元へ成否を返します。
+bool ParticleManager::CreateParticleGroup(const std::string name, const std::string textureFilePath) {
+	if (!PrepareGroupResources(textureFilePath)) {
+		return false;
 	}
-    RemoveExistingGroup(name);
-    // 登録済みの名前かチェックしてassert
-    assert(particleGroups_.find(name) == particleGroups_.end() && "その名前のグループは既に存在します");
 
     // 新たな空のパーティクルグループを作成
     ParticleGroup newGroup{};
@@ -225,27 +306,31 @@ void ParticleManager::CreateParticleGroup(const std::string name, const std::str
     newGroup.textureFilePath = textureFilePath;
 
     // 描画に必要なインスタンス領域を、通常粒子でもほかの形状と同じ手順で作ります。
-    InitializeInstancingResources(newGroup);
+    if (!InitializeInstancingResources(newGroup)) {
+        return false;
+    }
 
-    // コンテナに登録
-    particleGroups_[name] = newGroup;
+	// 完成したGroupだけを置き換え、途中失敗時には古い粒子を残します。
+    RemoveExistingGroup(name);
+    particleGroups_[name] = std::move(newGroup);
+	return true;
 }
 
-// 名前とTextureでRingを作り、共通の描画領域を準備してから円環頂点を追加します。
-void ParticleManager::CreateRingParticleGroup(const std::string name, const std::string textureFilePath)
+// Ringの画像と円環頂点を登録し、呼び出し元へ成否を返します。
+bool ParticleManager::CreateRingParticleGroup(const std::string name, const std::string textureFilePath)
 {
-	if (!srvManager_ || !srvManager_->CanAllocate()) {
-		return;
+	if (!PrepareGroupResources(textureFilePath)) {
+		return false;
 	}
-    RemoveExistingGroup(name);
-    assert(particleGroups_.find(name) == particleGroups_.end() && "Particle group already exists");
 
     ParticleGroup newGroup{};
     newGroup.textureFilePath = textureFilePath;
     newGroup.useBillboard = false;
 
     // Ring固有の頂点を作る前に、通常粒子と同じ描画領域を準備します。
-    InitializeInstancingResources(newGroup);
+    if (!InitializeInstancingResources(newGroup)) {
+        return false;
+    }
 
     const uint32_t kRingDivide = 32;
     const float kOuterRadius = 1.0f;
@@ -255,12 +340,22 @@ void ParticleManager::CreateRingParticleGroup(const std::string name, const std:
 
     newGroup.vertexCount = kRingDivide * 6;
     newGroup.vertexResource = dxCommon_->CreateBufferResource(sizeof(VertexData) * newGroup.vertexCount);
+    if (!newGroup.vertexResource) {
+        Logger::Log("ParticleManager: ring vertex buffer could not be created: " + name);
+        srvManager_->Free(newGroup.instancingSrvIndex);
+        return false;
+    }
     newGroup.vertexBufferView.BufferLocation = newGroup.vertexResource->GetGPUVirtualAddress();
     newGroup.vertexBufferView.SizeInBytes = sizeof(VertexData) * newGroup.vertexCount;
     newGroup.vertexBufferView.StrideInBytes = sizeof(VertexData);
 
     VertexData* vertexData = nullptr;
-    newGroup.vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+    const HRESULT mapResult = newGroup.vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+    if (FAILED(mapResult) || !vertexData) {
+        Logger::Log("ParticleManager: ring vertex buffer could not be mapped: " + name);
+        srvManager_->Free(newGroup.instancingSrvIndex);
+        return false;
+    }
 
     for (uint32_t index = 0; index < kRingDivide; ++index) {
         float sin = std::sin(index * radianPerDivide);
@@ -279,11 +374,14 @@ void ParticleManager::CreateRingParticleGroup(const std::string name, const std:
         vertexData[vertexIndex + 5] = { { -sin * kInnerRadius, cos * kInnerRadius, 0.0f, 1.0f }, { u, 1.0f }, normal };
     }
 
-    particleGroups_[name] = newGroup;
+	// 頂点まで完成してから旧Groupを外し、失敗時の粒子を失わないようにします。
+    RemoveExistingGroup(name);
+    particleGroups_[name] = std::move(newGroup);
+	return true;
 }
 
-// 名前・Texture・寸法からCylinderを作り、共通の描画領域の後で側面頂点を追加します。
-void ParticleManager::CreateCylinderParticleGroup(
+// 不正な寸法と頂点Bufferのサイズ超過を生成前に拒否し、既存Groupを残します。
+bool ParticleManager::CreateCylinderParticleGroup(
     const std::string name,
     const std::string textureFilePath,
     uint32_t divide,
@@ -291,15 +389,19 @@ void ParticleManager::CreateCylinderParticleGroup(
     float bottomRadius,
     float height)
 {
-	if (!srvManager_ || !srvManager_->CanAllocate()) {
-		return;
+	constexpr uint32_t kVerticesPerDivide = 6;
+	const size_t maxDivideForVertexView =
+		(std::numeric_limits<uint32_t>::max)() / (sizeof(VertexData) * kVerticesPerDivide);
+	if (divide < 3 || divide > maxDivideForVertexView ||
+		!std::isfinite(topRadius) || topRadius <= 0.0f ||
+		!std::isfinite(bottomRadius) || bottomRadius <= 0.0f ||
+		!std::isfinite(height) || height <= 0.0f) {
+		Logger::Log("ParticleManager: invalid cylinder dimensions for group: " + name);
+		return false;
 	}
-    RemoveExistingGroup(name);
-    assert(particleGroups_.find(name) == particleGroups_.end() && "Particle group already exists");
-    assert(divide >= 3);
-    assert(topRadius > 0.0f);
-    assert(bottomRadius > 0.0f);
-    assert(height > 0.0f);
+	if (!PrepareGroupResources(textureFilePath)) {
+		return false;
+	}
 
     ParticleGroup newGroup{};
     newGroup.textureFilePath = textureFilePath;
@@ -307,19 +409,30 @@ void ParticleManager::CreateCylinderParticleGroup(
 	newGroup.updateCallback = UpdateCylinderParticle;
 
     // Cylinder固有の頂点を作る前に、通常粒子と同じ描画領域を準備します。
-    InitializeInstancingResources(newGroup);
+    if (!InitializeInstancingResources(newGroup)) {
+        return false;
+    }
 
-    const uint32_t verticesPerDivide = 6;
     const float radianPerDivide = 2.0f * std::numbers::pi_v<float> / float(divide);
 
-    newGroup.vertexCount = divide * verticesPerDivide;
+    newGroup.vertexCount = divide * kVerticesPerDivide;
     newGroup.vertexResource = dxCommon_->CreateBufferResource(sizeof(VertexData) * newGroup.vertexCount);
+    if (!newGroup.vertexResource) {
+        Logger::Log("ParticleManager: cylinder vertex buffer could not be created: " + name);
+        srvManager_->Free(newGroup.instancingSrvIndex);
+        return false;
+    }
     newGroup.vertexBufferView.BufferLocation = newGroup.vertexResource->GetGPUVirtualAddress();
     newGroup.vertexBufferView.SizeInBytes = sizeof(VertexData) * newGroup.vertexCount;
     newGroup.vertexBufferView.StrideInBytes = sizeof(VertexData);
 
     VertexData* vertexData = nullptr;
-    newGroup.vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+    const HRESULT mapResult = newGroup.vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+    if (FAILED(mapResult) || !vertexData) {
+        Logger::Log("ParticleManager: cylinder vertex buffer could not be mapped: " + name);
+        srvManager_->Free(newGroup.instancingSrvIndex);
+        return false;
+    }
 
     for (uint32_t index = 0; index < divide; ++index) {
         float sin = std::sin(index * radianPerDivide);
@@ -332,7 +445,7 @@ void ParticleManager::CreateCylinderParticleGroup(
         Vector3 normal0 = { -sin, 0.0f, cos };
         Vector3 normal1 = { -sinNext, 0.0f, cosNext };
 
-        uint32_t vertexIndex = index * verticesPerDivide;
+        uint32_t vertexIndex = index * kVerticesPerDivide;
         vertexData[vertexIndex + 0] = { { -sin * topRadius, height, cos * topRadius, 1.0f }, { u, 1.0f }, normal0 };
         vertexData[vertexIndex + 1] = { { -sinNext * topRadius, height, cosNext * topRadius, 1.0f }, { uNext, 1.0f }, normal1 };
         vertexData[vertexIndex + 2] = { { -sin * bottomRadius, 0.0f, cos * bottomRadius, 1.0f }, { u, 0.0f }, normal0 };
@@ -341,7 +454,10 @@ void ParticleManager::CreateCylinderParticleGroup(
         vertexData[vertexIndex + 5] = { { -sin * bottomRadius, 0.0f, cos * bottomRadius, 1.0f }, { u, 0.0f }, normal0 };
     }
 
-    particleGroups_[name] = newGroup;
+	// 頂点まで完成してから旧Groupを外し、失敗時の粒子を失わないようにします。
+    RemoveExistingGroup(name);
+    particleGroups_[name] = std::move(newGroup);
+	return true;
 }
 
 void ParticleManager::ClearAllParticles()

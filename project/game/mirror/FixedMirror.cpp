@@ -11,6 +11,7 @@
 
 using namespace MyMath;
 
+// Model・白い板画像・反射先を準備し、いずれかが欠けた鏡をStageへ渡さないようにします。
 bool FixedMirror::Initialize(
 	Object3dCommon* object3dCommon,
 	DirectXCommon* dxCommon,
@@ -37,8 +38,10 @@ bool FixedMirror::Initialize(
 	if (!Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
 		return false;
 	}
-	// 反射Textureがまだ一枚も作られていない時や裏面を見た時にも、UVチェッカーを表示しません。
-	object_.SetTextureOverride("resources/debug/white.png");
+	// 反射Textureが未生成の時や裏面でもUVチェッカーに戻さないため、白画像が欠けたら生成を止めます。
+	if (!object_.SetTextureOverride("resources/debug/white.png")) {
+		return false;
+	}
 	// plane.objの板に厚みを持たせ、Playerが鏡をすり抜けないようにします。
 	collider_.SetLocalShape({}, { 1.0f, 1.0f, 0.05f });
 	SyncVisualAndCollider();

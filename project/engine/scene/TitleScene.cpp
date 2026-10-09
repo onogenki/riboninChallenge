@@ -7,7 +7,7 @@
 #include "SpriteCommon.h"
 #include "SceneRenderPipeline.h"
 #include "SkyBox.h"
-#include "TextureManager.h"
+#include "Object3dFactory.h"
 #include "Object3dRenderContext.h"
 #include "PostEffect.h"
 #include "ImGuiManager.h"
@@ -75,7 +75,6 @@ void TitleScene::Initialize()
 	hasDrawnPreparedScene_ = false;
 	presentationStep_ = PresentationStep::kFrames;
 	preparationStep_ = PreparationStep::kRenderSystems;
-	isFinished_ = false;
 	titleFrameTimer_ = 0.0f;//最初のアニメーションの時間
 	titleFrameIndex_ = 0;//アニメーションspriteの1枚目
 	presentationTimer_ = 0.0f;
@@ -96,7 +95,7 @@ void TitleScene::InitializeRenderSystems()
 	PostEffect::GetInstance()->SetSepia(false);
 
 	// Title専用のCameraManagerを作り、ほかのSceneのCamera状態を持ち込まないようにします。
-	InitializeMainCamera(kCameraStart);
+	InitializeMainCamera(cameraManager, mainCamera, kCameraStart);
 	object3dCommon = Object3dCommon::GetInstance();
 	object3dCommon->Initialize(dxCommon);
 	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
@@ -197,17 +196,15 @@ void TitleScene::StartTitleNoise()
 	postEffect->SetRandomNoise(true);
 }
 
-// Titleを選んだ時だけ、SkyBox TextureとEditor用Resource一覧をまとめて準備します。
+// Titleを選んだ時だけ、DDSとGPU Bufferが完成したSkyBoxをFactoryから受け取ります。
 bool TitleScene::InitializeSkyBoxAndEditorResources()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	// DDSが無いままSkyBoxを描くと、未登録SRVを参照してしまいます。
-	if (!TextureManager::GetInstance()->LoadTexture("Resources/debug/qwantani_moonrise_puresky_1k.dds")) {
+	skyBox_ = Object3dFactory::CreateSkyBox(
+		dxCommon, cameraManager->GetActiveCamera(), "Resources/backGround/skybox-night-cube.dds");
+	if (!skyBox_) {
 		return false;
 	}
-	skyBox_ = std::make_unique<SkyBox>();
-	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
-	skyBox_->SetTexture("Resources/debug/qwantani_moonrise_puresky_1k.dds");
 	// Releaseには編集UIがないため、素材棚の走査・サムネイル読込を行いません。
 #ifdef USE_IMGUI
 	titleEditor_.ScanResourceShelf();
@@ -457,7 +454,6 @@ void TitleScene::Finalize()
 	titleEditor_.Finalize();
 	mainCamera.reset();
 	cameraManager.reset();
-	isFinished_ = false;
 	isInitialized_ = false;
 	isSpriteReady_ = false;
 	hasDrawnTitleSprite_ = false;

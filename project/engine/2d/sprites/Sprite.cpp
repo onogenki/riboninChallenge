@@ -1,8 +1,7 @@
 #include "Sprite.h"
 #include"SpriteCommon.h"
 #include "MyMath.h"
-#include <cassert>
-#include "Model.h"
+#include "Logger.h"
 #include "TextureManager.h"
 
 using namespace MyMath;
@@ -20,9 +19,19 @@ void Sprite::AdjustTextureSize()
 
 }
 
-// 画像パスはSetTextureで参照するだけなので、初期化時の不要なコピーを避けます。
-void Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFilePath)
-{	 
+// 四つのBufferを従来の順に準備し、失敗したSpriteを描画一覧へ渡しません。
+bool Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFilePath)
+{
+	ResetGpuResources();
+	if (!spriteCommon || !spriteCommon->GetDxCommon() || !spriteCommon->GetDevice()) {
+		Logger::Log("Sprite initialization failed: shared drawing resources are unavailable.");
+		return false;
+	}
+	const auto fail = [this](const char* resourceName) {
+		Logger::Log(std::string("Sprite initialization failed: ") + resourceName + " buffer creation or mapping failed.");
+		ResetGpuResources();
+		return false;
+	};
 	position = { 0.0f, 0.0f };
 	rotation = 0.0f;
 	anchorPoint = { 0.0f, 0.0f }; // 左上を基準（または0.5fで中心）
@@ -35,6 +44,9 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFi
 
 	//頂点リソースを作る
 	vertexResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(VertexData) * 4);
+	if (!vertexResource) {
+		return fail("vertex");
+	}
 
 	//頂点リソースの先頭のGPUアドレスを描画に使う
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
@@ -44,7 +56,9 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFi
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
 	//書き込むためのアドレスを取得
-	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	if (FAILED(vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData))) || !vertexData) {
+		return fail("vertex");
+	}
 
 	//各頂点の法線を初期化します。座標とUVはUpdateでサイズに合わせて更新します。
 	vertexData[0].normal = { 0.0f,0.0f,-1.0f };
@@ -53,6 +67,9 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFi
 	vertexData[3].normal = { 0.0f,0.0f,-1.0f };
 
 	indexResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * 6);
+	if (!indexResource) {
+		return fail("index");
+	}
 
 	//リソースの先頭のアドレスから使う
 	indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
@@ -61,14 +78,21 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFi
 	//インデックスはuint32_tとする
 	indexBufferView.Format = DXGI_FORMAT_R32_UINT;
 
-	indexResource->Map(0, nullptr, reinterpret_cast<void**>(&indexData));
+	if (FAILED(indexResource->Map(0, nullptr, reinterpret_cast<void**>(&indexData))) || !indexData) {
+		return fail("index");
+	}
 	indexData[0] = 0;  indexData[1] = 1;   indexData[2] = 2;
 	indexData[3] = 1;  indexData[4] = 3;   indexData[5] = 2;
 
 	//色とUV変換を保持するMaterial全体のリソースを作る
 	materialResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(Material));
+	if (!materialResource) {
+		return fail("material");
+	}
 	//書き込むためのアドレスを取得
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+	if (FAILED(materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData))) || !materialData) {
+		return fail("material");
+	}
 
 	//Texture本来の色を使えるよう、乗算色を白にしておく
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -77,8 +101,14 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFi
 
 	//TransformationMatrix用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	transformationMatrixResource = spriteCommon->GetDxCommon()->CreateBufferResource(sizeof(TransformationMatrix));
+	if (!transformationMatrixResource) {
+		return fail("transformation matrix");
+	}
 	//座標変換行列リソースにデータを書き込むためのアドレスを取得してtransformationMatrixDataに割り当てる
-	transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData));
+	if (FAILED(transformationMatrixResource->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData))) ||
+		!transformationMatrixData) {
+		return fail("transformation matrix");
+	}
 
 	// 単位行列で初期化
 	transformationMatrixData->WVP = MakeIdentity4x4();
@@ -91,7 +121,28 @@ void Sprite::Initialize(SpriteCommon* spriteCommon, const std::string& textureFi
 	uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 
-	SetTexture(textureFilePath);
+	if (!SetTexture(textureFilePath)) {
+		ResetGpuResources();
+		return false;
+	}
+	return true;
+}
+
+// Map済みポインタを使えない状態へ戻し、対応するBufferも解放します。
+void Sprite::ResetGpuResources()
+{
+	vertexData = nullptr;
+	indexData = nullptr;
+	materialData = nullptr;
+	transformationMatrixData = nullptr;
+	vertexResource.Reset();
+	indexResource.Reset();
+	materialResource.Reset();
+	transformationMatrixResource.Reset();
+	vertexBufferView = {};
+	indexBufferView = {};
+	textureFilePath_.clear();
+	spriteCommon = nullptr;
 }
 
 void Sprite::Update()
@@ -164,14 +215,14 @@ void Sprite::Draw()
 
 }
 
-//画像をセットする関数
-void Sprite::SetTexture(const std::string& textureFilePath) {
+// 読めない画像なら現在のSprite設定を変えず、呼び出し元へ失敗を返します。
+bool Sprite::SetTexture(const std::string& textureFilePath) {
 	// Loadingなど、Sceneが事前読込していない画像も、サイズを参照する前に必ず読み込みます。
 	// 同じ画像の再読込はTextureManagerが省くため、Sprite側でGPU資源を重複所有しません。
 	const bool isLoaded = TextureManager::GetInstance()->LoadTexture(textureFilePath);
-	assert(isLoaded);
 	if (!isLoaded) {
-		return;
+		Logger::Log("Sprite texture could not be loaded: " + textureFilePath);
+		return false;
 	}
 	//TextureManagerから、その画像のインデックス番号を取得
 	textureFilePath_ = textureFilePath;
@@ -181,4 +232,5 @@ void Sprite::SetTexture(const std::string& textureFilePath) {
 
 	//サイズも表示範囲も自動的に画像に合わせる
 	AdjustTextureSize();
+	return true;
 }

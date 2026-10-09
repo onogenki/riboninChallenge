@@ -617,6 +617,9 @@
     <ClCompile Include="game\stage1\StageStart.cpp">
       <Filter>08_Game\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="game\stage1\StageTitleOverlay.cpp">
+      <Filter>08_Game\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="game\GameSceneRegistration.cpp">
       <Filter>08_Game</Filter>
     </ClCompile>
@@ -980,6 +983,9 @@
       <Filter>00_App</Filter>
     </ClInclude>
     <ClInclude Include="game\stage1\StageStart.h">
+      <Filter>08_Game\Stage1</Filter>
+    </ClInclude>
+    <ClInclude Include="game\stage1\StageTitleOverlay.h">
       <Filter>08_Game\Stage1</Filter>
     </ClInclude>
     <ClInclude Include="game\GameSceneRegistration.h">

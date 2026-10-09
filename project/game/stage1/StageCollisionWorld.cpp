@@ -7,7 +7,7 @@
 #include "StageLightPuzzle.h"
 #include "StageMapRuntime.h"
 
-// 床・Door・Mirror・JSON配置物を、Player用とLight遮蔽用の二つの一覧へ仕分けます。
+// 床・Doorと有効な非TriggerのMirror・JSON配置物を、Player・Camera外壁・Light遮蔽の一覧へ仕分けます。
 void StageCollisionWorld::Rebuild(const Context& context)
 {
 	if (!context.floor) {
@@ -26,7 +26,8 @@ void StageCollisionWorld::Rebuild(const Context& context)
 
 	if (context.fixedMirrors) {
 		for (const std::unique_ptr<FixedMirror>& fixedMirror : *context.fixedMirrors) {
-			if (fixedMirror) {
+			if (fixedMirror && fixedMirror->GetCollider().IsEnabled() &&
+				!fixedMirror->GetCollider().IsTrigger()) {
 				solidObbs_.push_back(fixedMirror->GetObb());
 			}
 		}
@@ -41,14 +42,18 @@ void StageCollisionWorld::Rebuild(const Context& context)
 	}
 
 	// 持っているMirrorはPlayer自身と重なるため、置かれている時だけ障害物にします。
-	if (context.carryableMirror && !context.carryableMirror->IsCarried()) {
+	if (context.carryableMirror && !context.carryableMirror->IsCarried() &&
+		context.carryableMirror->GetCollider().IsEnabled() &&
+		!context.carryableMirror->GetCollider().IsTrigger()) {
 		solidObbs_.push_back(context.carryableMirror->GetObb());
 	}
 
 	if (context.stageMapRuntime) {
 		context.stageMapRuntime->SyncColliders();
 		for (const StageMapRuntime::RuntimeObject& runtimeObject : context.stageMapRuntime->GetObjects()) {
-			if (!runtimeObject.visual || !runtimeObject.hasBoxCollider) {
+			// 生のOBBへ変える前にColliderの有効・Trigger設定を確認し、通過用を壁にしません。
+			if (!runtimeObject.visual || !runtimeObject.hasBoxCollider ||
+				!runtimeObject.GetCollider().IsEnabled() || runtimeObject.GetCollider().IsTrigger()) {
 				continue;
 			}
 			const MyMath::OBB runtimeObb = runtimeObject.GetObb();

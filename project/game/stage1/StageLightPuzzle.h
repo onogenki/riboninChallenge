@@ -40,8 +40,8 @@ public:
 		float laserVisualWidth = 0.32f;
 	};
 
-	// Laserの計算設定と、Charge/Door Laserを描くRendererを準備します。
-	void Initialize(DirectXCommon* directXCommon);
+	// Laserの計算設定と描画用Rendererを準備し、光を描けない時は失敗を返します。
+	bool Initialize(DirectXCommon* directXCommon);
 	// Scene終了時に、Puzzleが所有する描画用GPUデータを解放します。
 	void Finalize();
 	// 携帯鏡の更新後に、Laser・Switch・Door・大型Mirrorを一つの順番で更新します。

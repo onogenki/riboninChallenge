@@ -4,6 +4,8 @@
 #include "Model.h"
 #include "Object3d.h"
 #include "Object3dCommon.h"
+#include "SkyBox.h"
+#include "TextureManager.h"
 
 // モデルの読込とObject3d初期化を一箇所にまとめ、描画可能なObject3dを返します。
 std::unique_ptr<Object3d> Object3dFactory::Create(
@@ -18,7 +20,26 @@ std::unique_ptr<Object3d> Object3dFactory::Create(
 	return object;
 }
 
-// 既に所有しているObject3dへ、Factoryと同じモデル読込・初期化手順を適用します。
+// 必須DDSと四つのGPU BufferがそろったSkyBoxだけをSceneへ渡します。
+std::unique_ptr<SkyBox> Object3dFactory::CreateSkyBox(
+	DirectXCommon* directXCommon,
+	Camera* camera,
+	const std::string& texturePath)
+{
+	if (!directXCommon || !camera || texturePath.empty() ||
+		!TextureManager::GetInstance()->LoadTexture(texturePath)) {
+		return nullptr;
+	}
+
+	auto skyBox = std::make_unique<SkyBox>();
+    if (!skyBox->Initialize(directXCommon, camera)) {
+        return nullptr;
+    }
+	skyBox->SetTexture(texturePath);
+	return skyBox;
+}
+
+// モデル・一体分の描画データ・必要なSkinClusterがそろったObjectだけを渡します。
 bool Object3dFactory::InitializeObject(
 	Object3d& object,
 	Object3dCommon* object3dCommon,
@@ -30,11 +51,15 @@ bool Object3dFactory::InitializeObject(
 		return false;
 	}
 
-	object.Initialize(object3dCommon);
+	if (!object.Initialize(object3dCommon)) {
+		return false;
+	}
 	object.SetModel(modelName);
 	if (initializeAnimation) {
 		// SkeletalモデルだけがSkinClusterを作るため、通常モデルにも安全に呼べます。
-		object.InitializeAnimation();
+		if (!object.InitializeAnimation()) {
+			return false;
+		}
 	}
 	return true;
 }

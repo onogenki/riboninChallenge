@@ -3,7 +3,7 @@
 #include "AbstractSceneFactory.h"
 #include<string>
 
-// Factoryが作ったSceneの切替を予約し、旧Sceneの解放後に次Sceneを更新します。
+// 現在Sceneを状態として所有し、Factoryが作った次Sceneへ安全に切り替えるState Patternの本体です。
 class SceneManager
 {
 public:
@@ -21,7 +21,7 @@ public:
 
 	// sceneNameのSceneを次フレームへ予約し、予約できた時だけtrueを返します。
 	bool ChangeScene(const std::string& sceneName);
-	// sceneNameへ進む前にLoadingを予約し、予約できた時だけtrueを返します。
+	// Loading自身以外の登録済みsceneNameだけを予約し、失敗時は白画面へ切り替えません。
 	bool ChangeSceneWithLoading(const std::string& sceneName);
 	// Loadingの切替先を一度だけ取り出し、Manager側の登録を空にして返します。
 	std::string TakeLoadingDestinationSceneName();

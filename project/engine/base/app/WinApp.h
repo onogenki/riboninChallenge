@@ -32,6 +32,8 @@ public:
 	HINSTANCE GetHInstance() const { return wc.hInstance; }
 	HWND GetHwnd() const { return hwnd; }
 	WindowMode GetWindowMode() const { return windowMode_; }
+	// WM_QUITに指定された終了コードを、ウィンドウ解放前にFrameworkへ返します。
+	int GetQuitCode() const { return quitCode_; }
 	uint32_t GetClientWidth() const;
 	uint32_t GetClientHeight() const;
 
@@ -41,6 +43,7 @@ private:
 	WindowMode windowMode_ = WindowMode::Maximized;
 	RECT windowedRect_{};
 	bool isComInitialized_ = false;
+	int quitCode_ = 0;
 
 	void ToggleFullscreen();
 };

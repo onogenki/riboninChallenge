@@ -35,6 +35,8 @@ public:
 		bool isAnimationPreviewTest = false;
 		// trueなら棚からwalk.gltfを追加し、通常Scene内での描画・Animation更新を記録します。
 		bool isAnimationSceneTest = false;
+		// Scene内のAnimationを保ったまま、モデルと画像の再読込も確認します。
+		bool isHotReloadTest = false;
 		// 通常Sceneへの自動追加で作られたAnimationモデルの配列番号です。
 		size_t animationObjectIndex = 0;
 		// 自動確認結果を書き出すログのパスです。
@@ -98,7 +100,8 @@ public:
 
 	// 環境変数が有効な時に、UI操作の自動確認を開始します。
 	static void Start(State& state, const std::string& timestamp,
-		bool isAnimationPreviewTest = false, bool isAnimationSceneTest = false);
+		bool isAnimationPreviewTest = false, bool isAnimationSceneTest = false,
+		bool isHotReloadTest = false);
 	// Update内で、モデル棚・プレビュー・Inspectorの確認を一段階ずつ進めます。
 	static void Update(State& state, const Context& context);
 	// Draw後に、Game Viewの画像・一枚動画を保存して確認を終了します。

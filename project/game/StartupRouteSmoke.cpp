@@ -12,7 +12,7 @@ void StartupRouteSmoke::Initialize(bool requested, bool startsWithLoading)
 	}
 }
 
-// Loading→Title→Loading→Stage1へ進め、途中のScene切替失敗は次フレームで再試行します。
+// テストだけがTitleからLoading経由のStage1切替を予約し、SceneManagerの描画順を確認します。
 void StartupRouteSmoke::Update()
 {
 	if (!enabled_ || finished_) {
@@ -33,6 +33,13 @@ void StartupRouteSmoke::Update()
 
 	if (sceneName == "TITLE" && sceneUpdateCount_ >= 8 &&
 		titleDrawCount_ > 0 && !stage1Requested_ && !sceneManager->HasPendingScene()) {
+		// 未登録名やLoading自身を行き先にして、白画面だけが予約されないか確認します。
+		if (sceneManager->ChangeSceneWithLoading("__INVALID_LOADING_DESTINATION_SMOKE__") ||
+			sceneManager->ChangeSceneWithLoading("LOADING") ||
+			sceneManager->HasPendingScene()) {
+			Finish(false, "An invalid destination changed to Loading.");
+			return;
+		}
 		stage1Requested_ = sceneManager->ChangeSceneWithLoading("STAGE1");
 	}
 	if (sceneName == "STAGE1" && sceneUpdateCount_ >= 8 && stage1DrawCount_ > 0) {
@@ -71,6 +78,8 @@ void StartupRouteSmoke::Finish(bool success, const std::string& reason)
 	if (finished_) {
 		return;
 	}
+	// ログだけでなく実行ファイルの終了コードにも、同じ成否を渡します。
+	wasSuccessful_ = success;
 	std::ofstream log("logs/startup_route_smoke.log", std::ios::trunc);
 	if (log) {
 		log << (success ? "SUCCESS" : "FAILURE") << ": " << reason

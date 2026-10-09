@@ -10,6 +10,7 @@ class FixedMirror;
 class Object3d;
 class Object3dCommon;
 class Player;
+class SkyBox;
 class StageHazardLights;
 class StageLightPuzzle;
 
@@ -22,6 +23,7 @@ public:
 	{
 		Object3dCommon* object3dCommon = nullptr;
 		Camera* activeCamera = nullptr;
+		SkyBox* skyBox = nullptr;
 		const std::vector<std::unique_ptr<Object3d>>* sceneObjects = nullptr;
 		const StageMapRuntime* stageMapRuntime = nullptr;
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;
@@ -32,6 +34,6 @@ public:
 		const StageHazardLights* hazardLights = nullptr;
 	};
 
-	// 部屋・JSON配置物・鏡・Player・Laserを、Game View用の順番で描画します。
+	// 夜空を背景に描いてから、部屋・JSON配置物・鏡・Player・Laserを重ねます。
 	static void Draw(const Context& context);
 };

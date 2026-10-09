@@ -15,7 +15,7 @@ class Framework
 {
 public:
 
-	// 共通資源を依存順に作り、派生先のGameがSceneを追加できる状態にします。
+	// 共通資源を依存順に作り、失敗した資源の後続を始めずScene開始前に終了を要求します。
 	virtual void Initialize();
 	// Sceneを先に終了し、描画・入力・Audioで使った共通資源を解放します。
 	virtual void Finalize();
@@ -30,12 +30,21 @@ public:
 	// 派生先のGameを基底ポインタから破棄できるようにします。
 	virtual ~Framework() = default;
 
-	// Initialize → Update/Drawの繰り返し → Finalizeの順に実行します。
-	void Run();
+	// 初期化→更新・描画→終了の順を固定し、派生Gameの処理を呼ぶTemplate Methodです。
+	int Run();
 
 protected:
-	// 派生先のGameが終了を予約するための状態です。
+	// Factoryの所有をFrameworkへ移し、SceneManagerには生存中の参照だけを渡します。
+	void SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory);
+	// Game側のテスト終了時も、終了要求と結果を同時に記録します。
+	void RequestEnd(int exitCode = 0);
+
+private:
 	bool endRequest_ = false;
+	int exitCode_ = 0;
+	// 初期化途中で終了する時、まだ開始していないAudioとImGuiを解放しません。
+	bool isAudioInitialized_ = false;
+	bool isImGuiInitialized_ = false;
 
 	// FactoryとWindowはFrameworkが所有し、Managerの共有本体は借りて使います。
 	std::unique_ptr<AbstractSceneFactory> sceneFactory_;

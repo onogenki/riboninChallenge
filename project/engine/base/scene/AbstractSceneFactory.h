@@ -5,7 +5,7 @@
 #include<vector>
 #include<memory>
 
-// Scene名から新しいSceneを作るための共通の入口です。
+// Scene名から新しいSceneを作るFactory Methodの共通の入口です。
 // SceneManagerはゲーム固有のScene型を知らず、このFactoryだけに生成を依頼します。
 class AbstractSceneFactory
 {

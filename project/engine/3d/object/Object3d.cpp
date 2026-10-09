@@ -2,6 +2,7 @@
 #include "DirectXCommon.h"
 #include "Object3dCommon.h"
 #include "Object3dGpuData.h"
+#include "Logger.h"
 #include "ModelManager.h"
 #include "SrvManager.h"
 #include "TextureManager.h"
@@ -17,9 +18,15 @@ Object3d::~Object3d()
 	ReleaseSkinClusterDescriptors();
 }
 
-void Object3d::Initialize(Object3dCommon* object3dCommon)
-{//引数で受け取ってメンバ変数に記録する
+// 一体分の行列・Camera・輪郭用Bufferが完成してから、このObjectを使用可能にします。
+bool Object3d::Initialize(Object3dCommon* object3dCommon)
+{
+	if (!object3dCommon || !object3dCommon->GetDxCommon()) {
+		Logger::Log("Object3d initialization failed: shared drawing resources are unavailable.");
+		return false;
+	}
 
+	// 共通描画設定とCameraは所有せず、Objectの生存中だけ参照します。
 	this->object3dCommon = object3dCommon;
 
 	//デフォルトカメラを自分にセット
@@ -27,11 +34,17 @@ void Object3d::Initialize(Object3dCommon* object3dCommon)
 
 	// 描画用の行列・Light・Camera Constant Bufferは、専用のGPUデータ部品へまとめます。
 	gpuData_ = std::make_unique<Object3dGpuData>();
-	gpuData_->Initialize(object3dCommon->GetDxCommon());
+	if (!gpuData_->Initialize(object3dCommon->GetDxCommon())) {
+		gpuData_.reset();
+		this->object3dCommon = nullptr;
+		camera = nullptr;
+		return false;
+	}
 	//Transform変数を作る
 	transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	transformPlayback_.Reset();
 	animationReturnState_.Reset();
+	return true;
 }
 
 // 一体のTransform履歴・Animation・描画行列を、フレームの経過時間で順に更新します。
@@ -216,7 +229,7 @@ void Object3d::DrawOccludedSilhouette(const Vector4& color)
 	}
 	model_->Draw(textureSrvIndexOverride_);
 }
-// 反射Textureを鏡面用Pipelineで描画し、通常モデル描画とは別のRoot Parameterを設定します。
+// 反射Textureを鏡面用Pipelineで描画し、行列と反射情報を固定できなければ描画しません。
 void Object3d::DrawMirror(
 	uint32_t reflectionTextureSrvIndex,
 	const Matrix4x4& reflectionViewProjection)
@@ -227,10 +240,12 @@ void Object3d::DrawMirror(
 
 	ID3D12GraphicsCommandList* commandList = object3dCommon->GetDxCommon()->GetCommandList();
 	object3dCommon->SetMirrorDrawSetting();
-	gpuData_->BindForMirrorDraw(
+	if (!gpuData_->BindForMirrorDraw(
 		commandList,
 		reflectionViewProjection,
-		{ 0.96f, 0.98f, 1.0f, 1.0f });
+		{ 0.96f, 0.98f, 1.0f, 1.0f })) {
+		return;
+	}
 	commandList->SetGraphicsRootDescriptorTable(
 		2,
 		SrvManager::GetInstance()->GetGPUDescriptorHandle(reflectionTextureSrvIndex));
@@ -245,11 +260,16 @@ void Object3d::SetModel(const std::string& filePath)
 	modelName_ = filePath;
 }
 
-// Model本来のTextureの代わりに、指定TextureをこのObjectだけへ適用します。
-void Object3d::SetTextureOverride(const std::string& texturePath)
+// 読込成功した画像だけを適用し、生成側が欠損を見逃さないよう成否を返します。
+bool Object3d::SetTextureOverride(const std::string& texturePath)
 {
-	TextureManager::GetInstance()->LoadTexture(texturePath);
-	textureSrvIndexOverride_ = TextureManager::GetInstance()->GetSrvIndex(texturePath);
+	TextureManager* textureManager = TextureManager::GetInstance();
+	if (!textureManager->LoadTexture(texturePath)) {
+		Logger::Log("Object3d: texture override load failed: " + texturePath);
+		return false;
+	}
+	textureSrvIndexOverride_ = textureManager->GetSrvIndex(texturePath);
+	return true;
 }
 
 // 共用の材質ではなくObject専用の値を変更し、他のplane.objへ影響させません。
@@ -299,12 +319,12 @@ const Object3d::DirectionalLight& Object3d::GetDirectionalLight() const
 	return gpuData_ ? gpuData_->GetDirectionalLight() : kDefaultLight;
 }
 
-// SkeletalモデルだけにSkinClusterとSkeletonを作り、Animation再生できる状態へ初期化します。
-void Object3d::InitializeAnimation()
+// SkeletalモデルだけにSkinClusterを作り、未完成ならFactoryへ失敗を返します。
+bool Object3d::InitializeAnimation()
 {
 	// モデルが未設定なら骨を作れないため、既存のAnimation状態を触らずに戻ります。
 	if (!model_) {
-		return;
+		return false;
 	}
 	const Model::ModelData& modelData = model_->GetModelData();
 	ReleaseSkinClusterDescriptors();
@@ -313,7 +333,7 @@ void Object3d::InitializeAnimation()
 		skinCluster_ = {};
 		isSkeletal_ = false;
 		isAnimating_ = false;
-		return;
+		return true;
 	}
 
 	//モデルの階層構造からスケルトンを生成
@@ -328,15 +348,28 @@ void Object3d::InitializeAnimation()
 			skinCluster_ = {};
 			isSkeletal_ = false;
 			isAnimating_ = false;
-			return;
+			Logger::Log("Object3d: no descriptors available for SkinCluster.");
+			return false;
 		}
 		//スケルトンがあるならSkinClusterも作成する
 		// （引数の descriptorHeap や device は DxCommon 等から引っ張ってくる）
 		auto device = object3dCommon->GetDxCommon()->GetDevice();
+		if (!device) {
+			Logger::Log("Object3d: DirectX device is unavailable for SkinCluster.");
+			skeleton_ = {};
+			isSkeletal_ = false;
+			isAnimating_ = false;
+			return false;
+		}
 		auto srvHeap = SrvManager::GetInstance()->GetDescriptorHeap();
 		uint32_t descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		skinCluster_ = model_->CreateSkinCluster(device, skeleton_, modelData, srvHeap, descriptorSize);
+		if (!model_->CreateSkinCluster(device, skeleton_, modelData, srvHeap, descriptorSize, skinCluster_)) {
+			skeleton_ = {};
+			isSkeletal_ = false;
+			isAnimating_ = false;
+			return false;
+		}
 		model_->Update(skeleton_);
 		model_->Update(skinCluster_, skeleton_);
 	}
@@ -344,6 +377,7 @@ void Object3d::InitializeAnimation()
 	{
 		isSkeletal_ = false;//アニメーションしないモデルはfalse
 	}
+	return true;
 }
 
 // SkinClusterが確保したSRV/UAVの番号を返却し、再初期化や破棄後に残さないようにします。
@@ -375,14 +409,14 @@ void Object3d::PlayAnimation(const Model::Animation& animation)
 	}
 }
 
-// モデルの環境反射の強さを設定します。
+// 借りている共有Modelの環境反射率を変更します。同じModelの別Objectにも及ぶため区別します。
 void Object3d::SetEnvironmentCoefficient(float coefficient) {
 	if (model_) {
 		model_->SetEnvironmentCoefficient(coefficient);
 	}
 }
 
-// モデルに設定された環境反射の強さを返します。
+// 借りている共有Modelの環境反射率を返し、個体専用の値とは誤認しないようにします。
 float Object3d::GetEnvironmentCoefficient() const {
 	if (model_) {
 		return model_->GetEnvironmentCoefficient();

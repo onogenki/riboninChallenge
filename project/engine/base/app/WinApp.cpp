@@ -93,15 +93,17 @@ void WinApp::Finalize()
 	}
 }
 
+// WM_QUITを通常のWindowProcへ渡さず、終了コードだけをFrameworkへ渡します。
 bool WinApp::ProcessMessage()
 {
 	MSG msg{};
 	while (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
 		if (msg.message == WM_QUIT) {
+			quitCode_ = static_cast<int>(msg.wParam);
 			return true;
 		}
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
 	}
 	return false;
 }

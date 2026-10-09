@@ -5,9 +5,11 @@
 `BaseScene`
 
 Title、Debug、Stage1が共通で使うSceneの土台です。全Sceneは`Initialize`、`Update`、`Draw`、`Finalize`を必ず実装します。
-共通で持つのは`Object3dCommon`、`SpriteCommon`、`CameraManager`、`MainCamera`だけです。
+`BaseScene`は共通の状態変数を持たず、Camera生成・登録を補助するだけです。
+`CameraManager`と`MainCamera`はTitle・Debug・Stage1がそれぞれ`private`で所有します。
+`Object3dCommon`と`SpriteCommon`は必要なSceneだけがManagerから借り、Scene終了時に共有本体を破棄しません。
 不要なDirectX、Object、Audioヘッダは含めず、各Sceneが必要なものだけを自分のヘッダで読み込みます。
-`CameraManager`や`Camera`を`unique_ptr`で前方宣言するため、BaseSceneの生成・解放は`BaseScene.cpp`で行います。
+各Sceneが前方宣言した`CameraManager`や`Camera`を`unique_ptr`で安全に破棄できるよう、Sceneのコンストラクタとデストラクタはそれぞれのcpp側に置きます。
 
 ヘッダでは`using namespace`を使いません。たとえば衝突用の箱は`MyMath::OBB`と明記し、
 そのヘッダを読み込む別のクラスへ名前空間の影響を漏らさないようにします。
@@ -30,23 +32,30 @@ Object3dの完全な型を知る場所で生成・破棄します。
 
 `SceneFactory`
 
-`"TITLE"`、`"DEBUG"`、`"STAGE1"`という名前から、対応するSceneを一体生成します。
+`"TITLE"`、`"TITLE_ORIGINAL"`、`"DEBUG"`、`"STAGE1"`という名前から、対応するSceneを一体生成します。
 ゲームのScene追加は`game/GameSceneRegistration.cpp`の`RegisterGameScenes()`へ、名前と生成関数を登録します。
 その登録を`GameSceneRegistry`経由で`SceneFactory`へ渡すため、Stage追加だけでengine側へStageのヘッダを増やす必要はありません。
+現在の`"TITLE"`は提出用に`Stage1(true)`を生成し、固定CameraのStage背景へTitle画像とENTER画像を重ねます。
+従来の12枚の画像から始まる`TitleScene`は`"TITLE_ORIGINAL"`で残し、通常起動では使用しません。
+`"STAGE1"`はタイトル表示なしの`Stage1()`を生成します。
 
 `SceneManager`
 
 現在のSceneを所有し、切替時に`Finalize → Initialize`の順で呼びます。
 各Sceneは`SceneManager::ChangeScene()`で次のScene名を予約するだけで、古いSceneの解放を自分で行いません。
+`ChangeSceneWithLoading()`はFactoryの登録一覧から行き先を先に確認します。未登録名や`LOADING`自身なら白画面への切替を予約しません。有効な行き先では、従来どおりLoadingを一度描画してから`LoadingScene::Update()`が目的Sceneを予約します。切替待機期間は白画面を更新し、待機が終わっても目的Sceneを生成できない場合はログを残して終了コード1で止めます。
+`BaseScene::IsFinished()`は既存の照会APIですが、現在の`SceneManager`は読んでいません。従来の`TitleScene`もこの値で終了せず、入力時のScene切替予約を使います。
 
-通常起動は`Game::Initialize()`が`LOADING`を予約し、白い`LoadingScene`が`TITLE`を予約します。
-Titleから本編に入ると`ChangeSceneWithLoading("STAGE1")`で再びLoadingを経由します。
-`StartupRouteSmoke`は環境変数を指定したテスト時だけ`Game`に呼ばれ、この順番と各SceneのDraw回数を確認します。Sceneの生成や所有はしません。
+通常起動は`Game::Initialize()`が`LOADING`を予約し、白い`LoadingScene`が`TITLE`を予約します。未登録の開始Scene名が指定された場合、`SceneManager::ChangeScene()`の失敗を`Game`が受けて終了コード1で止めます。Sceneのない更新・描画ループには進みません。
+その前に`Framework::Initialize()`がPostEffect・Model・Particleなどの共通資源を依存順に準備します。`DirectXCommon::CompileShader()`はShader読込・コンパイル・結果取得の失敗を例外で伝えます。必須画像やShaderが欠けた場合、`Framework`は後続の初期化を止め、終了コード1を記録します。`Game`はSceneを予約せず、`Framework::Run()`はUpdate/Drawへ入らず、生成済みの共通資源を解放します。AudioとImGuiは初期化済みの場合だけ終了処理を呼びます。
+現在の`TITLE`では、`Stage1::Update()`がGame View内のEnterを検出すると、Sceneを作り直さず同じ`Stage1`で本編の登場演出を始めます。
+`StartupRouteSmoke`はテスト時だけ`TITLE`から`ChangeSceneWithLoading("STAGE1")`を直接予約し、Loading→Title→Loading→Stage1の描画順と回数を確認します。
+そのため、このSmokeの成功は通常操作のEnter判定や、同じScene内で本編へ進む経路の確認にはなりません。
 
 ### 入力を読む順番
 
 `Framework::Update()`はScene更新より先に`Input::Update()`を呼びます。`Input`は前フレームの状態を保存した後、`UpdateKeyboard()`→`UpdateMouse()`→`UpdateGamepads()`→`UpdateCurrentDevice()`の順に更新します。`TriggerKey()`や`TriggerMouseButton()`は、保存した前フレームと現在値の差から「押した瞬間」を返します。
-`TitleScene`のEnter判定と`Stage1::UpdateMirrorGameplay()`のEキー・マウス判定は、同じ`Input`から読みます。ReleaseでマウスのDirectInput取得に失敗した時だけWindows入力へ切り替えます。キーボードの取得失敗はログに残しますが、現在はWindows入力への切替処理を持ちません。
+現在の`Stage1::Update()`のTitle用Enter判定、従来の`TitleScene`のEnter判定、`Stage1::UpdateMirrorGameplay()`のEキー・マウス判定は、同じ`Input`から読みます。ReleaseでマウスのDirectInput取得に失敗した時だけWindows入力へ切り替えます。キーボードの取得失敗はログに残しますが、現在はWindows入力への切替処理を持ちません。
 
 `Stage1`
 
@@ -59,6 +68,7 @@ Titleから本編に入ると`ChangeSceneWithLoading("STAGE1")`で再びLoading�
 `Stage1`へ追加してよい処理は、「このStageだけの遊び」に関係するものです。
 `Stage1.h`は値として持つ部品だけを直接`#include`し、`unique_ptr`で所有するPlayerやMirrorなどは前方宣言します。
 実体を使う`Stage1.cpp`だけがそれらのヘッダを読み込むため、ほかのSceneへ不要な依存が広がりません。
+`Stage1(true)`のTitle中は`game/stage1/StageTitleOverlay.cpp`の`StageTitleOverlay`が二枚のSpriteを生成・所有・更新し、Sceneは背景のStageと危険Lightの進行と描画順だけを決めます。Spriteの描画は`SceneRenderPipeline::DrawSprites()`へ渡します。Title専用Cameraを増やさず、同じ`mainCamera`を固定位置へ動かします。Enter後に`BeginStageStart()`を呼ぶまで、Player登場演出・Camera追従・BGMを進めません。
 
 ### Stage1を読む順番
 
@@ -134,7 +144,7 @@ Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別
 `Stage1`はDoorモデルとPuzzle部品を所有して、Updateの順番だけを決めます。
 
 `BaseScene::InitializeMainCamera()`は、Title・Debug・Stageが共通して行うMainCameraの生成・登録・有効化だけを担当します。
-各Sceneは開始位置を渡し、補助CameraやPlayer追従などの固有処理はそれぞれのSceneへ残します。
+各Sceneは自分が所有するCameraの格納先と開始位置を渡し、補助CameraやPlayer追従などの固有処理はそれぞれのSceneへ残します。
 
 ## Level
 
@@ -266,9 +276,12 @@ JSONで置いたキー・フィル・バックライトを先に残し、空い�
 `StageCollisionWorld`
 
 床・Door・固定Mirror・置いた携帯Mirror・JSON配置物を、用途別のOBB一覧へまとめます。
-`GetSolidObbs()`はPlayerとCamera壁回避用、`GetLightBlockingObbs()`はLaser遮蔽用です。
+`GetSolidObbs()`はPlayerの押し戻し用、`GetCameraBoundaryObbs()`は`CameraBoundary`タグを持つ外壁だけを使うCamera用、`GetLightBlockingObbs()`はLaser遮蔽用です。
 個別の`SphereCollider`や`ObbCollider`を置き換えるものではなく、Stageが持つColliderを集める場所です。
+`StageMapRuntime::UpdatePaths()`で移動した配置物のColliderを同期し、`StageCollisionWorld::Rebuild()`で一覧を作ってから`Player::Update()`へ渡します。順序を逆にするとPlayerが前フレームの壁位置で判定してしまいます。
 そのためStage1は、Player・Camera・Laserへ必要な一覧を渡すだけで、Colliderを作るループを書きません。
+
+ただし現在の床とDoorは、ほかの物体とは所有の形が異なります。`Stage1::InitializeStageGimmicks()`が作る床モデルは`Object3dCollection`が所有し、`StageCollisionWorld`が床のローカルBOX設定と現在のOBBを持ちます。`Stage1::ApplyFloorData()`がJSONの床TransformとBOX設定をそれぞれへ渡し、`Rebuild()`がモデルのTransformからOBBを作り直します。Doorモデルも`Object3dCollection`が所有しますが、開閉状態とDoorのOBBは`StageLightPuzzle`が持ち、`UpdatePuzzleVisuals()`で同時に更新します。`StageCollisionWorld`はDoorのOBBを借りて一覧へ加えます。床・Doorがそれぞれ`ObbCollider`を直接所有する構成には、まだなっていません。
 
 ## Collider
 
@@ -333,7 +346,7 @@ Colliderをメンバーへ追加するだけでは、移動や判定は自動実
 
 `SetTrigger(true)`は「通り抜ける判定」の目印です。`Check()`では重なりを検出します。
 `SphereCollider::ResolveSolidObbs()`は自分がTriggerなら押し戻しませんが、引数は生のOBB一覧なので、相手のEnabled／Trigger情報は含まれません。
-一覧を作る側で床・壁だけを選びます。`StageCollisionWorld`が本編の一覧作成の入口です。
+一覧を作る側で床・壁だけを選びます。`StageCollisionWorld::Rebuild()`はMirrorとJSON/CSV配置物について、有効で非TriggerのColliderだけをPlayer・Camera外壁・Light遮蔽用の一覧へ入れます。床とDoorは別のStage設定から作るOBBです。
 
 Colliderを持つPlayer、Enemy、Mirror、JSON配置物は、同じ名前の規則を使います。
 
@@ -388,6 +401,7 @@ soundEffects_.Clear();
 `BgmPlayer::Play()`は呼んだ時に再生開始します。画面表示まで待つ機能はBgmPlayer自身にはありません。
 本編の例は`Stage1::UpdateStageBgm()`です。`Stage1::Draw()`を通った後のUpdateで、一度だけPlayします。
 `Audio::LoadFile()`は再生せず事前読込だけを行えます。
+読込中にMedia Foundationの形式設定・サンプル変換・バッファ取得が失敗した場合や、デコード結果が空の場合は`false`を返し、共有音源一覧へ登録しません。`SoundEffectPlayer::Register()`と`BgmPlayer::Play()`はこの結果を確認してから次へ進みます。
 
 `IsPlaying()`は「未終了のVoiceを保持している」という意味で、一時停止中もtrueです。停止中かは`IsPaused()`と併せて判断します。
 `SoundEffectPlayer::Clear()`は名前の登録だけを消し、再生済みSEを止めたり共有音源を解放したりしません。
@@ -478,8 +492,18 @@ Transform・Animation・Model描画を担当します。
 `Object3d`一体がGPUへ渡す行列、Light、Camera、鏡反射用のConstant Bufferを担当します。
 GPU Resourceを作る・値を更新する・Root Parameterへ結び付ける処理だけを持ち、
 PlayerやStageのルールは持ちません。
+初期化ではObjectごとの行列 → Camera位置 → 壁越し輪郭色の三つのBufferを順に作り、それぞれのMap結果を確認します。
+一つでも失敗したら`Object3dGpuData::Initialize()`が途中の資源を外して`false`を返し、`Object3d::Initialize()`からFactoryへ伝わります。FactoryはそのObjectをSceneへ渡しません。
+三種類のLightの初期値は三つのBufferが完成した後に設定します。正常時のLight値やDraw順は従来どおりです。
 通常モデルとAnimationモデルの描画では、鏡CameraとGame Cameraが同じフレームで値を上書きしないよう、
-`BindForObjectDraw`が描画一回分の行列とCamera位置をSwapChain枠ごとのBufferへ固定します。
+`BindForObjectDraw()`が描画一回分の行列・Camera位置・三種類のLightをSwapChain枠ごとのBufferへ固定します。
+Sceneが渡すLight値はまずObjectごとのCPU側に保持し、描画直前にGPU用Bufferへコピーします。
+これは別フレームのGPU描画がまだ前の値を読んでいる間に、動くLightの値を上書きしないためです。
+描画済みの枠が再利用できるかは`DirectXCommon::PostDraw()`のFence待ちで決まります。
+鏡面そのものは`BindForMirrorDraw()`が別の描画用Bufferへ行列・反射Camera情報を固定します。
+この鏡面専用Bufferも同じSwapChain枠のFence待ち後に再利用するため、前フレームの鏡面描画中に値を上書きしません。
+鏡面のShaderや反射Cameraを計算する規則は`FixedMirror`と`StageReflectionRenderer`のままです。
+壁越し表示の専用Bufferは別経路で、現行本編には呼び出し元がありません。
 
 この分離により、モデルの動きやAnimationを追いたい時は`Object3d`、
 DirectXのConstant Bufferを追いたい時は`Object3dGpuData`だけを読めばよくなります。
@@ -500,6 +524,16 @@ Camera・Lightは生成時に個別設定せず、毎フレーム`Object3dRender
 どちらもモデル読込、`Object3d::Initialize()`、`SetModel()`をFactory内で一度だけ実行します。
 `Object3d`の上記三関数はFactory専用なので、Sceneが初期化やモデル設定の一部を忘れたObject3dを作れません。
 
+## 継承と状態・生成パターンの実際の役割
+
+エンジン層では、`Framework::Run()`が「Initialize → Update/Drawの反復 → Finalize」を固定し、ゲーム側の`Game`がScene登録・起動確認を含む`Initialize`と`Update`、Scene描画を行う`Draw`だけを上書きします。これはTemplate Methodです。`Game::Finalize()`は基底処理を呼ぶだけで独自の仕事がなかったため上書きせず、`Framework::Finalize()`を使います。どちらも基底クラスにvirtualデストラクタがあり、基底ポインタからの破棄に対応します。
+
+Scene単位の状態管理では、`SceneManager`が`unique_ptr<BaseScene>`で現在Sceneを所有し、仮想`Update()`・`Draw()`を呼び出します。次Sceneの予約後はGPU完了を待ち、旧Sceneの`Finalize()`と破棄、新Sceneの`Initialize()`の順で切り替えます。これはSceneを状態クラスとするState Patternです。ゲーム側の`LoadingScene`・`Stage1`と、エンジン側の`TitleScene`・`DebugScene`がそれぞれ必要な振る舞いだけを実装します。`Stage1`の仮Titleは同じSceneの開始モードであり、Enterのたびに別Sceneクラスへ分ける変更はしていません。
+
+生成では、`AbstractSceneFactory::CreateScene()`を`SceneFactory`が上書きし、登録名に対応するSceneを作ります。`SceneFactory::RegisterScene()`は空の名前・生成関数を拒否し、切替時に呼べない関数が残らないようにします。ゲーム側の`GameSceneRegistration`がLoadingとStage1の生成関数を登録するため、エンジン側のFactory本体はゲーム固有の鏡パズルの型を知りません。これはFactory Methodと登録関数の組合せです。一体のモデルには別の`Object3dFactory`を使い、読込・GPU準備が終わったObjectだけをSceneへ渡します。後者は単純Factoryであり、前者と同じ名前のパターンとして混同しません。
+
+`Collider`の派生型は球と箱に共通する有効・Trigger状態を再利用しますが、基底ポインタ経由の仮想`Check()`はありません。したがって「ポリモーフィズムを使った箇所」とは数えません。球対箱の判定は現在の型別オーバーロードが責任を明示しており、実在しない共通動作を基底へ追加しません。また`TitleScene`の準備・演出の列挙型と`StageStart`の落下→Camera引継ぎは、現状では固定された短い進行です。Scene単位のState Patternとは区別し、Stateクラスを増やす場合は状態ごとの異なる処理と遷移が増えた時に判断します。
+
 SkeletalモデルをLoop再生したいSceneは、生成後に次の一行だけ書きます。
 
 ```cpp
@@ -516,6 +550,24 @@ TitleとDebugは「再生するか」だけを決め、Animationファイルの�
 
 Sceneやゲーム物体が`std::make_unique<Object3d>()`、`Object3d::Initialize()`、`SetModel()`を直接呼ばないため、
 モデル読込と初期化の手順は一か所だけになります。
+
+### Modelの所有とAnimationの更新順
+
+`ModelManager::LoadModel()`がファイル名ごとに一つの`Model`を所有し、`Object3d`はそのポインタを借ります。
+`Model::Initialize()`はモデルファイル → Index Buffer → 頂点Buffer → 材質Buffer → 材質画像の順で準備します。三つのBuffer生成とMapをそれぞれ確認し、失敗した時はModel自身の途中GPU資源とCPU側のMap先を外して`false`を返します。`ModelManager::LoadModel()`は成功したModelだけを登録するため、描画側が未完成のBufferを受け取りません。成功時の材質初期値、画像、描画順は変えません。
+骨ありモデルの`Model::CreateSkinCluster()`はPalette・頂点Influence・出力頂点・計算情報の資源と四つのDescriptorを順に準備し、失敗時は取得済みDescriptorを返して`false`を返します。`Object3d::InitializeAnimation()`と`Object3dFactory::InitializeObject()`はその結果を伝えるため、通常モデルは従来どおり通し、骨ありモデルだけ未完成のまま渡しません。
+`Model::IsLoaded()`はGPU Buffer三つの有無だけを調べるため、画像を含めた読込成功は`Initialize()`の結果で判断します。
+
+骨ありの場合、`Object3d`が`Skeleton`と`SkinCluster`を個体ごとに所有します。
+毎フレームは`Model::ApplyAnimation()`で骨の姿勢を決め、`Update(Skeleton&)`で親子行列を作り、
+`Update(SkinCluster&, const Skeleton&)`でGPU用Paletteへ書き込んでから描画します。
+`Object3d::Draw()`が通常・骨ありのPipelineを選び、`Model::Draw()`が頂点と材質を渡します。
+`Model::SetTexture()`と環境反射率の設定は共有Modelの材質を変えるため、個体専用の画像には`Object3d::SetTextureOverride()`を使います。
+
+`ModelManager::ReloadModel()`は新しいモデルファイルを読んだ後、`Model::CopyRuntimeSettingsFrom()`で実行中の材質値と`SetTexture()`による明示画像だけを引き継ぎます。ファイル側で変えた頂点や、明示指定していない画像参照は新しい読込結果を使います。GPUが古いModelを読み終えてから同じ`Model`の中身を交換するため、`Object3d`が借りるModelポインタは変わりません。`TextureManager::CreateTextureData()`も画像転送とGPU完了待ちの後でSRVを差し替えます。再読込中にモデルが黒くなった時は、まずこの「ファイル由来の値」と「実行中に調整した値」の引継ぎ順を確認します。
+画像の初回読込・再読込では、`TextureManager::CreateTextureData()`がTexture本体 → SRV番号 → 中間Upload Bufferと転送Command List → GPU待ち → SRV登録の順に進めます。`DirectXCommon::ExecuteTextureTransfer()`が中間Buffer・Map・Command Listの失敗を返した場合、初回のSRV番号だけを返却し、再読込では旧Textureと旧SRVを保持します。画像ファイル自体の欠損やGPU資源失敗を、確認用画像や空の登録で隠しません。
+
+個体専用画像の変更は、`Object3d::SetTextureOverride()`が`TextureManager::LoadTexture()`の成功を確認し、その後でSRV番号を取得して適用します。失敗時は以前の画像設定を保ち、パスをログへ記録して`false`を返します。`CarryableMirror::Initialize()`・`FixedMirror::Initialize()`と`Stage1`はこの結果を確認し、必須の見た目が欠けた個体を生成成功扱いにしません。素材棚も`SceneEditor::ScanResourceShelf()`で読めた画像だけをSRV・寸法・サムネイルへ進めます。読めない画像を代替素材で表示成功に見せるのではなく、未登録として扱います。
 
 `Object3dRenderContext`
 
@@ -538,6 +590,7 @@ Lightingの平行光・点光源・SpotLightの項目は`LevelLoader.cpp`内の`
 その結果を`Stage1::ApplyStageLighting()`がSceneの照明へ反映します。
 編集結果を保存する時は`LevelLoader::Save()`が`SaveLighting()`へ照明のJSON組立を任せます。
 Engine座標はそのまま、Blender座標は読込時と逆にY/Zを入れ替え、再読込後も同じ照明値にします。
+保存では、完成した`stage1.json.tmp`を同じフォルダ内で`stage1.json`へ置き換えます。失敗したら`.tmp`を消さず、Editorに二つのファイルを確認するよう表示します。読込は常に`.json`だけで、`.tmp`を勝手に本編へ反映しません。
 平行光と点光源は`Stage1`が保持し、JSONのキー・フィル・バックライトは`stageSpotLights_`へ最大3灯だけ保持します。
 
 毎フレームの`Stage1::Update()`では、Mirror・Puzzle・危険Lightを更新した**後**に
@@ -713,6 +766,7 @@ Debug画面のモデルとECS BOX Colliderを、Game Viewへ線として重ね�
 
 Debug画面でモデルまたはTextureを一件だけ大きく確認する時の、所有データ・Camera復帰位置・Mouse操作を担当します。
 `DebugScene`はShelfから選んだモデルを生成し、中心と大きさを渡すだけです。
+Textureプレビューでは`EnterTexture()`が画像を読み込めた時だけSpriteを作り、Camera復帰位置と現在のプレビューを更新します。失敗時は`false`を返し、それらの状態を変えません。
 プレビューは画面全体ではないため、`BaseScene`を継承しません。
 
 `SceneEditor::HandleShelfDropOnEditView()`
@@ -774,6 +828,7 @@ Previewを開始・終了する機能やモデルを追加する機能は持た�
 
 DebugSceneのModel Shelfや自動確認が使う、3Dモデル生成、Texture Sprite追加、一括削除を担当します。
 Object・Sprite・ECSの所有者はDebugSceneのままです。追加後のECS登録と選択状態更新だけをContextの関数でSceneへ返します。
+Texture追加は`AddTexture()`で`TextureManager::LoadTexture()`の成功を確認してからSpriteを作ります。読めなければ一覧追加・ECS登録・Inspector選択を行わず、`false`を返します。
 
 `DebugSceneRenderer`
 
@@ -821,6 +876,8 @@ Stage1の床・鏡・追加Collider・Event Trigger・Event Cameraを線で確�
 Stage1本編はPlayer・Mirror・Door・Cameraを更新し、Smoke Testの記録処理を持ちません。
 
 ## Title UI
+
+以下は通常起動の`TITLE`ではなく、`TITLE_ORIGINAL`で使う従来の`TitleScene`の説明です。
 
 `TitleEditor`
 
@@ -897,10 +954,13 @@ Stage1はJSON保存と、`ApplyStageMapData()`による実行中モデル・Coll
 | 確認対象 | 環境変数 | 確認する内容 |
 | --- | --- | --- |
 | Debug UI | `RIBONIN_CHALLENGE_START_SCENE=DEBUG` と `RIBONIN_CHALLENGE_DEBUG_UI_SMOKE=1` | Model Shelf、追加、Inspector、Game View保存 |
+| Debug粒子・時間再生 | `RIBONIN_CHALLENGE_START_SCENE=DEBUG` と `RIBONIN_CHALLENGE_TIME_PLAYBACK_SMOKE=1` | 存在しない画像の登録拒否、既存Group保持、Particleの発生・逆再生 |
 | Stage1本編 | `RIBONIN_CHALLENGE_START_SCENE=STAGE1` と `RIBONIN_CHALLENGE_STAGE1_GAMEPLAY_SMOKE=1` | Collider、EnemyManager、Mirror、Laser、Door、Camera、落下 |
 | Title再起動 | `RIBONIN_CHALLENGE_START_SCENE=TITLE`、`RIBONIN_CHALLENGE_SCENE_STRESS_SCENE=TITLE`、`RIBONIN_CHALLENGE_SCENE_STRESS_RESTARTS=2` | Titleの初期化、描画、破棄を二回繰り返す |
 
-Stage1確認の成功ログには`SUCCESS`、`sphereColliderApi=1`、`enemyManager=1`が出ます。
+Stage1確認の成功ログには`SUCCESS`、`sphereColliderApi=1`、`enemyManager=1`、`hazardReflectionRoute=1`が出ます。
+`hazardReflectionRoute`は携帯鏡の表側へテスト専用の短い線分を向け、`Stage1::ReflectHazardLightSegments()`が本編の鏡一覧・遮蔽物を使って反射できるかを確認します。通常プレイの危険Lightや鏡の配置は変えません。
+一方の`hazardReflection`は現行配置で動く危険Lightが実際に鏡へ当たったかを記録する観測値で、成功条件ではありません。`0`だけで反射処理の故障とは判断できず、鏡の反射像を画面で確認した証拠にもなりません。
 Title再起動確認は終了コード0で成功です。どの確認もゲーム本編のデータを保存・変更しません。
 
 ## 新しい処理を置く判断
@@ -933,6 +993,9 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | Scene・PostEffect・SwapChainの描画先切替とPresent | DirectXCommonRenderPass |
 | Shader・Descriptor・Texture/Buffer Resourceの作成と転送 | DirectXCommonResources |
 | Particle Groupの生成、通常Emit、更新、GPU描画 | ParticleManager |
+| 全画面PostEffectのPipeline・定数Buffer・効果設定 | PostEffect |
+| 全Sprite共通のRoot Signature・Graphics Pipeline | SpriteCommon |
+| 一枚のSpriteの頂点・定数Buffer、位置・色・画像の設定 | Sprite |
 | Hit・Ring・Lightなど既成演出の粒子発生 | ParticleManagerEffects |
 | Compute Shaderで動かす粒子のバッファ・Emitter・描画 | GPUParticle |
 | 頂点・材質のGPU Resource作成と通常・Skinning描画 | Model |
@@ -940,6 +1003,7 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | SkinClusterのGPU Resource、Compute Skinning、骨ありモデル描画 | ModelSkinning |
 | 通常3DモデルのRootSignature・Graphics Pipeline | Object3dCommon |
 | 鏡用・Skinning用・Skybox用の専用Pipeline | Object3dCommonMirror / Object3dCommonSkinning / Object3dCommonSkybox |
+| 一つのSkyBoxの頂点・Index・行列・Material Buffer | SkyBox |
 | 球・箱の当たり判定を持つ | SphereCollider / ObbCollider |
 | Debug画面の画像・動画保存 | GameViewCapture |
 | スクリーンショット・動画・リプレイの保存 | CaptureManager |
@@ -976,3 +1040,18 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | Stage JSONの3D選択・ギズモ編集 | StageEditViewport |
 | Stage JSONのモデル・Event・Camera Area追加／削除 | StageLevelEditor |
 | Enemyを生成・一覧管理する | EnemyManager |
+
+## Particle Groupの画像と所有順
+
+`DebugScene::InitializeSceneResources()`は`DebugParticleEffects::InitializeResources()`を呼び、Debug用の画像を先読みしてから各Particle Groupの生成を`ParticleManager`へ依頼します。
+`ParticleManager::CreateParticleGroup()`、`CreateRingParticleGroup()`、`CreateCylinderParticleGroup()`は、`PrepareGroupResources()`で画像とSRVの空きを確認し、新しいBuffer・Map・SRVまで完成してからグループを登録します。失敗した画像名や未完成のGPU領域を描画一覧へ残さないため、後の`ParticleManager::Draw()`が未登録資源を取得しません。同じ名前を作り直す時も、準備失敗なら古いグループは残ります。
+Debugの時間再生Smokeは、実素材を消さずに存在しない検証用パスを渡し、この失敗経路を確認します。成功ログの`missingParticleTexture=rejected+originalPreserved`は登録拒否と既存Group保持の結果であり、全画像欠損時の画面表示を保証するものではありません。
+GPUで更新する足跡粒子は別の`GPUParticle`が担当します。`DebugParticleEffects::InitializeResources()`が従来の三番目の画像読込時点で`GPUParticle::PrepareTexture()`を呼び、`GPUParticle::Draw()`は成功時だけ固定画像のSRVを使います。TextureとSRVの実体は`TextureManager`が所有し、`GPUParticle`は画像の指定先と準備成否だけを保持します。
+`GPUParticle::Initialize()`は五つの計算用Buffer → 七つのSRV/UAV → Compute用Pipeline → 描画用Pipeline → 描画・制御Buffer → GPU上の粒子初期化の順です。各生成・Mapの失敗を確認し、最初の失敗はFrameworkへ伝えてScene開始を止めます。途中で取得したSRV/UAVとBufferは`GPUParticle::Finalize()`が解放します。成功時のShader・頂点・描画設定と順番は変えていません。
+`ParticleManager`側の順番は「画像準備 → グループ生成 → `Emit`で粒子追加 → `Update`でGPU用データ更新 → `Draw`で画像を使って描画」です。GPU足跡粒子は`GPUParticle::Update()`がCompute Shaderで更新し、その後に`Draw()`します。粒子の形や色は従来の各設定を調整し、画像の読込失敗を見た目の代替画像で隠しません。
+
+`PostEffect`は自身のRoot Signature・効果別Pipeline・三つの定数Bufferをprivateで所有し、SceneやImGuiは公開された効果設定関数だけを呼びます。初期化は「Root Signature → Pipeline → BufferとMap → マスク画像二枚」の順で、失敗時はFrameworkがScene開始を止めます。`Framework::Finalize()`はSceneの終了後、TextureManagerの終了前に`PostEffect::Finalize()`を呼び、借りたSRV管理参照と自分のGPU資源を外します。マスク画像はTextureManagerが所有します。
+
+2D描画の`SpriteCommon`は全Sprite共通のRoot SignatureとGraphics Pipelineを所有し、個々の頂点・定数Buffer、位置・色・画像は`Sprite`がprivateで所有します。Sceneは`SpriteCommon::Initialize()`の成功を確認してからSpriteを作ります。`Sprite::Initialize()`は自身の四つのBuffer生成とMapの成否を調べ、完成した時だけ`true`を返します。失敗時は途中まで作った自身のGPU資源を外し、SceneやManagerはそのSpriteを描画一覧へ登録しません。`Sprite::SetTexture()`は画像の読込・登録が失敗した時に`false`を返し、既存Spriteの画像設定を保ちます。Loading → Title → Stage1やDebugへ移る際も各Sceneの開始時に共通設定を作り直し、SceneManagerは切替前にGPUの完了を待ちます。`DirectXCommon::CreateBufferResource()`は生成失敗で空を返し、各所有者が使用前に確認します。GPUメモリ不足やMap失敗を実機で強制した確認はまだありません。
+3D背景は`Object3dFactory::CreateSkyBox()`がDDSを読み込み、`SkyBox::Initialize()`に四つのBufferとMapを準備させてからSceneへ渡します。途中で失敗したSkyBoxはSceneへ登録しません。DDS画像の実体はTextureManager、頂点・Index・行列・MaterialのGPU BufferはSkyBox自身が所有します。Titleの3D準備、Stage1、Debugは同じFactoryを使い、元のDDS・頂点・描画順は変えません。
+共通の`ParticleManager::Initialize()`はRoot Signature → Graphics Pipeline → 標準の板頂点 → Material Bufferの順で準備します。各段階で失敗が分かったら例外を`Framework`へ伝え、次の資源とSceneを開始しません。`Framework::Finalize()`は`ParticleManager::Finalize()`を呼び、GroupのSRVを先に返してから、途中まで作成した共通GPU資源も解放します。GPUメモリ不足・Map失敗を実機で強制した確認はまだありません。

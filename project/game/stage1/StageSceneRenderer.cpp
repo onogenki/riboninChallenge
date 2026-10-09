@@ -7,18 +7,22 @@
 #include "Object3dCommon.h"
 #include "Player.h"
 #include "SceneRenderPipeline.h"
+#include "SkyBox.h"
 #include "StageHazardLights.h"
 #include "StageLightPuzzle.h"
 
-// 本編の通常描画対象を、Mirror Surfaceが最後に重なる順番で表示します。
+// 夜空→Object一覧・JSON配置物→鏡面→携帯鏡・Player→光の順にGame Viewを描きます。
+// 鏡面の専用Pipelineから通常設定へ戻し、後続Objectの描画形式が変わらないようにします。
 void StageSceneRenderer::Draw(const Context& context)
 {
-	if (!context.object3dCommon || !context.activeCamera || !context.sceneObjects ||
+	if (!context.object3dCommon || !context.activeCamera || !context.skyBox || !context.sceneObjects ||
 		!context.stageMapRuntime || !context.fixedMirrors || !context.lightPuzzle ||
 		!context.hazardLights) {
 		return;
 	}
 
+	// 深度を書かないSkyBoxを先に置き、後から描く半透明の光を夜空で上書きしません。
+	context.skyBox->Draw();
 	// 発射装置もこの一覧に含まれます。壁などのJSON配置物と同じ通常深度で描きます。
 	SceneRenderPipeline::DrawObjects(context.object3dCommon, *context.sceneObjects);
 	context.stageMapRuntime->Draw();

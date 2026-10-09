@@ -18,10 +18,10 @@ void ModelManager::Initialize(DirectXCommon* dxCommon)
 
 void ModelManager::Finalize()
 {
-	// モデルが借りる共通部を先に解放する従来の順序を保ちます。
-	modelCommon.reset();
+	// Modelが借りるModelCommonを残したまま、先に各Modelを解放します。
 	models.clear();
 	modelWriteTimes_.clear();
+	modelCommon.reset();
 }
 
 bool ModelManager::LoadModel(const std::string& fileName)
@@ -105,13 +105,18 @@ void ModelManager::ReloadAllLoadedModels()
 	}
 }
 
-// Object3dがModelのアドレスを保持するため、読込成功後に同じインスタンスへ移します。
+// 読込成功後、古い頂点・材質をGPUが読み終えてから同じModelへ中身を移します。
 bool ModelManager::ReloadModel(const std::string& fileName, Model& model)
 {
 	Model reloadedModel{};
 	if (!reloadedModel.Initialize(modelCommon.get(), "resources", fileName)) {
 		return false;
 	}
+	if (!reloadedModel.CopyRuntimeSettingsFrom(model)) {
+		return false;
+	}
+	// Object3dが持つModelのアドレスは維持し、差し替え前のGPU資源だけを安全に解放します。
+	modelCommon->GetDxCommon()->WaitForGPU();
 	model = std::move(reloadedModel);
 	return true;
 }
@@ -128,7 +133,6 @@ Model* ModelManager::FindModel(const std::string& fileName)
 
 ModelManager::~ModelManager()
 {
-	// 従来どおり、モデル格納コンテナより先に共通部を解放します。
-	modelCommon.reset();
-	// map内のunique_ptrは自動的に解放されるため、明示的なdeleteは不要
+	// 通常終了以外でも、Modelから共通部への参照が有効な順で片付けます。
+	Finalize();
 }

@@ -2,6 +2,7 @@
 
 #include "Sprite.h"
 #include "SpriteCommon.h"
+#include "TextureManager.h"
 #include "Camera.h"
 #include "Object3d.h"
 #include "DirectXCommon.h"
@@ -57,9 +58,15 @@ bool DebugAssetPreview::EnterTexture(
 		return false;
 	}
 
-	SaveReturnCamera(camera);
+	// 画像が欠けている場合は、現在のプレビューと復帰用Camera状態を変えずに戻ります。
+	if (!TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+		return false;
+	}
 	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize(spriteCommon, textureFilePath);
+	if (!sprite->Initialize(spriteCommon, textureFilePath)) {
+		return false;
+	}
+	SaveReturnCamera(camera);
 	sprite->SetAnchorPoint({ 0.5f, 0.5f });
 	object_.reset();
 	sprite_ = std::move(sprite);

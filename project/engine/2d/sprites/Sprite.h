@@ -44,8 +44,8 @@ public:
 	Sprite() = default;
 	~Sprite() = default;
 
-	// 共通描画部品を借り、画像パスを複製せずに頂点・マテリアルを準備します。
-	void Initialize(SpriteCommon* spriteCommon, const std::string& textureFilePath);
+	// 共通描画部品を借り、四つのBufferと画像がそろった時だけtrueを返します。
+	bool Initialize(SpriteCommon* spriteCommon, const std::string& textureFilePath);
 
 	// 現在の位置・サイズ・切り出し設定から、行列と頂点の値を更新します。
 	void Update();
@@ -68,7 +68,8 @@ public:
 	void SetRotation(float rotation) { this->rotation = rotation; }//回転
 	void SetColor(const Vector4& color) { materialData->color = color; }//色
 	void SetSize(const Vector2& size) { this->size = size; }//サイズ
-	void SetTexture(const std::string& textureFilePath);// テクスチャを変更する関数
+	// 読込失敗時は現在の画像を維持し、変更しなかったことを返します。
+	bool SetTexture(const std::string& textureFilePath);
 	void SetAnchorPoint(const Vector2& anchorPoint) { this->anchorPoint = anchorPoint; }//アンカーポイント
 	void SetIsFlipX(bool isFlipX) { this->isFlipX_ = isFlipX; }
 	void SetIsFlipY(bool isFlipY) { this->isFlipY_ = isFlipY; }
@@ -126,4 +127,6 @@ private:
 
 	//テクスチャサイズをイメージに合わせる
 	void AdjustTextureSize();
+	// 途中生成したGPU資源と、それを指すCPUポインタを一緒に外す。
+	void ResetGpuResources();
 };

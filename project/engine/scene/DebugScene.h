@@ -18,9 +18,12 @@
 #include <memory>
 
 class Camera;
+class CameraManager;
+class Object3dCommon;
 class ParticleEmitter;
 class SkyBox;
 class Sprite;
+class SpriteCommon;
 
 // Debug用のモデル・Sprite・Cameraを所有し、確認用UIと各部品の進行順を決めるSceneです。
 // モデル生成や個別の描画は専用部品へ任せ、Sceneには全体の流れだけを残します。
@@ -41,14 +44,20 @@ public:
 	void Draw()override;
 
 private:
+	// Cameraと描画共通設定はDebugSceneが所有・借用し、他Sceneの状態を書き換えません。
+	std::unique_ptr<CameraManager> cameraManager;
+	std::unique_ptr<Camera> mainCamera;
+	Object3dCommon* object3dCommon = nullptr;
+	SpriteCommon* spriteCommon = nullptr;
+
 	// ---------- DebugScene開始時の準備 ----------
 
 	// PostEffect・Object3d・Sprite・Particleの共通状態を、Debug用の初期値へそろえます。
-	void InitializeRenderSystems();
+	bool InitializeRenderSystems();
 	// MainCameraと上から見る補助Cameraを作り、Scene専用のCameraManagerへ登録します。
 	void InitializeCameras();
-	// Texture・SkyBox・Audio・Particle素材など、初期Objectより先に必要な素材を読み込みます。
-	void InitializeSceneResources();
+	// 初期Objectより先に必須画像を確認し、SkyBoxとParticle素材を準備します。
+	bool InitializeSceneResources();
 	// Terrain・Animation確認モデル・scene.json・初期Spriteを、DebugScene所有の一覧へ追加します。
 	bool InitializeInitialContent();
 	// Debug画面全体で使うLightと、Particle Emitterを初期値で作成します。
@@ -114,6 +123,8 @@ private:
 	DebugEntityRegistry entityRegistry_{};
 	// 背景として描画するSkyBoxです。
     std::unique_ptr<SkyBox> skyBox_;
+	// 必須画像・初期Object・Cameraの準備が終わるまで更新と描画を行いません。
+	bool isSceneReady_ = false;
 
 	// ---------- モデル棚とプレビュー ----------
 

@@ -35,7 +35,7 @@ public:
 		Object3dCommon* object3dCommon,
 		const std::vector<const LevelLoader::ObjectData*>& mirrorDataList,
 		std::vector<std::unique_ptr<FixedMirror>>& outFixedMirrors);
-	// 同じ枚数の既存Mirrorへ位置・Y回転・サイズ・Colliderを反映します。GPU資源は作り直しません。
+	// 同じ枚数の既存Mirrorへ位置・Y回転・サイズ・Colliderを反映します。不正な入力なら一枚も変更せず、GPU資源も作り直しません。
 	// Sceneは枚数の変更やモデル再読込が必要な場合、こちらではなくCreateFixedMirrorsを使います。
 	static bool ApplyFixedMirrorEdits(
 		const std::vector<const LevelLoader::ObjectData*>& mirrorDataList,

@@ -40,6 +40,9 @@ int main(int argc, char** argv)
 	Check(!audio->StopWave(Audio::kInvalidVoiceId), "invalid stop target", failures);
 	Check(!audio->IsVoicePlaying(Audio::kInvalidVoiceId), "invalid playing query", failures);
 
+	// 実行ファイルは音源ではないため、失敗した読込を成功キャッシュへ残さないことを確認します。
+	Check(!audio->LoadFile(argv[0]), "non-audio file rejected", failures);
+	Check(!audio->LoadFile(argv[0]), "failed audio load not cached", failures);
 	const std::string filename = argv[1];
 	Check(audio->LoadFile(filename), "load existing audio", failures);
 	Check(audio->LoadFile(filename), "reuse loaded audio", failures);

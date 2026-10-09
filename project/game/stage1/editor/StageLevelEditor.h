@@ -34,10 +34,10 @@ public:
 	bool AddEventPair(const Context& context);
 	bool AddCameraArea(const Context& context);
 	bool AddPathSphere(const Context& context);
-	// 選択中の削除可能なObjectをLevelDataから削除します。
+	// 選択中の削除可能なObjectを消し、再構築失敗時はデータと選択を戻します。
 	bool RemoveSelectedObject(const Context& context);
-	// Editorから追加した通常モデルだけを全削除し、JSON保存まで行います。
-	void ClearEditorAddedObjects(const Context& context);
+	// Editor追加モデルだけを消し、再構築と保存の結果を表示用の文章で返します。
+	std::string ClearEditorAddedObjects(const Context& context);
 	// Scene終了時にShelfの前回選択を破棄します。
 	void Finalize();
 

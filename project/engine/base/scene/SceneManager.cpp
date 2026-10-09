@@ -2,6 +2,7 @@
 #include "CaptureManager.h"
 #include "DirectXCommon.h"
 #include "Logger.h"
+#include <algorithm>
 #include <utility>
 
 // アプリ全体で共有する一つのSceneManagerを返します。
@@ -81,10 +82,16 @@ bool SceneManager::ChangeScene(const std::string& sceneName)
 	return true;
 }
 
-// Scene名ごとのLoading別名を作らず、共通LoadingSceneを経由してから目的のSceneへ移動します。
+// 行き先が登録済みか先に確認し、無効な名前ではLoadingだけを表示し続けないようにします。
 bool SceneManager::ChangeSceneWithLoading(const std::string& sceneName)
 {
-	if (sceneName.empty() || !ChangeScene("LOADING")) {
+	const auto& sceneNames = GetAvailableSceneNames();
+	if (sceneName.empty() || sceneName == "LOADING" ||
+		std::find(sceneNames.begin(), sceneNames.end(), sceneName) == sceneNames.end()) {
+		Logger::Log("Scene change with loading failed: invalid destination scene: '" + sceneName + "'.");
+		return false;
+	}
+	if (!ChangeScene("LOADING")) {
 		return false;
 	}
 

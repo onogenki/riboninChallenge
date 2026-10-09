@@ -13,7 +13,7 @@ class Object3dGpuData;
 class Object3dFactory;
 class Camera;
 
-// 一体分のTransform・Animation・Light設定を所有し、共有Modelを借りて描画します。
+// 一体分のTransform・Animation・Light描画データを所有し、頂点と材質は共有Modelから借ります。
 class Object3d
 {
 public:
@@ -154,11 +154,12 @@ public:
 	void SetSpotLight(const SpotLight& light);
 	// 複数のLightを同時に設定し、暗い部屋でもそれぞれのLightが周囲を照らせるようにします。
 	void SetSpotLights(const std::array<SpotLight, kMaximumSpotLightCount>& lights);
+	// 共有Modelの材質を変更します。同じModelを使う別Objectにも影響するため、個体別設定ではありません。
 	void SetEnvironmentCoefficient(float coefficient);
 	// 共有Modelの材質を変えず、このObjectの裏面だけを暗くします。
 	void SetBackFaceBrightness(float brightness);
-	// このObject3dだけ、Model本来の画像とは別のTextureを使用する
-	void SetTextureOverride(const std::string& texturePath);
+	// 読込成功時だけこのObjectのTextureを上書きし、失敗時は以前の設定を保ってfalseを返します。
+	bool SetTextureOverride(const std::string& texturePath);
 	void ClearTextureOverride() { textureSrvIndexOverride_ = UINT32_MAX; }
 
 	//getter
@@ -166,6 +167,7 @@ public:
 	const Vector3& GetRotate()const { return transform.rotate; }
 	const Vector3& GetTranslate()const { return transform.translate; }
 	const DirectionalLight& GetDirectionalLight() const;
+	// このObjectが借りている共有Modelの環境反射率を読みます。
 	float GetEnvironmentCoefficient() const;
 	Model* GetModel() const { return model_; }
 	const std::string& GetModelName() const { return modelName_; }
@@ -181,10 +183,11 @@ private:
 	// Object3dを描画可能な状態へ準備する手順は、Factoryだけが実行します。
 	// Sceneやゲーム物体はFactoryから受け取った後に、位置・Light・Animation再生だけを設定します。
 	friend class Object3dFactory;
-	void Initialize(Object3dCommon* object3dCommon);
+	// 一体分のGPU描画データが完成した時だけFactoryへ成功を返します。
+	bool Initialize(Object3dCommon* object3dCommon);
 	void SetModel(Model* model) { this->model_ = model; }
 	void SetModel(const std::string& filePath);
-	void InitializeAnimation();
+	bool InitializeAnimation();
 
 	void ReleaseSkinClusterDescriptors();
 

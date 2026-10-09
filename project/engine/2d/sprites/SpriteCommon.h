@@ -17,8 +17,8 @@ public:
 	SpriteCommon(const SpriteCommon&) = delete;
 	SpriteCommon& operator=(const SpriteCommon&) = delete;
 
-	// SceneからDirectX操作窓口を借り、全Spriteで使う描画設定を作ります。
-	void Initialize(DirectXCommon* dxCommon);
+	// SceneからDirectX操作窓口を借り、共通描画設定を完成できた時だけtrueを返します。
+	bool Initialize(DirectXCommon* dxCommon);
 
 	// Sprite::Drawより先に共通Pipelineと三角形描画を設定します。
 	void SetCommonDrawSetting();

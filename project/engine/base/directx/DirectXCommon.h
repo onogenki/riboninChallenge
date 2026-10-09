@@ -49,6 +49,7 @@ public:
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSRVGPUDescriptorHandle(uint32_t index);
 
 
+	// Shaderの読込・コンパイル・結果取得が失敗した時は、空のBlobを返さず例外で呼び出し元へ伝えます。
 	Microsoft::WRL::ComPtr < IDxcBlob> CompileShader(
 		//CompilerするShaderファイルへのパス
 		const std::wstring& filePath,
@@ -71,7 +72,7 @@ public:
 	//GPUのCopyTextureRegionだけを行う
 	void RecordTextureCopyCommand(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const Microsoft::WRL::ComPtr<ID3D12Resource>& intermediateResource, size_t numSubresources, ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 
-	//どこからでも使えるバッファ生成関数として公開する
+	// Upload Bufferを生成し、失敗時は空を返して呼び出し元に中止を判断させる。
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(size_t sizeInBytes);
 
 	//getter
@@ -104,8 +105,8 @@ public:
 	bool QueueGameTextureCapture(bool usePostEffectTexture);
 	bool TryGetGameTextureCapturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight);
 
-	// テクスチャの転送コマンドを実行して完了を待つ関数
-	void ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);
+	// 転送用資源とCommand Listを準備できた時だけコピー・GPU待ちを行い、SRV登録へ進める。
+	bool ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages);
 
 private:
 	// DirectXの起動時と画面サイズ変更時にだけ呼ぶ内部初期化処理。
@@ -229,7 +230,6 @@ private:
 	//記録時間(FPS固定用)
 	std::chrono::steady_clock::time_point reference_{};
 	std::chrono::microseconds kMinTime_{};
-	std::chrono::microseconds kMinCheckTime_{};
 	float deltaTime_ = 1.0f / 60.0f;
 
 	uint32_t width = WinApp::kClientWidth; // 幅・高さをメンバに

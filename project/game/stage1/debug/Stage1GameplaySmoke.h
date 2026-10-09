@@ -1,6 +1,8 @@
 #pragma once
 
+#include "Laser.h"
 #include "MyMath.h"
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -32,6 +34,8 @@ public:
 		float largeMirrorTargetYawOffset = 0.0f;
 		// EnemyManagerがEnemyを生成する時に使う共通3D描画設定です。所有しません。
 		Object3dCommon* object3dCommon = nullptr;
+		// 本編と同じ鏡・遮蔽物を使う、危険Lightの反射経路です。
+		std::function<std::vector<LaserSegment>(const std::vector<LaserSegment>&)> reflectHazardSegments;
 	};
 
 	// 毎フレーム変わる本編の値だけを、自動確認へ渡します。
@@ -73,6 +77,12 @@ private:
 	bool gameplaySmokeEnabled_ = false;
 	// 球Collider同士を一行で判定する共通APIの結果を記録します。
 	bool gameplaySmokeSphereColliderApi_ = false;
+	// StageのOBB一覧が無効・Trigger Colliderを壁として収集しないか記録します。
+	bool gameplaySmokeStageMapColliderFlags_ = false;
+	// 不正な鏡編集データで既存Mirrorが途中まで変更されないか記録します。
+	bool gameplaySmokeMirrorEditAtomicity_ = false;
+	// Editorの再構築失敗でJSONデータと選択が元へ戻るか記録します。
+	bool gameplaySmokeStageEditorRollback_ = false;
 	// EnemyManagerが複数Enemyを生成し、所有・解放できるかを記録します。
 	bool gameplaySmokeEnemyManagerSpawn_ = false;
 	// Playerが一度でも床へ着地したかを記録します。
@@ -119,6 +129,8 @@ private:
 	bool gameplaySmokeMirrorFloorReflection_ = false;
 	// 危険LightがMirrorで反射したかを記録します。
 	bool gameplaySmokeHazardLightReflection_ = false;
+	// 鏡へ向けた検証用線分が、本編の危険Light反射経路で反射するかを記録します。
+	bool gameplaySmokeHazardReflectionRoute_ = false;
 	// Doorが初期状態で閉じているかを記録します。
 	bool gameplaySmokeDoorStartsClosed_ = false;
 	// Door用Laserが斜めに反射できたかを記録します。

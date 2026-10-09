@@ -18,7 +18,7 @@
 #include "PostEffect.h"
 #include "SceneRenderPipeline.h"
 #include "SceneManager.h"
-#include "Sprite.h"
+#include "SkyBox.h"
 #include "SpriteCommon.h"
 #include "SrvManager.h"
 #include "StageMapObjectIndex.h"
@@ -27,13 +27,13 @@
 #include "StageMirrorFactory.h"
 #include "StageReflectionRenderer.h"
 #include "StageSceneRenderer.h"
-#include "TextureManager.h"
+#include "StageTitleOverlay.h"
 #include "debug/StagePuzzleDebugUi.h"
-#include <algorithm>
 #include <cmath>
 #include <dinput.h>
 #include <functional>
 #include <numbers>
+#include <Windows.h>
 
 using namespace MyMath;
 
@@ -41,6 +41,7 @@ namespace
 {
 	constexpr const char* kStageMapFilePath = "resources/levels/stage1.json";
 	constexpr const char* kStageMapFileName = "stage1";
+	constexpr const char* kSkyBoxTexturePath = "Resources/backGround/skybox-night-cube.dds";
 	constexpr const char* kStageMapChipFilePath = "resources/maps/stage1.csv";
 	// CSVの一マスを、ゲーム内でも1x1x1のブロックとして配置します。
 	constexpr float kStageMapChipCellSize = 1.0f;
@@ -53,100 +54,7 @@ namespace
 	// 提出用Titleだけが使う、Edit Viewで決めた固定Cameraの位置と角度です。
 	const Vector3 kTemporaryTitleCameraPosition{ 16.703f, 0.689f, 37.457f };
 	const Vector3 kTemporaryTitleCameraRotationDegrees{ 0.335f, -183.0f, 0.0f };
-	constexpr const char* kTemporaryTitleTexture = "resources/font/title.png";
-	constexpr const char* kTemporaryEnterTexture = "resources/font/ENTER.png";
-	constexpr float kTitleFadeSeconds = 2.0f;
-	constexpr float kEnterVisibleSeconds = 5.0f;
-	constexpr float kEnterHiddenSeconds = 1.0f;
 }
-
-// 提出用Titleの二枚だけを所有し、元のTitleSceneの12枚には触れません。
-class StageTitleOverlay
-{
-public:
-	// 二枚とも読めた場合だけSpriteを生成し、失敗時に空の登録を残しません。
-	bool Initialize(SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
-	{
-		if (!spriteCommon || !directXCommon) {
-			return false;
-		}
-		spriteCommon->Initialize(directXCommon);
-		TextureManager* textureManager = TextureManager::GetInstance();
-		if (!textureManager->LoadTexture(kTemporaryTitleTexture) ||
-			!textureManager->LoadTexture(kTemporaryEnterTexture)) {
-			return false;
-		}
-		auto titleSprite = std::make_unique<Sprite>();
-		titleSprite->Initialize(spriteCommon, kTemporaryTitleTexture);
-		// 透過余白を除いた画像部分だけを、画面上側へ配置します。
-		titleSprite->SetTextureLeftTop({ 129.0f, 597.0f });
-		titleSprite->SetTextureSize({ 1784.0f, 713.0f });
-		sprites_.push_back(std::move(titleSprite));
-
-		auto enterSprite = std::make_unique<Sprite>();
-		enterSprite->Initialize(spriteCommon, kTemporaryEnterTexture);
-		enterSprite->SetTextureLeftTop({ 379.0f, 757.0f });
-		enterSprite->SetTextureSize({ 1283.0f, 419.0f });
-		sprites_.push_back(std::move(enterSprite));
-		Update(0.0f,
-			static_cast<float>(directXCommon->GetClientWidth()),
-			static_cast<float>(directXCommon->GetClientHeight()));
-		return true;
-	}
-
-	// Titleは一度だけ濃くし、Enterは5秒表示と1秒非表示を繰り返します。
-	void Update(float deltaTime, float clientWidth, float clientHeight)
-	{
-		if (sprites_.size() != 2 || clientWidth <= 0.0f || clientHeight <= 0.0f) {
-			return;
-		}
-		const float elapsed = (std::max)(deltaTime, 0.0f);
-		fadeElapsed_ = (std::min)(fadeElapsed_ + elapsed, kTitleFadeSeconds);
-		blinkElapsed_ = std::fmod(
-			blinkElapsed_ + elapsed, kEnterVisibleSeconds + kEnterHiddenSeconds);
-
-		Sprite* titleSprite = sprites_[0].get();
-		const Vector2 titleTextureSize{ 1784.0f, 713.0f };
-		const float titleWidth = (std::min)(
-			clientWidth * 0.8f,
-			clientHeight * 0.38f * titleTextureSize.x / titleTextureSize.y);
-		const float titleHeight = titleWidth * titleTextureSize.y / titleTextureSize.x;
-		titleSprite->SetPosition({ (clientWidth - titleWidth) * 0.5f, clientHeight * 0.05f });
-		titleSprite->SetSize({ titleWidth, titleHeight });
-		titleSprite->SetColor({ 1.0f, 1.0f, 1.0f, fadeElapsed_ / kTitleFadeSeconds });
-		titleSprite->Update();
-
-		Sprite* enterSprite = sprites_[1].get();
-		const Vector2 enterTextureSize{ 1283.0f, 419.0f };
-		const float enterWidth = (std::min)(
-			clientWidth * 0.45f,
-			clientHeight * 0.22f * enterTextureSize.x / enterTextureSize.y);
-		const float enterHeight = enterWidth * enterTextureSize.y / enterTextureSize.x;
-		enterSprite->SetPosition({
-			(clientWidth - enterWidth) * 0.5f,
-			clientHeight * 0.95f - enterHeight,
-		});
-		enterSprite->SetSize({ enterWidth, enterHeight });
-		enterSprite->SetColor({
-			1.0f, 1.0f, 1.0f,
-			blinkElapsed_ < kEnterVisibleSeconds ? 1.0f : 0.0f,
-		});
-		enterSprite->Update();
-	}
-
-	// Scene終了時だけGPU完了を待ったうえで、二枚のSpriteを解放します。
-	void Finalize()
-	{
-		sprites_.clear();
-	}
-
-	const std::vector<std::unique_ptr<Sprite>>& GetSprites() const { return sprites_; }
-
-private:
-	std::vector<std::unique_ptr<Sprite>> sprites_;
-	float fadeElapsed_ = 0.0f;
-	float blinkElapsed_ = 0.0f;
-};
 
 // 通常のStage1直起動は変えず、Titleとして生成された時だけ待機画面を使います。
 Stage1::Stage1(bool startsWithTemporaryTitle)
@@ -160,47 +68,73 @@ Stage1::Stage1(bool startsWithTemporaryTitle)
 // Stage1が所有するPlayer・Mirror・Rendererを、完全な型を知る場所で破棄します。
 Stage1::~Stage1() = default;
 
+// 必須部品を順にそろえ、途中で失敗したStageを更新・描画へ進めません。
 void Stage1::Initialize()
 {
+	isStageReady_ = false;
 	isTemporaryTitleActive_ = startsWithTemporaryTitle_;
 	hasStageFrameBeenDrawn_ = false;
 	hasStageBgmStarted_ = false;
-	InitializeRenderSystems();
+	if (!InitializeRenderSystems()) {
+		Logger::Log("Stage1 initialization failed: light puzzle renderer could not be prepared.");
+		PostQuitMessage(1);
+		return;
+	}
 	// BGMの再生役だけを準備し、音声ファイルの読込はStage1画面の表示後まで遅らせます。
 	stageBgm_.Initialize(Audio::GetInstance());
 	InitializeDefaultLighting();
 	if (!InitializeStageGimmicks()) {
+		Logger::Log("Stage1 initialization failed: required stage gimmick model, texture or light renderer could not be prepared.");
+		PostQuitMessage(1);
 		return;
 	}
 	// JSONが読めない時に予備座標の鏡を表示しないよう、Stage開始をここで止めます。
 	if (!InitializeStageMap()) {
+		Logger::Log("Stage1 initialization failed: stage map could not be loaded.");
+		PostQuitMessage(1);
 		return;
 	}
 	if (!InitializePlayerAndCamera()) {
+		Logger::Log("Stage1 initialization failed: player or camera could not be prepared.");
+		PostQuitMessage(1);
+		return;
+	}
+	// 仮Titleと本編のどちらでも、完成したCameraを使う夜空を一度だけ生成します。
+	skyBox_ = Object3dFactory::CreateSkyBox(
+		DirectXCommon::GetInstance(), cameraManager->GetActiveCamera(), kSkyBoxTexturePath);
+	if (!skyBox_) {
+		Logger::Log(std::string("Stage1 initialization failed: SkyBox texture could not be loaded: ") + kSkyBoxTexturePath);
+		PostQuitMessage(1);
 		return;
 	}
 	if (isTemporaryTitleActive_ &&
 		!stageTitleOverlay_->Initialize(SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
-		// 素材が欠けても空のSpriteを描かず、原因をログへ残します。
-		Logger::Log("Temporary title initialization failed: title or ENTER texture could not be loaded.");
+		// Titleの共通Pipelineが未完成なら描画へ進めず、素材欠損も同じ失敗として止めます。
+		Logger::Log("Temporary title initialization failed: Sprite pipeline or texture could not be prepared.");
+		PostQuitMessage(1);
+		return;
 	}
 	InitializeGameplaySmoke();
+	isStageReady_ = true;
 }
 
-// DirectX・Camera・Object3dを、Stage1が使える初期状態へそろえます。
-void Stage1::InitializeRenderSystems()
+// Lightを先に準備し、描けない場合はCamera・Objectを作らず起動を止めます。
+bool Stage1::InitializeRenderSystems()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	lightPuzzle_.Initialize(dxCommon);
+	if (!lightPuzzle_.Initialize(dxCommon)) {
+		return false;
+	}
 	PostEffect::GetInstance()->SetGrayscale(false);
 	PostEffect::GetInstance()->SetSepia(false);
 
 	// Playerが部屋を見る通常Cameraを、まず作成します。
-	InitializeMainCamera({ 0.0f, 1.0f, -12.0f });
+	InitializeMainCamera(cameraManager, mainCamera, { 0.0f, 1.0f, -12.0f });
 	object3dCommon = Object3dCommon::GetInstance();
 	object3dCommon->Initialize(dxCommon);
 	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
 	sceneObjects_.Initialize(object3dCommon);
+	return true;
 }
 
 // JSONにLightingがない場合にも使える、Stage1の初期照明を設定します。
@@ -218,10 +152,10 @@ void Stage1::InitializeDefaultLighting()
 	pointLight_.decay = 1.0f;
 }
 
-// CollectionとFactoryへ生成を依頼し、必須の床・携帯鏡・Puzzle部品がそろったか確認します。
+// CollectionとFactoryへ生成を依頼し、設定を変更せず必須部品がそろったか確認します。
 bool Stage1::InitializeStageGimmicks()
 {
-	StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
+	const StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 
 	// 床はJSON読込後に配置を上書きするため、ここでは読込失敗時用の初期値を置きます。
@@ -262,7 +196,9 @@ bool Stage1::InitializeStageGimmicks()
 	}
 	laserEmitter_->SetTranslate(puzzleSettings.laserOrigin);
 	laserEmitter_->SetScale({ 0.9f, 0.9f, 0.9f });
-	laserEmitter_->SetTextureOverride("resources/debug/white.png");
+	if (!laserEmitter_->SetTextureOverride("resources/debug/white.png")) {
+		return false;
+	}
 
 	doorLaserEmitter_ = sceneObjects_.Create("debug/sphere.obj");
 	if (!doorLaserEmitter_) {
@@ -270,10 +206,14 @@ bool Stage1::InitializeStageGimmicks()
 	}
 	doorLaserEmitter_->SetTranslate(puzzleSettings.doorLaserOrigin);
 	doorLaserEmitter_->SetScale({ 0.65f, 0.65f, 0.65f });
-	doorLaserEmitter_->SetTextureOverride("resources/debug/white.png");
+	if (!doorLaserEmitter_->SetTextureOverride("resources/debug/white.png")) {
+		return false;
+	}
 
 	// 危険Lightの色・太さ・描画用Rendererは、軌道と同じギミック部品が所有します。
-	hazardLights_.Initialize(dxCommon);
+	if (!hazardLights_.Initialize(dxCommon)) {
+		return false;
+	}
 
 	// 二つのSwitchはSphere、Doorは厚みのあるfloor.objを縮小して表現します。
 	chargeSwitch_ = sceneObjects_.Create("debug/sphere.obj");
@@ -286,7 +226,9 @@ bool Stage1::InitializeStageGimmicks()
 		puzzleSettings.chargeSwitchRadius * 2.0f,
 		puzzleSettings.chargeSwitchRadius * 2.0f,
 	});
-	chargeSwitch_->SetTextureOverride("resources/debug/white.png");
+	if (!chargeSwitch_->SetTextureOverride("resources/debug/white.png")) {
+		return false;
+	}
 
 	doorSwitch_ = sceneObjects_.Create("debug/sphere.obj");
 	if (!doorSwitch_) {
@@ -298,7 +240,9 @@ bool Stage1::InitializeStageGimmicks()
 		puzzleSettings.doorSwitchRadius * 2.0f,
 		puzzleSettings.doorSwitchRadius * 2.0f,
 	});
-	doorSwitch_->SetTextureOverride("resources/debug/white.png");
+	if (!doorSwitch_->SetTextureOverride("resources/debug/white.png")) {
+		return false;
+	}
 
 	lightDoor_ = sceneObjects_.Create("debug/floor.obj");
 	if (!lightDoor_) {
@@ -345,7 +289,10 @@ bool Stage1::InitializePlayerAndCamera()
 		return false;
 	}
 	// sphere.obj本来のUVチェッカーを使わず、Playerだけへモンスターボール画像を明示します。
-	player_->GetObject().SetTextureOverride("resources/debug/monsterBall.png");
+	if (!player_->GetObject().SetTextureOverride("resources/debug/monsterBall.png")) {
+		player_.reset();
+		return false;
+	}
 
 	// Camera本体とは別のControllerに、Playerを追従する規則を任せます。
 	cameraController_ = std::make_unique<CameraController>();
@@ -391,10 +338,10 @@ void Stage1::BeginStageStart()
 		stageStartSettings_);
 }
 
-// 自動動作確認に必要なStage固有データだけを渡します。
+// 設定値を変更せず自動動作確認へ渡し、テスト側で本編の反射経路を確認できるようにします。
 void Stage1::InitializeGameplaySmoke()
 {
-	StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
+	const StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
 	gameplaySmoke_.Initialize({
 		player_.get(),
 		carryableMirror_.get(),
@@ -410,16 +357,23 @@ void Stage1::InitializeGameplaySmoke()
 		puzzleSettings.largeMirrorBaseYaw,
 		puzzleSettings.largeMirrorTargetYawOffset,
 		object3dCommon,
+		[this](const std::vector<LaserSegment>& sourceSegments)
+		{
+			return ReflectHazardLightSegments(sourceSegments);
+		},
 	});
 }
 
+// 初期化途中で終了した場合も、生成済みの所有物だけを安全に解放します。
 void Stage1::Finalize()
 {
+	isStageReady_ = false;
 	// unique_ptr がオブジェクトを自動的に解放します。
 	// SceneManager がこの関数の前に GPU の処理完了を待機します。
 	if (stageTitleOverlay_) {
 		stageTitleOverlay_->Finalize();
 	}
+	skyBox_.reset();
 	stageCameraEvents_.Clear(cameraManager.get());
 	stageEditor_.Finalize();
 	sceneObjects_.Clear();
@@ -443,8 +397,12 @@ void Stage1::Finalize()
 	player_.reset();
 }
 
+// 必須部品が未準備なら、PlayerやCameraを参照する通常更新を行いません。
 void Stage1::Update()
 {
+	if (!isStageReady_) {
+		return;
+	}
 	// 提出用TitleではStageの描画だけを準備し、Player・Camera追従・BGMは進めません。
 	if (isTemporaryTitleActive_) {
 		DirectXCommon* dxCommon = DirectXCommon::GetInstance();
@@ -561,10 +519,16 @@ void Stage1::PrepareStageRenderObjects()
 	if (player_) {
 		renderContext.UpdateObject(player_->GetObject());
 	}
+	// Cameraの更新後にSkyBoxの行列を作り、仮Titleと本編で同じ向きを描きます。
+	skyBox_->Update();
 }
 
+// 必須部品が未準備なら、反射用Textureとゲーム画面を描画しません。
 void Stage1::Draw()
 {
+	if (!isStageReady_) {
+		return;
+	}
 	// ---------- 固定鏡の反射Textureを先に作成 ----------
 	SrvManager::GetInstance()->PreDraw();
 	StageReflectionRenderer::Context reflectionContext{};
@@ -586,6 +550,7 @@ void Stage1::Draw()
 	StageSceneRenderer::Context sceneRendererContext{};
 	sceneRendererContext.object3dCommon = object3dCommon;
 	sceneRendererContext.activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	sceneRendererContext.skyBox = skyBox_.get();
 	sceneRendererContext.sceneObjects = &sceneObjects_.GetObjects();
 	sceneRendererContext.stageMapRuntime = &stageMapRuntime_;
 	sceneRendererContext.fixedMirrors = &fixedMirrors_;
@@ -744,7 +709,7 @@ void Stage1::UpdateStageCamera(float deltaTime, bool isStageStartPlaying)
 	cameraManager->Update();
 }
 
-// 最初のStage1描画を待ってからBGMを読み込むため、音が白いLoading画面より先に流れません。
+// 直起動では最初の描画後に、Title経由ではEnter後の本編UpdateでBGMを始めます。
 void Stage1::UpdateStageBgm(float deltaTime)
 {
 	if (!hasStageFrameBeenDrawn_) {
@@ -1033,7 +998,7 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
 	puzzleSettings.largeMirrorBaseYaw = mirrorDataList.front()->rotation.y;
 	fixedMirrors_.front()->GetYawForEdit() = puzzleSettings.largeMirrorBaseYaw +
-		puzzleSettings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmountForEdit();
+		puzzleSettings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount();
 	fixedMirrors_.front()->SyncVisualAndCollider();
 
 	if (rebuildRuntimeObjects) {

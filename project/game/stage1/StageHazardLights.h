@@ -22,8 +22,8 @@ public:
 	// forward宣言したLaserRendererを安全に破棄するため、実装はcppに置きます。
 	~StageHazardLights();
 
-	// 危険Lightごとの色・太さ・最大線分数を使い、描画用Rendererを準備します。
-	void Initialize(DirectXCommon* directXCommon);
+	// 危険Lightの描画用Rendererを全て準備し、一つでも描けない時は失敗を返します。
+	bool Initialize(DirectXCommon* directXCommon);
 
 	// 時刻から危険Lightを更新し、反射・Player接触までを計算します。
 	void Update(
@@ -52,7 +52,7 @@ private:
 	float time_ = 0.0f;
 	bool isPlayerHit_ = false;
 
-	// Stage1の最初の危険Light配置です。将来JSON化する場合も、このクラスの設定値になります。
+	// 危険Lightの初期位置と移動範囲です。Updateがここを基準に軌道を計算します。
 	Vector3 ceilingSweepStart_{ 18.0f, 4.25f, 26.0f };
 	float ceilingSweepDistance_ = 5.0f;
 	Vector3 horizontalMoveNearStart_{ 32.0f, 1.00f, 30.0f };

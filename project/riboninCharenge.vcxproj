@@ -446,6 +446,7 @@
     <ClCompile Include="game\stage1\StageReflectionRenderer.cpp" />
     <ClCompile Include="game\stage1\StageSceneRenderer.cpp" />
     <ClCompile Include="game\stage1\StageStart.cpp" />
+    <ClCompile Include="game\stage1\StageTitleOverlay.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game\GameSceneRegistration.h" />
@@ -472,6 +473,7 @@
     <ClInclude Include="game\stage1\StageReflectionRenderer.h" />
     <ClInclude Include="game\stage1\StageSceneRenderer.h" />
     <ClInclude Include="game\stage1\StageStart.h" />
+    <ClInclude Include="game\stage1\StageTitleOverlay.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\2d\particles\ParticleEmitter.h" />

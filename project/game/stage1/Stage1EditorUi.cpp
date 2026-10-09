@@ -76,7 +76,7 @@ void Stage1::DrawStagePuzzleDebugUi()
 			// 進行中の回転量はJSONへ焼き込まず、基準角度だけを保存します。
 			StageLightPuzzle::Settings& settings = lightPuzzle_.GetSettings();
 			settings.largeMirrorBaseYaw = fixedMirror.GetYaw() -
-				settings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmountForEdit();
+				settings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount();
 			std::function<bool(std::vector<LevelLoader::ObjectData>&)> syncMirrorData;
 			syncMirrorData = [&](std::vector<LevelLoader::ObjectData>& objects)
 			{

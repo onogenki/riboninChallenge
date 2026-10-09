@@ -10,31 +10,40 @@
 #include "externals/imgui/imgui.h"
 #endif
 
-// Debug画面のEmitterとEffectが共通で使うTexture・Particle Groupを一度だけ準備します。
-void DebugParticleEffects::InitializeResources()
+// TextureとGroupを既存順に作り、見えない粒子を成功扱いにしないため成否を返します。
+bool DebugParticleEffects::InitializeResources()
 {
 	TextureManager* textureManager = TextureManager::GetInstance();
-	textureManager->LoadTexture("Resources/debug/uvChecker.png");
-	textureManager->LoadTexture("Resources/debug/circle.png");
-	textureManager->LoadTexture("Resources/debug/circle2.png");
-	textureManager->LoadTexture("Resources/debug/gradationLine.png");
+	GPUParticle* gpuParticle = GPUParticle::GetInstance();
+	if (!textureManager->LoadTexture("Resources/debug/uvChecker.png") ||
+		!textureManager->LoadTexture("Resources/debug/circle.png")) {
+		return false;
+	}
+	// GPU粒子自身が読込成否を保持し、失敗時は空のSRVを描画へ渡しません。
+	if (!gpuParticle->PrepareTexture() ||
+		!textureManager->LoadTexture("Resources/debug/gradationLine.png")) {
+		return false;
+	}
 
 	ParticleManager* particleManager = ParticleManager::GetInstance();
-	particleManager->CreateParticleGroup("Circle", "Resources/debug/circle.png");
-	particleManager->CreateParticleGroup("Plane", "Resources/debug/uvChecker.png");
-	particleManager->CreateParticleGroup("Hit", "Resources/debug/circle2.png");
-	particleManager->CreateRingParticleGroup("Ring", "Resources/debug/gradationLine.png");
-	particleManager->CreateCylinderParticleGroup("Cylinder", "Resources/debug/gradationLine.png");
-	particleManager->CreateParticleGroup("PillarSparkle", "Resources/debug/circle2.png");
-	particleManager->CreateParticleGroup("LightCore", "Resources/debug/circle2.png");
-	particleManager->CreateParticleGroup("LightRain", "Resources/debug/gradationLine.png");
-	particleManager->CreateParticleGroup("LightSpiral", "Resources/debug/circle2.png");
+	// 各生成結果をその場で確認し、種類名の別リストを持たないようにします。
+	if (!particleManager->CreateParticleGroup("Circle", "Resources/debug/circle.png") ||
+		!particleManager->CreateParticleGroup("Plane", "Resources/debug/uvChecker.png") ||
+		!particleManager->CreateParticleGroup("Hit", "Resources/debug/circle2.png") ||
+		!particleManager->CreateRingParticleGroup("Ring", "Resources/debug/gradationLine.png") ||
+		!particleManager->CreateCylinderParticleGroup("Cylinder", "Resources/debug/gradationLine.png") ||
+		!particleManager->CreateParticleGroup("PillarSparkle", "Resources/debug/circle2.png") ||
+		!particleManager->CreateParticleGroup("LightCore", "Resources/debug/circle2.png") ||
+		!particleManager->CreateParticleGroup("LightRain", "Resources/debug/gradationLine.png") ||
+		!particleManager->CreateParticleGroup("LightSpiral", "Resources/debug/circle2.png")) {
+		return false;
+	}
 
-	GPUParticle* gpuParticle = GPUParticle::GetInstance();
 	gpuParticle->SetEmitterType(0, GPUParticle::EmitterType::Mix);
 	gpuParticle->SetEmitterParticleType(0, GPUParticle::ParticleType::Trail);
 	gpuParticle->SetEmitterType(1, GPUParticle::EmitterType::Mix);
 	gpuParticle->SetEmitterParticleType(1, GPUParticle::ParticleType::Trail);
+	return true;
 }
 
 // Particle種類ごとの有効状態・発生数・大きさをImGuiで編集します。

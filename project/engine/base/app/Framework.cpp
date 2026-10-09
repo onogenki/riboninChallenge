@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <chrono>
+#include <exception>
 #include <fstream>
 #include <format>
 #include <mfapi.h>
@@ -116,33 +117,54 @@ void Framework::Initialize()
 	// RenderTextureをShaderから読めるよう、SrvManager初期化後にSRVを生成する
 	dxCommon_->CreateRenderTextureSRV(srvManager_);
 	TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
-	// RenderTextureをSwapChainへコピーするPostEffectを初期化する
-	PostEffect::GetInstance()->Initialize(dxCommon_, srvManager_);
-	ModelManager::GetInstance()->Initialize(dxCommon_);
-	ParticleManager::GetInstance()->Initialize(dxCommon_, srvManager_);
-	GPUParticle::GetInstance()->Initialize(dxCommon_, srvManager_);
-	Audio::GetInstance()->Initialize();
+	// 失敗した資源の後続を初期化しないため、Sceneが必要とする共通部品を順に準備します。
+	try {
+		// RenderTextureをSwapChainへコピーするPostEffectを初期化する
+		PostEffect::GetInstance()->Initialize(dxCommon_, srvManager_);
+		ModelManager::GetInstance()->Initialize(dxCommon_);
+		ParticleManager::GetInstance()->Initialize(dxCommon_, srvManager_);
+		GPUParticle::GetInstance()->Initialize(dxCommon_, srvManager_);
+		Audio::GetInstance()->Initialize();
+		isAudioInitialized_ = true;
 
-	//入力の初期化
-	input_ = Input::GetInstance();
-	input_->Initialize(winApp_.get());
-
-	imGuiManager_ = ImGuiManager::GetInstance();
-	imGuiManager_->Initialize(winApp_.get(), dxCommon_, srvManager_);
-	CaptureManager::GetInstance()->Initialize();
+		// 入力とImGuiは描画資源の準備後に従来どおり初期化します。
+		input_ = Input::GetInstance();
+		input_->Initialize(winApp_.get());
+		imGuiManager_ = ImGuiManager::GetInstance();
+		imGuiManager_->Initialize(winApp_.get(), dxCommon_, srvManager_);
+		isImGuiInitialized_ = true;
+		CaptureManager::GetInstance()->Initialize();
+	} catch (const std::exception& error) {
+		// 必須画像やShaderが欠けた時は、次の初期化とScene開始を止めます。
+		Logger::Log(std::string("Framework initialization failed: ") + error.what());
+		RequestEnd(1);
+	}
 
 	// クラッシュ時にExportDumpを呼ぶように登録
 	SetUnhandledExceptionFilter(ExportDump);
-
 }
 
+// SceneFactoryを先に所有し、SceneManagerが参照する間は破棄されないようにします。
+void Framework::SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory)
+{
+	sceneFactory_ = std::move(sceneFactory);
+	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
+}
+
+// 終了判定と終了コードを一緒に更新し、派生先が内部状態を書き換えないようにします。
+void Framework::RequestEnd(int exitCode)
+{
+	exitCode_ = exitCode;
+	endRequest_ = true;
+}
+
+// 終了メッセージを受けたフレームでは、破棄済みWindowを使う更新へ進みません。
 void Framework::Update()
 {
-	//ウィンドウにメッセージが来てたら最優先で処理される
-	if (winApp_->ProcessMessage())
-	{
-		//終了フラグを立てて、このフレームの更新処理をする抜ける
-		endRequest_ = true;
+	// Windowを閉じた後のResize・Input・Scene更新を避けるため、ここで戻ります。
+	if (winApp_->ProcessMessage()) {
+		RequestEnd();
+		return;
 	}
 	dxCommon_->ResizeIfNeeded();
 	input_->Update();
@@ -156,7 +178,7 @@ void Framework::Update()
 	SceneManager::GetInstance()->Update();
 }
 
-// Sceneが使う共通資源を残したままSceneを終了し、その後で各Managerを片付けます。
+// Sceneを先に終了し、共有資源は使う側から作成時と逆の順で解放します。
 void Framework::Finalize()
 {
 
@@ -164,15 +186,21 @@ void Framework::Finalize()
 	SceneManager::GetInstance()->SetSceneFactory(nullptr);
 
 	CaptureManager::GetInstance()->Finalize();
-	imGuiManager_->Finalize();
-	TextureManager::GetInstance()->Finalize();
-	ModelManager::GetInstance()->Finalize();
-	ParticleManager::GetInstance()->Finalize();
+	if (isImGuiInitialized_) {
+		imGuiManager_->Finalize();
+		isImGuiInitialized_ = false;
+	}
 	GPUParticle::GetInstance()->Finalize();
-	Audio::GetInstance()->Unload();
-
-	// Audio::Initializeで開始したMedia Foundationは、音源の解放後に終了します。
-	MFShutdown();
+	ParticleManager::GetInstance()->Finalize();
+	ModelManager::GetInstance()->Finalize();
+	PostEffect::GetInstance()->Finalize();
+	TextureManager::GetInstance()->Finalize();
+	if (isAudioInitialized_) {
+		Audio::GetInstance()->Unload();
+		// Audio::Initializeで開始したMedia Foundationは、音源の解放後に終了します。
+		MFShutdown();
+		isAudioInitialized_ = false;
+	}
 
 	if (winApp_) {
 		winApp_->Finalize();
@@ -183,12 +211,14 @@ void Framework::Finalize()
 	winApp_.reset();
 }
 
-void Framework::Run()
+// 終了理由を資源解放前に取り出し、WinMainへ伝えます。
+int Framework::Run()
 {
 	//ゲームの初期化
 	Initialize();
 
-	while (true) //ゲームループ
+	// 初期化失敗を受け取った時は、未完成のSceneを更新・描画せず解放へ進みます。
+	while (!IsEndRequest()) //ゲームループ
 	{
 		//毎フレーム更新
 		Update();
@@ -200,6 +230,9 @@ void Framework::Run()
 		//描画
 		Draw();
 	}
+	// WinAppはFinalizeで解放されるため、先に終了コードを保存します。
+	const int result = exitCode_ != 0 ? exitCode_ : (winApp_ ? winApp_->GetQuitCode() : 0);
 	//ゲームの終了
 	Finalize();
+	return result;
 }

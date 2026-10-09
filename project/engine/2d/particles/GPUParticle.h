@@ -41,9 +41,11 @@ public:
 
 	// Frameworkが初期化した二つの窓口を借り、粒子用資源を作ります。SRVの空きが7枠必要です。
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+	// Debug Sceneが使う固定画像を読み、失敗時は描画できない状態を保ちます。
+	bool PrepareTexture();
 	// deltaTime秒だけEmitterを進め、発生とGPU上の粒子更新をこの順に行います。
 	void Update(float deltaTime);
-	// 指定Cameraで粒子を描きます。cameraがnullptrなら描画しません。
+	// 指定Cameraと固定画像の準備がそろった時だけ粒子を描きます。
 	void Draw(const Camera* camera);
 	// emitterIndex番の発生位置をワールド座標で指定します。範囲外の番号は無視します。
 	void SetEmitterTranslate(uint32_t emitterIndex, const Vector3& translate);
@@ -143,8 +145,8 @@ private:
 
 	// 粒子計算用バッファ、Shaderから見るSRV/UAV、描画・制御用バッファを依存順に準備します。
 	void CreateParticleBuffers();
-	// 五種類の粒子バッファを、同じDefault Heap・UAV状態で容量だけ変えて作ります。
-	void CreateParticleBufferResource(uint64_t sizeInBytes, Microsoft::WRL::ComPtr<ID3D12Resource>& resource) const;
+	// 五種類の粒子バッファを、同じDefault Heap・UAV状態で作り、失敗した名前を伝えます。
+	void CreateParticleBufferResource(uint64_t sizeInBytes, Microsoft::WRL::ComPtr<ID3D12Resource>& resource, const char* resourceName) const;
 	void CreateParticleDescriptors();
 	void CreateDrawAndControlBuffers();
 	void CreateComputePipeline();
@@ -156,6 +158,8 @@ private:
 
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
+	// 固定画像の読込に成功した時だけDrawでSRVを取得します。
+	bool isTextureReady_ = false;
 	uint32_t particleSrvIndex_ = SrvManager::kInvalidSrvIndex;
 	uint32_t activeParticleIndicesSrvIndex_ = SrvManager::kInvalidSrvIndex;
 	uint32_t particleUavIndex_ = SrvManager::kInvalidSrvIndex;

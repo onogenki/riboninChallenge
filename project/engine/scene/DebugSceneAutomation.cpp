@@ -56,12 +56,14 @@ void DebugScene::InitializeUiSmokeFromEnvironment()
 	}
 
 	const bool isAnimationPreviewTest = smokeMode == "walk";
-	const bool isAnimationSceneTest = smokeMode == "walk-scene";
+	const bool isHotReloadTest = smokeMode == "walk-scene-reload";
+	const bool isAnimationSceneTest = smokeMode == "walk-scene" || isHotReloadTest;
 	DebugUiSmoke::Start(
 		uiSmoke_,
 		gameViewCapture_.MakeTimestampString(),
 		isAnimationPreviewTest,
-		isAnimationSceneTest);
+		isAnimationSceneTest,
+		isHotReloadTest);
 }
 
 // UI変更後のParticle Effectと、Sceneを操作する二種類の自動確認を更新します。

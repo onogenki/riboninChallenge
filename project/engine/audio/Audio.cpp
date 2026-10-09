@@ -5,6 +5,7 @@
 #include <wrl.h>
 #include <algorithm>
 #include <cassert>
+#include <utility>
 
 #pragma comment(lib, "xaudio2.lib")
 #pragma comment(lib, "mfreadwrite.lib")
@@ -98,8 +99,10 @@ bool Audio::LoadFile(const std::string& filename)
 	if (FAILED(result)) {
 		return false;
 	}
-	pPCMType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
-	pPCMType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
+	if (FAILED(pPCMType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio)) ||
+		FAILED(pPCMType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM))) {
+		return false;
+	}
 	result = pReader->SetCurrentMediaType(audioStreamIndex, nullptr, pPCMType.Get());
 	if (FAILED(result)) {
 		return false;
@@ -142,19 +145,34 @@ bool Audio::LoadFile(const std::string& filename)
 		{
 			ComPtr<IMFMediaBuffer> pBuffer;
 			//サンプルに含まれるサウンドデータのバッファを一繋ぎにして取得
-			pSample->ConvertToContiguousBuffer(&pBuffer);
+			if (FAILED(pSample->ConvertToContiguousBuffer(&pBuffer)) || !pBuffer) {
+				return false;
+			}
 
 			BYTE* pData = nullptr;//データ読み取りポインタ
 			DWORD maxLength = 0, currentLength = 0;
 			//バッファの読み込み時にロック
-			pBuffer->Lock(&pData, &maxLength, &currentLength);
+			if (FAILED(pBuffer->Lock(&pData, &maxLength, &currentLength))) {
+				return false;
+			}
 			//バッファの末尾にデータを追加
-			soundData.buffer.insert(soundData.buffer.end(), pData, pData + currentLength);
-			pBuffer->Unlock();
+			// 空サンプルではnullポインタを参照せず、読めないサンプルも登録しません。
+			const bool hasReadableData = pData != nullptr || currentLength == 0;
+			if (hasReadableData && currentLength > 0) {
+				soundData.buffer.insert(soundData.buffer.end(), pData, pData + currentLength);
+			}
+			const HRESULT unlockResult = pBuffer->Unlock();
+			if (!hasReadableData || FAILED(unlockResult)) {
+				return false;
+			}
 		}
 	}
 
-	soundDatas_[filename] = soundData;
+	// デコード結果が空なら、再生不能な音源を読込済みキャッシュへ残しません。
+	if (soundData.buffer.empty()) {
+		return false;
+	}
+	soundDatas_.emplace(filename, std::move(soundData));
 	return true;
 }
 

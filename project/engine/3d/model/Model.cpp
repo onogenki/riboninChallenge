@@ -38,7 +38,13 @@ Model::Node Model::ReadNode(aiNode* node)
 // モデル本体と材質画像を順に準備し、画像を読めないモデルは登録させないようにします。
 bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename)
 {
-
+	// 前回の途中資源を残さず、読込失敗時も未完成のModelを登録しないようにします。
+	ResetGpuResources();
+	if (!modelCommon || !modelCommon->GetDxCommon() ||
+		!modelCommon->GetDxCommon()->GetDevice()) {
+		Logger::Log("Model: ModelCommon or DirectX device is unavailable: " + filename);
+		return false;
+	}
 	//ModelCommonのポインタを引数からメンバ変数に記録する
 	modelCommon_ = modelCommon;
 	//モデル読み込み
@@ -46,15 +52,16 @@ bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 		return false;
 	}
 
-	CreateIndexData();
-	//頂点データ作成
-	CreateVertexData();
-	//マテリアルデータ作成
-	CreateMaterialData();
+	// GPUへ渡す三つのBufferが揃ってから、材質画像の読込へ進みます。
+	if (!CreateIndexData() || !CreateVertexData() || !CreateMaterialData()) {
+		ResetGpuResources();
+		return false;
+	}
 	for (MaterialData& material : modelData.materials)
 	{
 		const std::filesystem::path texturePath = material.textureFilePath;
-		// 画像指定のない材質だけ、従来どおり確認用画像を使います。
+		// 空・None・先頭が*の画像参照は、従来どおり確認用画像へ置き換えます。
+		// この画像が見えても、元画像の表示成功とは扱いません。
 		if (material.textureFilePath.empty() ||
 			material.textureFilePath.find("None") != std::string::npos ||
 			material.textureFilePath.front() == '*')
@@ -65,11 +72,13 @@ bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 			std::error_code error;
 			if (!std::filesystem::exists(texturePath, error)) {
 				Logger::Log("Model: referenced texture unavailable: " + material.textureFilePath);
+				ResetGpuResources();
 				return false;
 			}
 		}
 		if (!TextureManager::GetInstance()->LoadTexture(material.textureFilePath)) {
 			Logger::Log("Model: texture load failed: " + material.textureFilePath);
+			ResetGpuResources();
 			return false;
 		}
 	}
@@ -114,7 +123,7 @@ void Model::DrawGeometry()
 	}
 }
 
-// 画像を読み込めた時だけ全材質を差し替え、失敗時は既存の画像パスを残します。
+// 画像を読み込めた時だけ全材質を差し替え、再読込時にも使える明示指定として記録します。
 void Model::SetTexture(const std::string& filePath)
 {
 	if (!TextureManager::GetInstance()->LoadTexture(filePath)) {
@@ -125,14 +134,49 @@ void Model::SetTexture(const std::string& filePath)
 	{
 		material.textureFilePath = filePath;
 	}
+	runtimeTextureOverride_ = filePath;
+}
+
+// ファイル由来の頂点・材質一覧は新しいまま、実行中に調整した材質値と明示画像だけを引き継ぎます。
+bool Model::CopyRuntimeSettingsFrom(const Model& previous)
+{
+	if (!materialData || !previous.materialData) {
+		return false;
+	}
+	if (previous.runtimeTextureOverride_ &&
+		!TextureManager::GetInstance()->Contains(*previous.runtimeTextureOverride_)) {
+		return false;
+	}
+
+	materialData->color = previous.materialData->color;
+	materialData->enableLighting = previous.materialData->enableLighting;
+	materialData->uvTransform = previous.materialData->uvTransform;
+	materialData->shininess = previous.materialData->shininess;
+	materialData->environmentCoefficient = previous.materialData->environmentCoefficient;
+	materialData->specularIntensity = previous.materialData->specularIntensity;
+	if (previous.runtimeTextureOverride_) {
+		for (MaterialData& material : modelData.materials) {
+			material.textureFilePath = *previous.runtimeTextureOverride_;
+		}
+		runtimeTextureOverride_ = previous.runtimeTextureOverride_;
+	}
+	return true;
 }
 
 //アニメーション適用
-void Model::CreateIndexData()
+// IndexをGPUへ渡すBufferを作り、生成・Mapの失敗を上位へ伝えます。
+bool Model::CreateIndexData()
 {
-	assert(!modelData.indices.empty());
+	if (modelData.indices.empty()) {
+		Logger::Log("Model: index data is empty");
+		return false;
+	}
 	// --- インデックスバッファの作成 ---
 	indexResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * modelData.indices.size());
+	if (!indexResource) {
+		Logger::Log("Model: index buffer creation failed");
+		return false;
+	}
 
 	// インデックスバッファビューの設定
 	indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
@@ -141,18 +185,32 @@ void Model::CreateIndexData()
 
 	// --- データのマップとコピー ---
 	uint32_t* mappedIndex = nullptr;
-	indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+	const HRESULT mapResult = indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+	if (FAILED(mapResult) || !mappedIndex) {
+		Logger::Log("Model: index buffer Map failed");
+		return false;
+	}
 	std::memcpy(mappedIndex, modelData.indices.data(), sizeof(uint32_t) * modelData.indices.size());
 	indexResource->Unmap(0, nullptr);
+	return true;
 }
 
-void Model::CreateVertexData()
+// 頂点Bufferが完成した時だけ、描画用のViewとMap先を有効にします。
+bool Model::CreateVertexData()
 {
+	if (modelData.vertices.empty()) {
+		Logger::Log("Model: vertex data is empty");
+		return false;
+	}
 	// 書き込むデータのサイズ（頂点データ全体のバイト数）
 	size_t sizeInBytes = sizeof(VertexData) * modelData.vertices.size();
 
 	// 1. 頂点リソースを作る (Spriteから持ってきたヘルパー関数を使用)
 	vertexResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeInBytes);
+	if (!vertexResource) {
+		Logger::Log("Model: vertex buffer creation failed");
+		return false;
+	}
 
 	// 2. 頂点バッファビューを作成
 	// リソースの先頭のアドレスから使う
@@ -164,19 +222,33 @@ void Model::CreateVertexData()
 
 	// 3. データを書き込む
 	// 書き込むためのアドレスを取得
-	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	const HRESULT mapResult = vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+	if (FAILED(mapResult) || !vertexData) {
+		Logger::Log("Model: vertex buffer Map failed");
+		return false;
+	}
 
 	// 読み込んだモデルデータ(std::vector)の中身を、マップしたメモリ(vertexData)へ一括コピー
 	std::memcpy(vertexData, modelData.vertices.data(), sizeInBytes);
+	return true;
 }
 
-void Model::CreateMaterialData()
+// Materialの初期値を書けるMap先が得られた時だけ成功とします。
+bool Model::CreateMaterialData()
 {
 	// 1. マテリアルリソースを作る (サイズは Material 構造体1つ分)
 	materialResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(Material));
+	if (!materialResource) {
+		Logger::Log("Model: material buffer creation failed");
+		return false;
+	}
 
 	// 2. データを書き込むためのアドレスを取得して materialData に割り当てる
-	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+	const HRESULT mapResult = materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
+	if (FAILED(mapResult) || !materialData) {
+		Logger::Log("Model: material buffer Map failed");
+		return false;
+	}
 
 	// 3. マテリアルデータの初期値を書き込む
 	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
@@ -190,6 +262,25 @@ void Model::CreateMaterialData()
 	materialData->specularIntensity = 1.0f;
 
 	materialData->uvTransform = MakeIdentity4x4();
+	return true;
+}
+
+// Modelが所有するBufferとCPUのMap先を一緒に無効にし、失敗後の再利用を防ぎます。
+void Model::ResetGpuResources()
+{
+	if (vertexResource && vertexData) {
+		vertexResource->Unmap(0, nullptr);
+	}
+	if (materialResource && materialData) {
+		materialResource->Unmap(0, nullptr);
+	}
+	vertexData = nullptr;
+	materialData = nullptr;
+	indexBufferView = {};
+	vertexBufferView = {};
+	indexResource.Reset();
+	vertexResource.Reset();
+	materialResource.Reset();
 }
 
 bool Model::LoadModelFile(const std::string& directoryPath, const std::string& filename)

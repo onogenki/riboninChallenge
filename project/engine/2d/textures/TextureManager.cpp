@@ -1,5 +1,6 @@
 #include "TextureManager.h"
 #include "DirectXCommon.h"
+#include "Logger.h"
 #include <cassert>
 #include <filesystem>
 
@@ -106,6 +107,7 @@ bool TextureManager::CreateTextureData(
 		hr = DirectX::LoadFromWICFile(wFilePath.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
 	}
 	if (FAILED(hr)) {
+		Logger::Log("TextureManager: image file load failed: " + filePath);
 		return false;
 	}
 
@@ -125,6 +127,7 @@ bool TextureManager::CreateTextureData(
 			mipImages
 		); 
 		if (FAILED(hr)) {
+			Logger::Log("TextureManager: mipmap generation failed: " + filePath);
 			return false;
 		}
 	}
@@ -132,6 +135,10 @@ bool TextureManager::CreateTextureData(
 	textureData.filePath = filePath; //ファイルパス
 	textureData.metadata = mipImages.GetMetadata(); //テクスチャメタデータを取得
 	textureData.resource = dxCommon_->CreateTextureResource(textureData.metadata);
+	if (!textureData.resource) {
+		Logger::Log("TextureManager: texture resource creation failed: " + filePath);
+		return false;
+	}
 
 	// 初回だけSRVを確保し、再読込は同じSRV番号を書き換えます。
 	if (allocateSrv) {
@@ -159,11 +166,21 @@ bool TextureManager::CreateTextureData(
 		srvDesc.Texture2D.MipLevels = UINT(textureData.metadata.mipLevels);
 	}
 
+	// 先に転送とGPU完了待ちを終え、再読込時に古い画像を読む描画が残らない状態にします。
+	// 同じSRV番号の差し替えを最後に行えば、追加のGPU待ちは必要ありません。
+	if (!dxCommon_->ExecuteTextureTransfer(textureData.resource, mipImages)) {
+		Logger::Log("TextureManager: texture transfer failed: " + filePath);
+		// 初回読込だけで取得したSRV番号は、空のTextureを登録せず返却します。
+		if (allocateSrv) {
+			srvManager_->Free(textureData.srvIndex);
+			textureData.srvIndex = SrvManager::kInvalidSrvIndex;
+			textureData.srvHandleCPU = {};
+			textureData.srvHandleGPU = {};
+		}
+		return false;
+	}
 	//設定をもとにSRVの生成
 	dxCommon_->GetDevice()->CreateShaderResourceView(textureData.resource.Get(), &srvDesc, textureData.srvHandleCPU);
-
-	//テクスチャデータの転送(GPUへのキックから完了待ち、リセットまでをDirectXCommonに全て任せる)
-	dxCommon_->ExecuteTextureTransfer(textureData.resource, mipImages);
 	std::error_code error;
 	textureData.lastWriteTime = std::filesystem::last_write_time(filePath, error);
 	textureData.hasWriteTime = !error;

@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <Windows.h>
 
 namespace
 {
@@ -62,6 +63,8 @@ namespace
 		const fs::path levelsDirectory = resourcesDirectory / "levels";
 		const fs::path jsonPath = levelsDirectory / "Smoke.json";
 		const fs::path temporaryJsonPath = levelsDirectory / "Smoke.json.tmp";
+		const fs::path newJsonPath = levelsDirectory / "SmokeNew.json";
+		const fs::path newTemporaryJsonPath = levelsDirectory / "SmokeNew.json.tmp";
 		bool passed = false;
 		try {
 			fs::create_directories(levelsDirectory);
@@ -120,6 +123,27 @@ namespace
 					blenderSaved ? LevelLoader::Load("Smoke") : nullptr;
 				passed = passed && blenderSaved && blenderReloaded && blenderReloaded->hasLighting &&
 					MatchesExpectedLighting(blenderReloaded->lighting);
+				// 既存ファイルがない時も、完成した一時ファイルを新しい名前へ移せます。
+				const bool newFileSaved = LevelLoader::Save("SmokeNew", engineLevel);
+				const std::unique_ptr<LevelLoader::LevelData> newFileLoaded =
+					newFileSaved ? LevelLoader::Load("SmokeNew") : nullptr;
+				passed = passed && newFileSaved && newFileLoaded && newFileLoaded->hasLighting &&
+					MatchesExpectedLighting(newFileLoaded->lighting) && !fs::exists(newTemporaryJsonPath);
+				// 削除共有を許さず既存JSONを開き、置換失敗でも元ファイルを読めるか調べます。
+				const HANDLE lockedFile = CreateFileW(
+					jsonPath.c_str(), GENERIC_READ, FILE_SHARE_READ,
+					nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+				if (lockedFile == INVALID_HANDLE_VALUE) {
+					passed = false;
+				} else {
+					LevelLoader::LevelData changedLevel{};
+					changedLevel.coordinateSystem = "engine";
+					const bool replacedWhileLocked = LevelLoader::Save("Smoke", changedLevel);
+					CloseHandle(lockedFile);
+					const std::unique_ptr<LevelLoader::LevelData> keptFile = LevelLoader::Load("Smoke");
+					passed = passed && !replacedWhileLocked && keptFile && keptFile->hasLighting &&
+						MatchesExpectedLighting(keptFile->lighting) && fs::exists(temporaryJsonPath);
+				}
 			}
 		} catch (...) {
 			passed = false;
@@ -129,7 +153,9 @@ namespace
 		const bool restoredDirectory = !error;
 		bool cleanedUp = true;
 		// 作成した既知のパスだけを内側から消し、ほかの一時ファイルには触れません。
-		for (const fs::path& path : { temporaryJsonPath, jsonPath, levelsDirectory, resourcesDirectory, temporaryDirectory }) {
+		for (const fs::path& path : {
+			newTemporaryJsonPath, newJsonPath, temporaryJsonPath, jsonPath,
+			levelsDirectory, resourcesDirectory, temporaryDirectory }) {
 			error.clear();
 			fs::remove(path, error);
 			cleanedUp = !error && cleanedUp;
@@ -215,7 +241,7 @@ int main()
 	check(index.GetPlayerStart() && index.GetPlayerStart()->translation.x == 7.0f,
 		"editing PlayerStart updates the LevelData read by the stage");
 	check(CheckLevelJsonValidationAndLighting(),
-		"invalid JSON is rejected; lighting survives Engine and Blender saves");
+		"JSON validation, new/replacement saves, and failed replacement preserve the old file");
 	std::cout << (failures == 0 ? "SUCCESS" : "FAILURE") << ": failures=" << failures << '\n';
 	return failures == 0 ? 0 : 1;
 }

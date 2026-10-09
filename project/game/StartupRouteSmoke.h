@@ -2,7 +2,8 @@
 
 #include <string>
 
-// 撮影や入力を行わず、通常起動のScene順とDraw呼び出しだけを確認する自動テストです。
+// 撮影や入力を行わず、Loading開始後にテストが予約するScene切替とDrawだけを確認します。
+// 現在のTitleのEnterは同じStage1内で進むため、このテストの切替経路とは異なります。
 class StartupRouteSmoke
 {
 public:
@@ -13,6 +14,7 @@ public:
 	// GameのDrawが終わった後に呼び、各Sceneが少なくとも一度描画されたことを記録します。
 	void AfterDraw();
 	bool IsFinished() const { return finished_; }
+	bool WasSuccessful() const { return wasSuccessful_; }
 
 private:
 	// 結果をlogsへ一度だけ書き、Gameが終了要求を出せる状態にします。
@@ -20,6 +22,7 @@ private:
 
 	bool enabled_ = false;
 	bool finished_ = false;
+	bool wasSuccessful_ = false;
 	bool stage1Requested_ = false;
 	std::string currentSceneName_;
 	int totalUpdateCount_ = 0;

@@ -1,5 +1,6 @@
 #include "SceneFactory.h"
 #include "GameSceneRegistry.h"
+#include "Logger.h"
 #include "TitleScene.h"    
 #include "DebugScene.h"
 #include <utility>
@@ -17,9 +18,14 @@ SceneFactory::SceneFactory()
 	GameSceneRegistry::Apply(*this);
 }
 
+// 空の名前・生成関数は登録せず、Scene切替時に呼べない関数が残るのを防ぎます。
 // Scene名と生成関数を一組として登録し、重複名は表示一覧へ追加しません。
 void SceneFactory::RegisterScene(const std::string& sceneName, SceneCreator creator)
 {
+	if (sceneName.empty() || !creator) {
+		Logger::Log("Scene registration failed: scene name or creator is empty.");
+		return;
+	}
 	if (creators_.emplace(sceneName, std::move(creator)).second) {
 		sceneNames_.push_back(sceneName);
 	}

@@ -424,14 +424,14 @@ void DirectXCommon::InitializeFixFPS()
 
 	//1/60秒ぴったりの時間
 	kMinTime_ = std::chrono::microseconds(uint64_t(1000000.0f / 60.0f));
-	//1/60秒よりわずかに短い時間
-	kMinCheckTime_ = std::chrono::microseconds(uint64_t(1000000.0f / 65.0f));
 }
 
+// 描画後に目標時刻まで待ち、次フレームで使う実経過時間を更新します。
+// 先にreturnしていた旧待機処理は実行されないため、この一経路だけを残します。
 void DirectXCommon::UpdateFixFPS()
 {
 	const std::chrono::steady_clock::time_point target = reference_ + kMinTime_;
-	std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
+	const std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
 	if (currentTime < target) {
 		// Sleepの粒度で大きく遅れないよう、最後の1msだけ短く待つ。
 		const std::chrono::steady_clock::time_point sleepUntil = target - std::chrono::milliseconds(1);
@@ -446,25 +446,6 @@ void DirectXCommon::UpdateFixFPS()
 	const std::chrono::duration<float> elapsedTime = frameEndTime - reference_;
 	deltaTime_ = std::clamp(elapsedTime.count(), 0.0f, 0.1f);
 	reference_ = frameEndTime;
-	return;
-
-	//現在時間を取得する
-	std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
-	//前回記録からの経過時間を取得する
-	std::chrono::microseconds elapsed =
-		std::chrono::duration_cast<std::chrono::microseconds>(now - reference_);
-
-	//1/60秒(よりわずかに短い時間)経ってない場合
-	if (elapsed < kMinCheckTime_)
-	{//1/60秒経過するまで微小なスリープを繰り返す
-		while (std::chrono::steady_clock::now() - reference_ < kMinTime_)
-		{
-			//1マイクロ秒スリープ
-			std::this_thread::sleep_for(std::chrono::microseconds(1));
-		}
-	}
-	//現在の時間を記録する
-	reference_ = std::chrono::steady_clock::now();
 }
 
 

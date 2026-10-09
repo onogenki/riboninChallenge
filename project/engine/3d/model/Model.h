@@ -1,5 +1,7 @@
 #pragma once
+#include <array>
 #include <cstdint>
+#include <utility>
 #include <vector>
 #include <string>
 #include <wrl.h>
@@ -173,46 +175,57 @@ public:
 		std::vector<Joint>joints;//所属しているジョイント
 	};
 
-	SkinCluster CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device,
-		const Skeleton& skeleton, const ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize);
+	// 骨・頂点のGPU資源が全部そろった時だけ、Object3dへSkinClusterを渡します。
+	bool CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device,
+		const Skeleton& skeleton, const ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize,
+		SkinCluster& result);
 
+	// 読込済みNodeの親子関係から骨を作り、Object3dへ値として渡します。
 	Skeleton CreateSkeleton(const Node& rootNode);
 
-	//アニメーションの解析
+	// ファイルのKeyframeを読み、呼び出し元が所有するAnimationを返します。
 	static Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename);
 
-	// 頂点と材質画像を読み、指定済み画像の欠損も含め準備できなければfalseを返します。
+	// 借りたModelCommonで頂点・材質・画像を準備し、指定済み画像の欠損も含め失敗ならfalseを返します。
 	bool Initialize(ModelCommon* modelCommon, const std::string& directoryPath, const std::string& filename);
+	// 三つのGPU Bufferの存在だけを調べます。材質画像まで読めたかはInitializeの戻り値で判断します。
 	bool IsLoaded() const { return vertexResource != nullptr && indexResource != nullptr && materialResource != nullptr; }
 
-	//skeletonの更新
+	// Animation適用後に、親子関係をたどって各骨の行列を更新します。
 	void Update(Skeleton& skeleton);
+	// 骨行列の更新後に、SkinClusterのGPU用Paletteへ書き込みます。
 	void Update(SkinCluster& skinCluster,const Skeleton& skeleton);
 
-	// 通常モデル描画用（骨なし）
+	// Object3dが通常Pipelineを設定した後、骨なし頂点と材質を描きます。
 	void Draw(uint32_t textureSrvIndexOverride = UINT32_MAX);
-	// 専用Shader側で材質を設定する描画用に、頂点とIndexだけを描画する
+	// 鏡など専用Shader側で材質を設定する時に、頂点とIndexだけを描きます。
 	void DrawGeometry();
 
-	// スキニングモデル描画用（骨あり）
+	// Object3dが骨ありPipelineを設定した後、頂点の影響度とPaletteを渡して描きます。
 	void Draw(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride = UINT32_MAX);
+	// Compute方式を選んだ描画経路だけで、骨変形した頂点をGPU出力Bufferへ書き込みます。
 	void DispatchSkinning(SkinCluster& skinCluster);
+	// DispatchSkinning後の頂点Bufferを、専用Pipelineで描きます。
 	void DrawSkinned(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride = UINT32_MAX);
 
-	// 読み込みに成功した画像だけを全材質へ適用し、失敗時は以前の設定を保ちます。
+	// 読込成功した画像を共有Modelの全材質へ適用します。個体専用ならObject3dのTexture上書きを使います。
 	void SetTexture(const std::string& filePath);
-	// 色付きLightの反射だけを弱め、Texture本来の色を見えやすくします。
+	// モデルファイルを再読込する時、実行中に変えた材質と明示的な画像指定だけを新しいModelへ引き継ぎます。
+	bool CopyRuntimeSettingsFrom(const Model& previous);
+	// 共有Modelの材質で、色付きLightの反射だけを弱めます。個体ごとの設定ではありません。
 	void SetSpecularIntensity(float intensity) {
 		if (materialData) {
 			materialData->specularIntensity = intensity;
 		}
 	}
 
+	// 共有Modelの環境反射率を変更します。同じModelを使う別Objectにも値が及びます。
 	void SetEnvironmentCoefficient(float coefficient) {
 		if (materialData) {
 			materialData->environmentCoefficient = coefficient;
 		}
 	}
+	// 共有Modelの環境反射率を読み、材質Bufferがなければ0を返します。
 	float GetEnvironmentCoefficient() const {
 		if (materialData) {
 			return materialData->environmentCoefficient;
@@ -220,11 +233,12 @@ public:
 		return 0.0f;
 	}
 
-	//アニメーション適用
+	// AnimationのNode名と骨を対応付け、Animationが生きている間だけ参照を借ります。
 	void BuildAnimationMapping(Skeleton& skeleton, const Animation& animation);
+	// 指定時刻のKeyframeを骨へ適用します。この後に骨行列とPaletteをUpdateします。
 	void ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime);
 
-	// 描画・当たり判定・骨生成が読込済みデータを参照します。外部から頂点や骨を書き換えないようにします。
+	// 読込済みデータのconst参照を貸します。Model再読込後まで保持せず、外部から書き換えません。
 	const ModelData& GetModelData() const { return modelData; }
 private:
 	// ファイル読込とAnimation内部でだけ使う補助関数。
@@ -248,12 +262,15 @@ private:
 	//マテリアル
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;
 	Material* materialData = nullptr;
+	// SetTextureで明示された画像だけを記録し、モデルファイル側の画像変更とは区別します。
+	std::optional<std::string> runtimeTextureOverride_;
 
 
 
 	bool LoadModelFile(const std::string& directoryPath, const std::string& filename);
-	void CreateIndexData();
-	void CreateVertexData();
-	void CreateMaterialData();
+	bool CreateIndexData();
+	bool CreateVertexData();
+	bool CreateMaterialData();
+	void ResetGpuResources();
 
 };

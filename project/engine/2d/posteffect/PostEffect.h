@@ -26,6 +26,8 @@ public:
 
 	// 描画資源とマスク画像を順に準備し、画像を読めない場合は初期化を止める。
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+	// 自分が所有するGPU資源を返し、借りていたManager参照を外す。
+	void Finalize();
 	// RenderTextureをそのままSwapChainへ転送する。
 	void Draw();
 	// 指定SRVを描画する。useEffectがfalseなら通常の転送だけを行う。

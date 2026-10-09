@@ -7,6 +7,7 @@
 
 #include <cassert>
 #include <cstring>
+#include <stdexcept>
 #include <vector>
 
 using namespace Logger;
@@ -35,8 +36,12 @@ Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	//hlslファイルを読む
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource = nullptr;
 	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderSource);
-	//読めなかったら止める
-	assert(SUCCEEDED(hr));
+	// 読込失敗を呼び出し元へ伝え、空のShaderを参照しないようにします。
+	if (FAILED(hr) || !shaderSource) {
+		const std::string message = "CompileShader: shader file could not be loaded: " + StringUtility::ConvertString(filePath);
+		Log(message);
+		throw std::runtime_error(message);
+	}
 	//読み込んだファイルの内容を設定する
 	DxcBuffer shaderSourceBuffer;
 	shaderSourceBuffer.Ptr = shaderSource->GetBufferPointer();
@@ -59,8 +64,12 @@ Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 		includeHandler.Get(),//includeが含まれた諸々
 		IID_PPV_ARGS(&shaderResult)//コンパイル結果
 	);
-	//コンパイルエラーではなくdxcが起動できないなど致命的な状況
-	assert(SUCCEEDED(hr));
+	// DXC自体が失敗した時も、結果を参照する前に止めます。
+	if (FAILED(hr) || !shaderResult) {
+		const std::string message = "CompileShader: compiler could not run: " + StringUtility::ConvertString(filePath);
+		Log(message);
+		throw std::runtime_error(message);
+	}
 
 	//警告・エラーが出てたらログに出して止める
 	Microsoft::WRL::ComPtr < IDxcBlobUtf8> shaderError = nullptr;
@@ -68,13 +77,23 @@ Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	if (shaderError != nullptr && shaderError->GetStringLength() != 0)
 	{
 		Log(shaderError->GetStringPointer());
-		//警告・エラーダメ絶対
-		assert(false);
+		// 従来Debugで止めていた警告・エラーは、Developmentでも失敗として扱います。
+		throw std::runtime_error("CompileShader: compiler reported a warning or error: " + StringUtility::ConvertString(filePath));
+	}
+	HRESULT shaderStatus = E_FAIL;
+	if (FAILED(shaderResult->GetStatus(&shaderStatus)) || FAILED(shaderStatus)) {
+		const std::string message = "CompileShader: shader compilation failed: " + StringUtility::ConvertString(filePath);
+		Log(message);
+		throw std::runtime_error(message);
 	}
 	//コンパイル結果から実行用のバイナリ部分を取得
 	Microsoft::WRL::ComPtr < IDxcBlob> shaderBlob = nullptr;
 	hr = shaderResult->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&shaderBlob), nullptr);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !shaderBlob) {
+		const std::string message = "CompileShader: compiled shader is unavailable: " + StringUtility::ConvertString(filePath);
+		Log(message);
+		throw std::runtime_error(message);
+	}
 	//成功したログを出す
 	Log(StringUtility::ConvertString(std::format(L"Compile,Succeeded,path:{},profile:{}\n", filePath, profile)));
 	//実行用のバイナリを返却
@@ -118,6 +137,10 @@ const uint32_t DirectXCommon::kMaxSRVCount = 512;
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(const DirectX::TexMetadata& metadata)
 {
+	if (!device_) {
+		Log("DirectXCommon: texture resource creation requires a device.");
+		return nullptr;
+	}
 	// 1. metadataを基にResourceの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
 	resourceDesc.Width = UINT(metadata.width); // Textureの幅
@@ -141,7 +164,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(cons
 		D3D12_RESOURCE_STATE_COPY_DEST, // データ転送される前提の初期状態
 		nullptr, // Clear最適化設定。使わないのでnullptr。
 		IID_PPV_ARGS(&resource)); // 作成するResourceへのポインタ
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !resource) {
+		Log("DirectXCommon: texture resource creation failed.");
+		return nullptr;
+	}
 
 	return resource;
 }
@@ -247,6 +273,10 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 [[nodiscard]]
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::WriteToIntermediateResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device)
 {
+	if (!texture || !device || mipImages.GetImageCount() == 0) {
+		Log("DirectXCommon: texture upload inputs are unavailable.");
+		return nullptr;
+	}
 	//テクスチャの情報を取得
 	D3D12_RESOURCE_DESC desc = texture->GetDesc();
 
@@ -270,9 +300,17 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::WriteToIntermediateResourc
 	);
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = CreateBufferResource(totalBytes);
+	if (!intermediateResource) {
+		Log("DirectXCommon: texture upload buffer creation failed.");
+		return nullptr;
+	}
 
 	uint8_t* mappedData = nullptr;
-	intermediateResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedData));
+	const HRESULT mapResult = intermediateResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedData));
+	if (FAILED(mapResult) || !mappedData) {
+		Log("DirectXCommon: texture upload buffer Map failed.");
+		return nullptr;
+	}
 
 	const DirectX::Image* images = mipImages.GetImages();
 	for (size_t i = 0; i < numSubresources; ++i)
@@ -354,6 +392,10 @@ void DirectXCommon::RecordTextureCopyCommand(const Microsoft::WRL::ComPtr<ID3D12
 
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateBufferResource(size_t sizeInBytes)
 {
+	if (!device_ || sizeInBytes == 0) {
+		Log("DirectXCommon: upload buffer requires a device and nonzero size.");
+		return nullptr;
+	}
 	// 頂点リソース用のヒープの設定
 	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
 	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
@@ -373,33 +415,53 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateBufferResource(size_
 	HRESULT hr = device_->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
 		&resourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
 		IID_PPV_ARGS(&resource));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !resource) {
+		Log("DirectXCommon: upload buffer creation failed.");
+		return nullptr;
+	}
 
 	return resource;
 }
 
-void DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages)
+// 中間Buffer・Command Listの失敗時はコピーせず、TextureManagerへ失敗を返します。
+bool DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages)
 {
+	if (!device_ || !commandQueue || !texture) {
+		Log("DirectXCommon: texture transfer resources are unavailable.");
+		return false;
+	}
 
 	// メインの commandList_ を汚さないよう、この関数内だけで使う一時的なコマンドリストを作る
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> tempAllocator = nullptr;
 	HRESULT hr = device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&tempAllocator));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !tempAllocator) {
+		Log("DirectXCommon: texture transfer command allocator creation failed.");
+		return false;
+	}
 
 	// 新しく作った tempAllocator を使って、一時的なコマンドリストを作成する
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> tempCommandList = nullptr;
 	hr = device_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, tempAllocator.Get(), nullptr, IID_PPV_ARGS(&tempCommandList));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !tempCommandList) {
+		Log("DirectXCommon: texture transfer command list creation failed.");
+		return false;
+	}
 
 	// CPUの処理：中間バッファにデータを書き込んで、そのポインタを受け取る
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = WriteToIntermediateResource(texture, mipImages, device_.Get());
+	if (!intermediateResource) {
+		return false;
+	}
 
 	// 転送コマンドを積む対象を、新しく作った「tempCommandList.Get()」にする
 	RecordTextureCopyCommand(texture, intermediateResource, mipImages.GetImageCount(), device_.Get(), tempCommandList.Get());
 
 	// 一時的なコマンドリストをCloseする
 	hr = tempCommandList->Close();
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		Log("DirectXCommon: texture transfer command list Close failed.");
+		return false;
+	}
 
 	// 実行するコマンドリストを「tempCommandList.Get()」にする
 	ID3D12CommandList* commandLists[] = { tempCommandList.Get() };
@@ -407,6 +469,7 @@ void DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Re
 
 	// GPUの実行完了を安全に待つ
 	WaitForGPU();
+	return true;
 
 }
 

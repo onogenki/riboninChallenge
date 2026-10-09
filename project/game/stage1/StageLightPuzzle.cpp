@@ -13,8 +13,8 @@ StageLightPuzzle::StageLightPuzzle() = default;
 
 StageLightPuzzle::~StageLightPuzzle() = default;
 
-// Laserの最大距離・反射回数を、Stage1のPuzzle用初期値へそろえます。
-void StageLightPuzzle::Initialize(DirectXCommon* directXCommon)
+// Laserの設定と描画用Rendererを作り、見えない光の判定だけを進めないよう失敗を返します。
+bool StageLightPuzzle::Initialize(DirectXCommon* directXCommon)
 {
 	// Sceneを再初期化しても前回の充電・Door状態を持ち越さないよう、実行中の値だけを戻します。
 	chargeLaser_ = {};
@@ -34,17 +34,18 @@ void StageLightPuzzle::Initialize(DirectXCommon* directXCommon)
 	chargeLaserRenderer_ = std::make_unique<LaserRenderer>();
 	if (!chargeLaserRenderer_->Initialize(directXCommon, 32)) {
 		chargeLaserRenderer_.reset();
-	} else {
-		chargeLaserRenderer_->SetBeamWidth(settings_.laserVisualWidth);
-		chargeLaserRenderer_->SetColor({ 0.05f, 0.95f, 1.00f, 1.0f });
+		return false;
 	}
+	chargeLaserRenderer_->SetBeamWidth(settings_.laserVisualWidth);
+	chargeLaserRenderer_->SetColor({ 0.05f, 0.95f, 1.00f, 1.0f });
 	doorLaserRenderer_ = std::make_unique<LaserRenderer>();
 	if (!doorLaserRenderer_->Initialize(directXCommon, 8)) {
 		doorLaserRenderer_.reset();
-	} else {
-		doorLaserRenderer_->SetBeamWidth(settings_.laserVisualWidth);
-		doorLaserRenderer_->SetColor({ 1.00f, 0.38f, 0.05f, 1.0f });
+		return false;
 	}
+	doorLaserRenderer_->SetBeamWidth(settings_.laserVisualWidth);
+	doorLaserRenderer_->SetColor({ 1.00f, 0.38f, 0.05f, 1.0f });
+	return true;
 }
 
 // Puzzleが所有するRendererを先に解放し、Sceneが次に初期化される準備をします。

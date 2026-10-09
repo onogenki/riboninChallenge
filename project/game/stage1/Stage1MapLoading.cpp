@@ -69,7 +69,7 @@ bool Stage1::ReloadStageMap()
 	return true;
 }
 
-// Edit Viewで変更したstage1.jsonを保存し、直後の再読込を防ぐため監視時刻も同期します。
+// Edit Viewのstage1.jsonを保存し、成功時だけ監視時刻を同期して自己再読込を防ぎます。
 bool Stage1::SaveStageMap()
 {
 	if (!stageMapData_) {
@@ -79,7 +79,7 @@ bool Stage1::SaveStageMap()
 
 	stageMapData_->coordinateSystem = "engine";
 	if (!LevelLoader::Save(kStageMapFileName, *stageMapData_)) {
-		stageMapReloadStatus_ = "Save failed. stage1.json was not changed.";
+		stageMapReloadStatus_ = "Save failed. Check stage1.json and stage1.json.tmp.";
 		return false;
 	}
 

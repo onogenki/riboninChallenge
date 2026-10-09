@@ -15,6 +15,7 @@
 #include "PostEffect.h"
 #include "ImGuiManager.h"
 #include "Input.h"
+#include "Logger.h"
 #include"SceneManager.h"
 #include "../debug/DebugAnimationPreview.h"
 #include "../debug/DebugCollisionOverlay.h"
@@ -29,6 +30,7 @@
 #include <cstddef>
 #include <dinput.h>
 #include <utility>
+#include <Windows.h>
 using namespace MyMath;
 
 namespace {
@@ -42,21 +44,33 @@ DebugScene::DebugScene() = default;
 // DebugSceneが所有する前方宣言型を、完全な型を読み込んだ場所で解放します。
 DebugScene::~DebugScene() = default;
 
+// 必須画像と初期Objectがそろった時だけ、Debug画面の更新を開始します。
 void DebugScene::Initialize()
 {
+	isSceneReady_ = false;
 	// DebugSceneの開始順は、描画基盤→Camera→素材→初期配置→Light→Debug補助機能です。
-	InitializeRenderSystems();
+	if (!InitializeRenderSystems()) {
+		Logger::Log("DebugScene initialization failed: shared Sprite pipeline could not be prepared.");
+		PostQuitMessage(1);
+		return;
+	}
 	InitializeCameras();
-	InitializeSceneResources();
+	if (!InitializeSceneResources()) {
+		PostQuitMessage(1);
+		return;
+	}
 	if (!InitializeInitialContent()) {
+		Logger::Log("DebugScene initialization failed: initial model or sprite could not be created.");
+		PostQuitMessage(1);
 		return;
 	}
 	InitializeLightsAndEmitters();
 	InitializeDebugTools();
+	isSceneReady_ = true;
 }
 
-// PostEffect・Object3d・Sprite・Particleの共通状態を、DebugScene開始時の値へそろえます。
-void DebugScene::InitializeRenderSystems()
+// 共通描画設定を順にそろえ、SpriteのPipelineが作れなければ後続のScene準備を止めます。
+bool DebugScene::InitializeRenderSystems()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 	PostEffect::GetInstance()->SetGrayscale(false);
@@ -67,14 +81,14 @@ void DebugScene::InitializeRenderSystems()
 	object3dCommon = Object3dCommon::GetInstance();
 	object3dCommon->Initialize(dxCommon);
 	spriteCommon = SpriteCommon::GetInstance();
-	spriteCommon->Initialize(dxCommon);
+	return spriteCommon->Initialize(dxCommon);
 }
 
 // DebugScene専用のCameraを作り、ほかのSceneで使ったCamera状態を持ち込みません。
 void DebugScene::InitializeCameras()
 {
 	// MainCameraは通常のGame Viewへ使います。
-	InitializeMainCamera({ 0.0f, 0.0f, -10.0f });
+	InitializeMainCamera(cameraManager, mainCamera, { 0.0f, 0.0f, -10.0f });
 	ParticleManager::GetInstance()->SetCameraManager(cameraManager.get());
 
 	// 上から確認する補助Cameraも同じManagerへ登録します。
@@ -88,29 +102,52 @@ void DebugScene::InitializeCameras()
 }
 
 
-// 初期Objectより先に、Texture・SkyBox・Audio・Particle素材を読み込みます。
-void DebugScene::InitializeSceneResources()
+// 夜空と既存の環境反射を別々に読み込み、Debugのモデル反射を変えずに背景だけそろえます。
+bool DebugScene::InitializeSceneResources()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	TextureManager::GetInstance()->LoadTexture("Resources/debug/monsterBall.png");//2枚目
-	TextureManager::GetInstance()->LoadTexture("Resources/debug/grass.png");//terrainのpng
+	TextureManager* textureManager = TextureManager::GetInstance();
+	const char* requiredTextures[] = {
+		"Resources/debug/monsterBall.png",
+		"Resources/debug/grass.png",
+		"Resources/debug/uvChecker.png",
+	};
+	for (const char* texturePath : requiredTextures) {
+		if (!textureManager->LoadTexture(texturePath)) {
+			Logger::Log(std::string("DebugScene initialization failed: required texture could not be loaded: ") + texturePath);
+			return false;
+		}
+	}
 
-	// Debug用Particleの素材と発生Groupは、種類ごとの設定を持つ部品へ準備を任せます。
-	debugParticleEffects_.InitializeResources();
+	// 素材やGroupが欠けた粒子を表示成功としないため、準備結果を確認します。
+	if (!debugParticleEffects_.InitializeResources()) {
+		Logger::Log("DebugScene initialization failed: particle texture or group could not be prepared.");
+		return false;
+	}
 
-	// skyBoxの背景
-	TextureManager::GetInstance()->LoadTexture("Resources/debug/qwantani_moon_noon_puresky_1k.dds");
+	// 背景は他の3D Sceneと同じDDSを使い、環境反射の見た目は従来のまま残します。
+	const char* skyBoxTexturePath = "Resources/backGround/skybox-night-cube.dds";
+	if (!textureManager->LoadTexture(skyBoxTexturePath)) {
+		Logger::Log(std::string("DebugScene initialization failed: SkyBox texture could not be loaded: ") + skyBoxTexturePath);
+		return false;
+	}
 
-	// SkyBoxによるモデルへの環境反射
-	object3dCommon->SetEnvironmentTexturePath("Resources/debug/qwantani_moon_noon_puresky_1k.dds");
+	const char* environmentTexturePath = "Resources/debug/qwantani_moon_noon_puresky_1k.dds";
+	if (!textureManager->LoadTexture(environmentTexturePath)) {
+		Logger::Log(std::string("DebugScene initialization failed: environment texture could not be loaded: ") + environmentTexturePath);
+		return false;
+	}
+	object3dCommon->SetEnvironmentTexturePath(environmentTexturePath);
 
-	//Skybox
-	skyBox_ = std::make_unique<SkyBox>();
-	skyBox_->Initialize(dxCommon, cameraManager->GetActiveCamera());
-	// 添付されているDDSテクスチャのパスを指定する
-	skyBox_->SetTexture("Resources/debug/qwantani_moon_noon_puresky_1k.dds");
+	// 読み込めたDDSだけをFactoryから受け取り、未登録SRVを描画しません。
+	skyBox_ = Object3dFactory::CreateSkyBox(dxCommon, cameraManager->GetActiveCamera(), skyBoxTexturePath);
+	if (!skyBox_) {
+		Logger::Log("DebugScene initialization failed: SkyBox could not be created.");
+		return false;
+	}
 
 	// Debug Sceneは音を即時再生せず、Game View表示後にStage1がBGMを開始します。
+	return true;
 }
 
 
@@ -142,11 +179,15 @@ bool DebugScene::InitializeInitialContent()
 	for (uint32_t i = 0; i < 1; ++i)
 	{
 		auto sprite = std::make_unique<Sprite>();
-		sprite->Initialize(spriteCommon, "Resources/debug/monsterBall.png");
+		if (!sprite->Initialize(spriteCommon, "Resources/debug/monsterBall.png")) {
+			return false;
+		}
 
 		if (i % 2 == 0) {
 			// 偶数番目にはUVチェッカーのPNGを設定
-			sprite->SetTexture("Resources/debug/uvChecker.png");
+			if (!sprite->SetTexture("Resources/debug/uvChecker.png")) {
+				return false;
+			}
 		}
 		Vector2 pos = { 0.0f + i * 0.0f, 0.0f + i * 50.0f };
 		sprite->SetPosition(pos);
@@ -274,8 +315,12 @@ Vector3 DebugScene::GetParticleEffectPosition() const
 	return debugAnimationPreview_.GetParticleEffectPosition();
 }
 
+// 初期化失敗後は未生成のSkyBoxやObjectを参照しません。
 void DebugScene::Update()
 {
+	if (!isSceneReady_) {
+		return;
+	}
 	// DebugSceneの一フレームは、読込→Capture→内容→UI→自動確認の順です。
 	// Blenderからscene.jsonが保存された時だけ、配置済みモデルを再読込します。
 	levelRuntime_.UpdateHotReload(MakeLevelRuntimeContext());
@@ -371,8 +416,12 @@ void DebugScene::UpdateEditorUi()
 	ImGuiManager::GetInstance()->End();
 }
 
+// 初期化が完了した画面だけをRenderPipelineへ渡します。
 void DebugScene::Draw()
 {
+	if (!isSceneReady_) {
+		return;
+	}
 	// 通常SceneとPreviewの描画経路をDebug専用Rendererへ渡します。
 	DebugSceneRenderer::Draw({
 		DirectXCommon::GetInstance(),
@@ -390,8 +439,10 @@ void DebugScene::Draw()
 	// Draw完了後のRenderTextureを使い、UI自動確認の画像・動画保存を進めます。
 	DebugUiSmoke::UpdateAfterDraw(uiSmoke_, MakeUiSmokeContext());
 }
+// 初期化途中でも生成済みのDebug用資源だけを解放します。
 void DebugScene::Finalize()
 {
+	isSceneReady_ = false;
 	//GPUの完了を待機
 	DirectXCommon::GetInstance()->WaitForGPU();
 

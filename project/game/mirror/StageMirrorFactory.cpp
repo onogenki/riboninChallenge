@@ -104,6 +104,7 @@ bool StageMirrorFactory::CreateFixedMirrors(
 }
 
 // Editorで変更した配置だけを既存Mirrorへ反映し、反射Textureの再生成を避けます。
+// 後ろのデータが不正でも前のMirrorだけ変わらないよう、全件を確認してから適用します。
 bool StageMirrorFactory::ApplyFixedMirrorEdits(
 	const std::vector<const LevelLoader::ObjectData*>& mirrorDataList,
 	std::vector<std::unique_ptr<FixedMirror>>& fixedMirrors)
@@ -113,12 +114,14 @@ bool StageMirrorFactory::ApplyFixedMirrorEdits(
 	}
 
 	for (size_t index = 0; index < mirrorDataList.size(); ++index) {
-		const LevelLoader::ObjectData* mirrorData = mirrorDataList[index];
-		FixedMirror* fixedMirror = fixedMirrors[index].get();
-		if (!mirrorData || !fixedMirror) {
+		if (!mirrorDataList[index] || !fixedMirrors[index]) {
 			return false;
 		}
+	}
 
+	for (size_t index = 0; index < mirrorDataList.size(); ++index) {
+		const LevelLoader::ObjectData* mirrorData = mirrorDataList[index];
+		FixedMirror* fixedMirror = fixedMirrors[index].get();
 		fixedMirror->GetYawForEdit() = mirrorData->rotation.y;
 		fixedMirror->GetMirror().SetCenter(mirrorData->translation);
 		fixedMirror->GetMirror().SetSize(

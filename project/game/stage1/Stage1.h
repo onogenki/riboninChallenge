@@ -25,9 +25,12 @@ class CameraController;
 class CarryableMirror;
 class FixedMirror;
 class Player;
+class SkyBox;
 class StageTitleOverlay;
+class CameraManager;
+class Object3dCommon;
 
-// 鏡パズル、開始演出、Cameraをまとめて実行するStage1本編のSceneです。
+// 鏡パズルと開始演出を進め、提出用Titleでは同じStageを固定視点で見せるSceneです。
 class Stage1 : public BaseScene
 {
 public:
@@ -42,10 +45,15 @@ public:
 	void Finalize() override;
 	// 毎フレーム、Player・Camera・ギミック・編集UIを更新します。
 	void Update() override;
-	// 毎フレーム、部屋・球・鏡の板を画面に描画します。
+	// 毎フレーム、SkyBox・部屋・球・鏡の板を画面に描画します。
 	void Draw() override;
 
 private:
+	// Stage1専用のCameraを所有し、描画共通設定はManagerから借ります。
+	std::unique_ptr<CameraManager> cameraManager;
+	std::unique_ptr<Camera> mainCamera;
+	Object3dCommon* object3dCommon = nullptr;
+
 	// ---------- JSONを実行中のオブジェクトへ変換する補助構造体 ----------
 
 	// 三灯照明は最大3本に固定し、残りのSpotLight枠をLaser演出へ残します。
@@ -53,8 +61,8 @@ private:
 
 	// ---------- 初期化の補助関数 ----------
 
-	// DirectX・Camera・Object3d共通設定を、このSceneで使える状態にします。
-	void InitializeRenderSystems();
+	// 描画用Light・Camera・Object3d共通設定を準備し、Lightを描けない時は失敗を返します。
+	bool InitializeRenderSystems();
 	// JSONを読む前に使う、Stage1の標準照明値を設定します。
 	void InitializeDefaultLighting();
 	// JSONへ依存しない床・鏡・Laser・Switch・Doorを作成します。
@@ -138,8 +146,10 @@ private:
 	bool ApplyStageMapData(bool rebuildRuntimeObjects);
 	// ---------- Stage1が所有する3Dオブジェクト ----------
 
-	// 床と球です。後で鏡へ映す対象にもなります。
+	// 床・発射装置・Switch・Doorを所有し、通常画面と鏡の反射描画へ一覧を貸します。
 	Object3dCollection sceneObjects_{};
+	// 仮Titleと本編が同じ夜空を使い、Scene終了時にSkyBoxを解放します。
+	std::unique_ptr<SkyBox> skyBox_;
 	// ---------- 鏡の状態 ----------
 
 	// 大型の固定鏡です。複数枚それぞれが反射Cameraと専用Textureを持ちます。
@@ -182,7 +192,7 @@ private:
 	Vector3 stagePlayerStartPosition_{ 0.0f, -0.8f, 5.0f };
 	// PlayerStartがstage1.jsonに書かれていた時だけtrueになります。
 	bool hasStagePlayerStart_ = false;
-	// 見た目とOBBを共有する床モデルです。
+	// 床の見た目です。寿命はsceneObjects_、判定形状はcollisionWorld_が管理します。
 	Object3d* floor_ = nullptr;
 	// ---------- 通常Cameraと開始演出 ----------
 
@@ -190,8 +200,10 @@ private:
 	std::unique_ptr<CameraController> cameraController_;
 	// 本編開始時だけPlayerとCameraを動かす、開始演出の操作役です。
 	std::unique_ptr<StageStart> stageStart_;
-	// 提出用Titleだけで使う固定視点とSpriteを、本編のCameraとは分けて保持します。
+	// 本編Cameraの開始位置を保存し、Title中だけ同じmainCameraを固定視点へ動かします。
 	const bool startsWithTemporaryTitle_ = false;
+	// 必須モデル・マップ・PlayerがそろうまではUpdateとDrawを行いません。
+	bool isStageReady_ = false;
 	bool isTemporaryTitleActive_ = false;
 	Vector3 stageStartGameplayCameraPosition_{};
 	Vector3 stageStartGameplayCameraRotate_{};

@@ -4,8 +4,6 @@
 
 // 前方宣言により、全Sceneが不要な描画・Audioヘッダを読み込まないようにします。
 class SceneManager;
-class Object3dCommon;
-class SpriteCommon;
 class CameraManager;
 class Camera;
 
@@ -14,9 +12,9 @@ class Camera;
 class BaseScene
 {
 public:
-	// 前方宣言したCamera型を安全に扱うため、実装はBaseScene.cppに置きます。
+	// 共通の状態変数を持たないSceneの基底を生成します。
 	BaseScene();
-	// unique_ptrが前方宣言したCamera型を安全に破棄できるよう、実装はBaseScene.cppに置きます。
+	// 派生Sceneを基底ポインタから破棄できるようにします。
 	virtual ~BaseScene();
 
 	// SceneManagerが切替を確定した時に呼び、Scene固有の資源を準備します。
@@ -31,16 +29,12 @@ public:
 	virtual bool IsFinished() const { return false; }
 
 protected:
-	// 全Scene共通のCameraManagerとMainCameraを作り、指定位置・回転で最初の有効Cameraにします。
-	void InitializeMainCamera(const Vector3& translate, const Vector3& rotate = {});
-
-	// 描画共通設定は借り、Scene終了時にManager本体を解放しません。
-	Object3dCommon* object3dCommon = nullptr;
-	SpriteCommon* spriteCommon = nullptr;
-
-	// Scene専用のCameraManagerとMainCameraはこのSceneが所有します。
-	std::unique_ptr<CameraManager> cameraManager;
-	std::unique_ptr<Camera> mainCamera;
+	// Sceneが所有するCameraへ生成結果を渡し、指定位置・回転で最初の有効Cameraにします。
+	void InitializeMainCamera(
+		std::unique_ptr<CameraManager>& cameraManager,
+		std::unique_ptr<Camera>& mainCamera,
+		const Vector3& translate,
+		const Vector3& rotate = {});
 
 };
 

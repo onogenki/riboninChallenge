@@ -1,7 +1,10 @@
 #include "DebugUiSmoke.h"
 
 #include "GameViewCapture.h"
+#include "ModelManager.h"
 #include "Object3d.h"
+#include "Sprite.h"
+#include "TextureManager.h"
 #include <Windows.h>
 #include <algorithm>
 #include <fstream>
@@ -11,7 +14,8 @@ void DebugUiSmoke::Start(
 	State& state,
 	const std::string& timestamp,
 	bool isAnimationPreviewTest,
-	bool isAnimationSceneTest)
+	bool isAnimationSceneTest,
+	bool isHotReloadTest)
 {
 	state.isEnabled = true;
 	state.isFinished = false;
@@ -21,6 +25,7 @@ void DebugUiSmoke::Start(
 	state.modelFile.clear();
 	state.isAnimationPreviewTest = isAnimationPreviewTest;
 	state.isAnimationSceneTest = isAnimationSceneTest;
+	state.isHotReloadTest = isHotReloadTest;
 	state.animationObjectIndex = 0;
 
 	std::error_code errorCode;
@@ -132,6 +137,31 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 			Finish(state, false, "Added walk.gltf has no active skeletal animation.");
 			return;
 		}
+		// 一枚目の描画後に再読込し、Modelの参照と実行中の材質指定を保って二枚目を描けるか確認します。
+		if (state.isHotReloadTest && state.stage == 2 && state.frame == 60) {
+			Model* modelBeforeReload = addedObject->GetModel();
+			Model* handModel = ModelManager::GetInstance()->FindModel("debug/sphere.obj");
+			if (!modelBeforeReload || !handModel || handModel->GetModelData().materials.empty()) {
+				Finish(state, false, "Models required for hot reload were not available.");
+				return;
+			}
+			const float environmentBeforeReload = addedObject->GetEnvironmentCoefficient();
+			const std::string handTextureBeforeReload =
+				handModel->GetModelData().materials.front().textureFilePath;
+			ModelManager::GetInstance()->ReloadAllLoadedModels();
+			TextureManager::GetInstance()->ReloadAllLoadedTextures();
+			if (addedObject->GetModel() != modelBeforeReload ||
+				addedObject->GetEnvironmentCoefficient() != environmentBeforeReload ||
+				handModel->GetModelData().materials.empty() ||
+				handModel->GetModelData().materials.front().textureFilePath != handTextureBeforeReload) {
+				Finish(state, false, "Model address or runtime material changed during hot reload.");
+				return;
+			}
+			std::ofstream log(state.logPath, std::ios::app);
+			if (log) {
+				log << "RELOAD: model and texture requested at frame 60.\n";
+			}
+		}
 		if ((state.stage == 1 && state.frame == 30) || (state.stage == 2 && state.frame == 90)) {
 			state.isPendingCapture = true;
 		}
@@ -181,6 +211,44 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 	if (!modelSelectionState.hasSelectedObject || modelSelectionState.selectedObjectIsAnimation ||
 		modelSelectionState.selectedObjectIndex != addedObjectIndex) {
 		Finish(state, false, "Added normal model was not selected for inspector/gizmo editing.");
+		return;
+	}
+
+	// 存在しない画像はSpriteの追加・Preview開始のどちらでも拒否し、現在の選択を残します。
+	constexpr const char* kMissingTexture = "Resources/debug/__missing_ui_texture_smoke_7f9ab3__.png";
+	if (std::filesystem::exists(kMissingTexture)) {
+		Finish(state, false, "The UI texture failure probe path already exists.");
+		return;
+	}
+	const size_t spriteCountBeforeFailure = context.sprites->size();
+	const bool addedMissingTexture = context.addTexture(kMissingTexture);
+	const bool previewedMissingTexture = context.enterTexturePreview(kMissingTexture);
+	const PreviewState previewAfterFailure = context.getPreviewState();
+	const SelectionState selectionAfterFailure = context.getSelectionState();
+	if (addedMissingTexture || previewedMissingTexture ||
+		context.sprites->size() != spriteCountBeforeFailure ||
+		previewAfterFailure.isModelPreviewMode || previewAfterFailure.isTexturePreviewMode ||
+		selectionAfterFailure.selectedObjectIndex != addedObjectIndex ||
+		!selectionAfterFailure.hasSelectedObject || selectionAfterFailure.hasSelectedSprite ||
+		TextureManager::GetInstance()->Contains(kMissingTexture)) {
+		Finish(state, false, "A missing UI texture changed the scene, preview, or texture registry.");
+		return;
+	}
+	// 表示中のSpriteも、読めない画像への切替で元の設定を失わないことを確認します。
+	Sprite* existingSprite = context.sprites->empty() ? nullptr : context.sprites->front().get();
+	if (!existingSprite) {
+		Finish(state, false, "No initialized Sprite was available for the texture change failure probe.");
+		return;
+	}
+	const Vector2 originalSize = existingSprite->GetSize();
+	const Vector2 originalTextureSize = existingSprite->GetTextureSize();
+	if (existingSprite->SetTexture(kMissingTexture) ||
+		existingSprite->GetSize().x != originalSize.x ||
+		existingSprite->GetSize().y != originalSize.y ||
+		existingSprite->GetTextureSize().x != originalTextureSize.x ||
+		existingSprite->GetTextureSize().y != originalTextureSize.y ||
+		TextureManager::GetInstance()->Contains(kMissingTexture)) {
+		Finish(state, false, "A missing texture changed an existing Sprite or created a texture registration.");
 		return;
 	}
 

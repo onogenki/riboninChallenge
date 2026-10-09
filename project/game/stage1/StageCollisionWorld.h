@@ -11,7 +11,7 @@ class StageLightPuzzle;
 class StageMapRuntime;
 
 // Stage内の床・壁・Mirror・Door・JSON配置物を、用途別のOBB一覧へまとめる部品です。
-// Objectの寿命はStageが所有し、このクラスはCollider一覧の作成結果だけを所有します。
+// Objectの寿命は各所有者に任せ、床のBOX設定・現在のOBBと用途別一覧を所有します。
 class StageCollisionWorld
 {
 public:
@@ -37,7 +37,7 @@ public:
 	void SetFloorLocalShape(const Vector3& localCenter, const Vector3& localHalfSize);
 	// Edit ViewのCollider表示へ渡す、床の最新OBBを返します。
 	const MyMath::OBB& GetFloorObb() const { return floorObb_; }
-	// PlayerとCameraの壁回避に使う、床・壁・Mirrorを含むOBB一覧を返します。
+	// Playerの押し戻しに使う、床・壁・Mirrorを含むOBB一覧を返します。
 	const std::vector<MyMath::OBB>& GetSolidObbs() const { return solidObbs_; }
 	// JSONのCameraBoundaryタグを持つ外壁だけを返します。Cameraは室内の壁では縮みません。
 	const std::vector<MyMath::OBB>& GetCameraBoundaryObbs() const { return cameraBoundaryObbs_; }

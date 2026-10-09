@@ -13,8 +13,8 @@ StageHazardLights::StageHazardLights() = default;
 
 StageHazardLights::~StageHazardLights() = default;
 
-// 各危険Lightが使うLaserRendererを作り、種類ごとの色と見やすい太さを設定します。
-void StageHazardLights::Initialize(DirectXCommon* directXCommon)
+// 各危険LightのRendererを作り、見えない光の判定だけが残らないよう失敗を返します。
+bool StageHazardLights::Initialize(DirectXCommon* directXCommon)
 {
 	const auto createRenderer = [directXCommon](
 		std::unique_ptr<LaserRenderer>& renderer,
@@ -25,16 +25,20 @@ void StageHazardLights::Initialize(DirectXCommon* directXCommon)
 		renderer = std::make_unique<LaserRenderer>();
 		if (!renderer->Initialize(directXCommon, maximumSegmentCount)) {
 			renderer.reset();
-			return;
+			return false;
 		}
 		renderer->SetColor(color);
 		renderer->SetBeamWidth(beamWidth);
+		return true;
 	};
-	createRenderer(ceilingSweepRenderer_, { 0.95f, 0.20f, 1.00f, 1.0f }, 0.70f, 4);
-	createRenderer(horizontalMoveRenderer_, { 1.00f, 0.82f, 0.10f, 1.0f }, 0.68f, 4);
-	createRenderer(bottomPulseRenderer_, { 0.15f, 0.55f, 1.00f, 1.0f }, 0.78f, 4);
-	createRenderer(bottomPulseWarningRenderer_, { 1.00f, 0.05f, 0.05f, 0.80f }, 2.40f, 1);
-	createRenderer(orbitRenderer_, { 0.20f, 1.00f, 0.35f, 1.0f }, 0.74f, 12);
+	if (!createRenderer(ceilingSweepRenderer_, { 0.95f, 0.20f, 1.00f, 1.0f }, 0.70f, 4) ||
+		!createRenderer(horizontalMoveRenderer_, { 1.00f, 0.82f, 0.10f, 1.0f }, 0.68f, 4) ||
+		!createRenderer(bottomPulseRenderer_, { 0.15f, 0.55f, 1.00f, 1.0f }, 0.78f, 4) ||
+		!createRenderer(bottomPulseWarningRenderer_, { 1.00f, 0.05f, 0.05f, 0.80f }, 2.40f, 1) ||
+		!createRenderer(orbitRenderer_, { 0.20f, 1.00f, 0.35f, 1.0f }, 0.74f, 12)) {
+		return false;
+	}
+	return true;
 }
 
 // 時刻から4種類の危険Lightを作り、反射・Player接触・軌道Lightの太さまで更新します。

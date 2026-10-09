@@ -42,11 +42,8 @@ public:
     void Update();
     // Update済みの各グループだけを、現在のCamera用データで描画します。
     void Draw();
-    // 所有する全グループのSRVと粒子を解放し、Manager本体は残します。
-    void Finalize() {
-        // インスタンス自体を消すのではなく、中身（グループリストなど）を掃除する
-        ClearAllGroups();
-    }
+    // 途中で初期化に失敗した時も、所有するGroupと共通GPU資源を解放します。
+    void Finalize();
 
 	//パーティクルの発生
 	// 名前で既存グループを探して粒子を追加します。名前は変更しないためコピーしません。
@@ -67,13 +64,13 @@ public:
 	// 既存グループへ渦巻き状の光を追加します。名前は検索専用です。
     void EmitLightSpiral(const std::string& name, uint32_t count, const Vector3& translate, float scaleMultiplier = 1.0f);
 
-    // 名前とTextureで通常粒子用グループを作り、同名があれば旧グループを置き換えます。
+    // 名前とTextureで通常粒子用グループを作り、登録できた時だけtrueを返します。
     // 置換時の参照切れを避けるため、名前とTextureは値として受け取ります。
-	void CreateParticleGroup(const std::string name, const std::string textureFilePath);
-    // 通常粒子と同じ管理下に、円環頂点を持つグループを作ります。
-    void CreateRingParticleGroup(const std::string name, const std::string textureFilePath);
-    // 分割数と寸法を使い、側面頂点を持つ円柱グループを作ります。
-    void CreateCylinderParticleGroup(
+	bool CreateParticleGroup(const std::string name, const std::string textureFilePath);
+    // 通常粒子と同じ管理下に円環頂点を作り、登録できた時だけtrueを返します。
+    bool CreateRingParticleGroup(const std::string name, const std::string textureFilePath);
+    // 分割数と寸法を使って円柱を作り、寸法・Texture・登録が有効な時だけtrueを返します。
+    bool CreateCylinderParticleGroup(
         const std::string name,
         const std::string textureFilePath,
         uint32_t divide = 32,
@@ -175,7 +172,6 @@ private:
 	{
 		using UpdateCallback = void (*)(Particle& particle, float signedDeltaTime, bool returning);
 		std::string textureFilePath;
-		uint32_t textureSrvIndex = UINT32_MAX;
 		std::list<Particle> particles;
 		uint32_t instancingSrvIndex = UINT32_MAX;
 		Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;
@@ -196,9 +192,11 @@ private:
 	void InitializeDefaultQuad();
 	// 粒子に共通する色とUV変換の初期値をGPUへ渡します。
 	void InitializeMaterial();
-	// 各形状に共通するインスタンス領域とSRVを、頂点生成より先に準備します。
-	void InitializeInstancingResources(ParticleGroup& group);
-	// 同名グループを置き換える前に、旧グループのSRVを返してから削除します。
+	// 各形状に共通する領域を作り、失敗時は未完成のGroupを登録しません。
+	bool InitializeInstancingResources(ParticleGroup& group);
+	// 登録前にTextureと粒子用SRVの空きを確認し、読めない画像のグループを残しません。
+	bool PrepareGroupResources(const std::string& textureFilePath);
+	// 新しいGroupが完成した後だけ、同名の古いGroupを削除します。
 	void RemoveExistingGroup(const std::string& name);
 	static void UpdateCylinderParticle(Particle& particle, float signedDeltaTime, bool returning);
 	// 風の切替時刻だけを進め、粒子の移動より先に当フレームの風状態を決めます。

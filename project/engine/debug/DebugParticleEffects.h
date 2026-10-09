@@ -7,8 +7,8 @@
 class DebugParticleEffects
 {
 public:
-	// Debug画面で使うParticleのTexture・Group・GPU Emitter設定を準備します。
-	void InitializeResources();
+	// Debug画面で使うParticleのTexture・Group・GPU Emitterを準備し、欠けた時は失敗を返します。
+	bool InitializeResources();
 	// Particle設定をImGuiで編集します。embeddedがtrueなら親ウィンドウへ埋め込みます。
 	void DrawImGui(const Vector3& effectPosition, bool embedded = false);
 	// 有効なParticleの発生とDebug用Shortcut入力を、一フレーム分まとめて更新します。

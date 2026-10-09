@@ -1,5 +1,6 @@
 #include "SceneEditor.h"
 #include "DirectXCommon.h"
+#include "Logger.h"
 #include "TextureManager.h"
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
@@ -38,7 +39,7 @@ namespace {
 	}
 }
 
-// resources配下を走査し、モデル棚に表示する情報とサムネイル形状を作る。
+// resources配下を走査し、読めない画像は登録せずログへ残して素材棚を作ります。
 void SceneEditor::ScanResourceShelf(ShelfState& state)
 {
 	state.entries.clear();
@@ -94,8 +95,10 @@ void SceneEditor::ScanResourceShelf(ShelfState& state)
 			shelfEntry.isTexture = true;
 			shelfEntry.textureFilePath = (std::filesystem::path("Resources") / relativePath).generic_string();
 			TextureManager* textureManager = TextureManager::GetInstance();
-			if (!textureManager->Contains(shelfEntry.textureFilePath)) {
-				textureManager->LoadTexture(shelfEntry.textureFilePath);
+			if (!textureManager->LoadTexture(shelfEntry.textureFilePath)) {
+				// 未登録のままSRVや寸法を取得するとDebugのassertやReleaseの例外になるため飛ばします。
+				Logger::Log("SceneEditor: shelf texture load failed: " + shelfEntry.textureFilePath);
+				continue;
 			}
 			shelfEntry.textureSrvIndex = textureManager->GetSrvIndex(shelfEntry.textureFilePath);
 			const DirectX::TexMetadata& metadata = textureManager->GetMetaData(shelfEntry.textureFilePath);

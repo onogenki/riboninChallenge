@@ -7,14 +7,20 @@
 #include "EnemyManager.h"
 #include "FixedMirror.h"
 #include "Laser.h"
+#include "Object3d.h"
 #include "Player.h"
+#include "StageCollisionWorld.h"
 #include "StageHazardLights.h"
+#include "StageMapRuntime.h"
+#include "StageMirrorFactory.h"
+#include "editor/StageLevelEditor.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <string>
 #include <fstream>
+#include <utility>
 #include <windows.h>
 
 // 数学関数と判定形状は、この実装ファイル内だけで短い名前を使います。
@@ -39,9 +45,123 @@ namespace
 	constexpr float kGameplaySmokeTimeoutSeconds = 12.0f;
 	// 高フレームレート時に秒数より先に終了しないための、安全用フレーム上限です。
 	constexpr int kGameplaySmokeMaximumFrameCount = 10000;
+
+	// ColliderのフラグをOBB一覧へ変換する時に失わないか、実素材を使わず確認します。
+	bool CheckStageMapColliderFlags()
+	{
+		Object3d floor;
+		floor.SetScale({ 1.0f, 1.0f, 1.0f });
+		StageMapRuntime mapRuntime;
+		StageMapRuntime::RuntimeObject runtimeObject{};
+		runtimeObject.tag = "CameraBoundary";
+		runtimeObject.visual = std::make_unique<Object3d>();
+		runtimeObject.visual->SetScale({ 1.0f, 1.0f, 1.0f });
+		runtimeObject.hasBoxCollider = true;
+		runtimeObject.collider.SetLocalShape({}, { 1.0f, 1.0f, 1.0f });
+		mapRuntime.GetObjects().push_back(std::move(runtimeObject));
+		ObbCollider& collider = mapRuntime.GetObjects().front().collider;
+		StageCollisionWorld collisionWorld;
+		StageCollisionWorld::Context context{};
+		context.floor = &floor;
+		context.stageMapRuntime = &mapRuntime;
+
+		collisionWorld.Rebuild(context);
+		const bool enabledIsSolid = collisionWorld.GetSolidObbs().size() == 2 &&
+			collisionWorld.GetCameraBoundaryObbs().size() == 1 &&
+			collisionWorld.GetLightBlockingObbs().size() == 2;
+		collider.SetEnabled(false);
+		collisionWorld.Rebuild(context);
+		const bool disabledIsIgnored = collisionWorld.GetSolidObbs().size() == 1 &&
+			collisionWorld.GetCameraBoundaryObbs().empty() &&
+			collisionWorld.GetLightBlockingObbs().size() == 1;
+		collider.SetEnabled(true);
+		collider.SetTrigger(true);
+		collisionWorld.Rebuild(context);
+		const bool triggerIsIgnored = collisionWorld.GetSolidObbs().size() == 1 &&
+			collisionWorld.GetCameraBoundaryObbs().empty() &&
+			collisionWorld.GetLightBlockingObbs().size() == 1;
+		return enabledIsSolid && disabledIsIgnored && triggerIsIgnored;
+	}
+
+	// 二枚目の編集データが不正でも、一枚目の既存Mirrorを変更しないことを確認します。
+	bool CheckMirrorEditsRejectPartialUpdate()
+	{
+		std::vector<std::unique_ptr<FixedMirror>> mirrors;
+		mirrors.push_back(std::make_unique<FixedMirror>());
+		mirrors.push_back(std::make_unique<FixedMirror>());
+		mirrors.front()->GetMirror().SetCenter({ 1.0f, 2.0f, 3.0f });
+		LevelLoader::ObjectData firstEdit{};
+		firstEdit.translation = { 4.0f, 5.0f, 6.0f };
+		const std::vector<const LevelLoader::ObjectData*> edits{ &firstEdit, nullptr };
+		const bool rejected = !StageMirrorFactory::ApplyFixedMirrorEdits(edits, mirrors);
+		const Vector3& center = mirrors.front()->GetMirror().GetCenter();
+		return rejected && center.x == 1.0f && center.y == 2.0f && center.z == 3.0f;
+	}
+
+	// Editorの再構築失敗時に、削除・一括削除・追加が元のJSONと選択を保つか確認します。
+	bool CheckStageEditorFailureRollback()
+	{
+		LevelLoader::LevelData levelData{};
+		LevelLoader::ObjectData firstObject{};
+		firstObject.name = "Existing";
+		firstObject.tag = "MapObject";
+		LevelLoader::ObjectData addedObject{};
+		addedObject.name = "EditorAdded1";
+		addedObject.tag = "EditorAdded";
+		levelData.objects.push_back(std::move(firstObject));
+		levelData.objects.push_back(std::move(addedObject));
+		int selectedIndex = 1;
+		int applyCalls = 0;
+		int saveCalls = 0;
+		std::string status;
+		StageLevelEditor::Context context{};
+		context.levelData = &levelData;
+		context.selectedObjectIndex = &selectedIndex;
+		context.applyLevelData = [&applyCalls](bool)
+		{
+			++applyCalls;
+			return false;
+		};
+		context.saveLevelData = [&saveCalls]()
+		{
+			++saveCalls;
+			return true;
+		};
+		context.setStatus = [&status](const std::string& message)
+		{
+			status = message;
+		};
+		const auto isOriginalState = [&]()
+		{
+			return levelData.objects.size() == 2 &&
+				levelData.objects[0].name == "Existing" &&
+				levelData.objects[1].name == "EditorAdded1" &&
+				selectedIndex == 1;
+		};
+		StageLevelEditor editor;
+		const bool removeRejected = !editor.RemoveSelectedObject(context) && isOriginalState();
+		const bool clearRejected = editor.ClearEditorAddedObjects(context) ==
+			"Clear failed. Current stage was kept." && isOriginalState() && saveCalls == 0;
+		const bool addRejected = !editor.AddCameraArea(context) && isOriginalState();
+		const bool pairRejected = !editor.AddEventPair(context) && isOriginalState();
+		// 再構築は成功して保存だけ失敗した時、保存済みと誤表示しないことも確認します。
+		context.applyLevelData = [](bool) { return true; };
+		context.saveLevelData = [&saveCalls]()
+		{
+			++saveCalls;
+			return false;
+		};
+		const std::string clearMessage = editor.ClearEditorAddedObjects(context);
+		const bool saveFailureReported = levelData.objects.size() == 1 &&
+			levelData.objects.front().name == "Existing" && selectedIndex == 0 &&
+			saveCalls == 1 && status == "Models cleared in memory, but Save Map failed." &&
+			clearMessage == status;
+		return removeRejected && clearRejected && addRejected && pairRejected &&
+			saveFailureReported && applyCalls == 4;
+	}
 }
 
-// 本編が所有する鏡・Player・固定設定を受け取り、自動確認を開始します。
+// 本編が所有する鏡・Player・固定設定を受け取り、配置に依存しない反射経路も自動確認します。
 void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 {
 	player_ = context.player;
@@ -112,6 +232,9 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 		detectsObbObbOverlap &&
 		playerChecksObbDirectly &&
 		playerChecksSphereDirectly;
+	gameplaySmokeStageMapColliderFlags_ = CheckStageMapColliderFlags();
+	gameplaySmokeMirrorEditAtomicity_ = CheckMirrorEditsRejectPartialUpdate();
+	gameplaySmokeStageEditorRollback_ = CheckStageEditorFailureRollback();
 
 	// StageがEnemyを直接newせず、Managerへ一覧生成と寿命管理を任せられるか確認します。
 	EnemyManager enemyManager;
@@ -175,6 +298,26 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	const std::vector<LaserSegment>& probeSegments = carryMirrorProbe.GetSegments();
 	gameplaySmokeCarryMirrorReflectedLaser_ =
 		probeSegments.size() >= 2 && probeSegments.front().hitMirror;
+
+	// 現行の危険Lightと鏡の配置に依存しないよう、鏡のごく近くから本編の反射経路へ一本だけ渡します。
+	// Sceneのライト配置は変えず、鏡一覧・遮蔽物・反射回数を含む実経路を確認します。
+	if (context.reflectHazardSegments) {
+		const Vector3 hazardProbeStart{
+			carryMirror.GetCenter().x + mirrorNormal.x * 0.25f,
+			carryMirror.GetCenter().y + mirrorNormal.y * 0.25f,
+			carryMirror.GetCenter().z + mirrorNormal.z * 0.25f,
+		};
+		const Vector3 hazardProbeEnd{
+			carryMirror.GetCenter().x - mirrorNormal.x * 0.25f,
+			carryMirror.GetCenter().y - mirrorNormal.y * 0.25f,
+			carryMirror.GetCenter().z - mirrorNormal.z * 0.25f,
+		};
+		const std::vector<LaserSegment> hazardProbeSegments = context.reflectHazardSegments({
+			{ hazardProbeStart, hazardProbeEnd, false, 0 },
+		});
+		gameplaySmokeHazardReflectionRoute_ =
+			hazardProbeSegments.size() >= 2 && hazardProbeSegments.front().hitMirror;
+	}
 
 	// 表側とは逆から当てたLaserは、携帯Mirrorでは反射しないことを確認します。
 	Laser carryMirrorBackfaceProbe;
@@ -621,6 +764,9 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 
 	const bool success =
 		gameplaySmokeSphereColliderApi_ &&
+		gameplaySmokeStageMapColliderFlags_ &&
+		gameplaySmokeMirrorEditAtomicity_ &&
+		gameplaySmokeStageEditorRollback_ &&
 		gameplaySmokeEnemyManagerSpawn_ &&
 		gameplaySmokePickedUpMirror_ &&
 		gameplaySmokeDroppedMirror_ &&
@@ -637,6 +783,7 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 		gameplaySmokeFixedMirrorReflection_ &&
 		gameplaySmokeMirrorFloorReflectsLaser_ &&
 		gameplaySmokeMirrorFloorReflection_ &&
+		gameplaySmokeHazardReflectionRoute_ &&
 		gameplaySmokeDoorStartsClosed_ &&
 		gameplaySmokeDoorDiagonalReflection_ &&
 		gameplaySmokeCameraSteps_ &&
@@ -651,6 +798,9 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 	if (log) {
 		log << (success ? "SUCCESS" : "FAILURE")
 			<< ": sphereColliderApi=" << gameplaySmokeSphereColliderApi_
+			<< " stageMapColliderFlags=" << gameplaySmokeStageMapColliderFlags_
+			<< " mirrorEditAtomicity=" << gameplaySmokeMirrorEditAtomicity_
+			<< " stageEditorRollback=" << gameplaySmokeStageEditorRollback_
 			<< " enemyManager=" << gameplaySmokeEnemyManagerSpawn_
 			<< " picked=" << gameplaySmokePickedUpMirror_
 			<< " dropped=" << gameplaySmokeDroppedMirror_
@@ -668,6 +818,7 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 			<< " mirrorFloorLaser=" << gameplaySmokeMirrorFloorReflectsLaser_
 			<< " mirrorFloorReflection=" << gameplaySmokeMirrorFloorReflection_
 			<< " hazardReflection=" << gameplaySmokeHazardLightReflection_
+			<< " hazardReflectionRoute=" << gameplaySmokeHazardReflectionRoute_
 			<< " doorStartsClosed=" << gameplaySmokeDoorStartsClosed_
 			<< " doorDiagonal=" << gameplaySmokeDoorDiagonalReflection_
 			<< " cameraSteps=" << gameplaySmokeCameraSteps_

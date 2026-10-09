@@ -11,7 +11,6 @@ public:
 
 	// Frameworkのライフサイクルに合わせてゲーム全体を管理する。
 	void Initialize() override;
-	void Finalize()override;
 	void Update()override;
 	void Draw()override;
 

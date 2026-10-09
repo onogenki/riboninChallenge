@@ -4,23 +4,34 @@
 #include "MyMath.h"
 #include"Camera.h"
 #include "Object3dCommon.h"
+#include "Logger.h"
 #include <cassert>
 
 using namespace MyMath;
 
-void SkyBox::Initialize(DirectXCommon* dxCommon, Camera* camera) {
-    assert(dxCommon);
-    assert(camera);
+// 頂点・Index・行列・Materialを従来の順に作り、未完成の背景をSceneへ渡しません。
+bool SkyBox::Initialize(DirectXCommon* dxCommon, Camera* camera) {
+    ResetResources();
+    if (!dxCommon || !camera || !dxCommon->GetDevice()) {
+        Logger::Log("SkyBox initialization failed: DirectX device or Camera is unavailable.");
+        return false;
+    }
+    const auto fail = [this](const char* resourceName) {
+        Logger::Log(std::string("SkyBox initialization failed: ") + resourceName + " buffer creation or mapping failed.");
+        ResetResources();
+        return false;
+    };
 
     // 引数でポインタを受け取ってメンバ変数に記録
     dxCommon_ = dxCommon;
     camera_ = camera;
 
-    ID3D12Device* device = dxCommon_->GetDevice();
-
     const uint32_t vertexCount = 24;
     // 頂点バッファの生成が抜けていたのを追加
     vertexBuffer_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * vertexCount);
+    if (!vertexBuffer_) {
+        return fail("vertex");
+    }
 
     vertexBufferView_.BufferLocation = vertexBuffer_->GetGPUVirtualAddress();
     vertexBufferView_.SizeInBytes = sizeof(VertexData) * vertexCount;
@@ -28,7 +39,9 @@ void SkyBox::Initialize(DirectXCommon* dxCommon, Camera* camera) {
 
     // 適切な構造体ポインタ(VertexData*)としてMapする
     VertexData* vertexData = nullptr;
-    vertexBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
+    if (FAILED(vertexBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData))) || !vertexData) {
+        return fail("vertex");
+    }
 
     // --- 頂点データの定義 ---
     // 右面 (X = 1.0f)
@@ -77,13 +90,18 @@ void SkyBox::Initialize(DirectXCommon* dxCommon, Camera* camera) {
 
     const uint32_t indexCount = 36;
     indexBuffer_ = dxCommon_->CreateBufferResource(sizeof(uint32_t) * indexCount);
+    if (!indexBuffer_) {
+        return fail("index");
+    }
 
     indexBufferView_.BufferLocation = indexBuffer_->GetGPUVirtualAddress();
     indexBufferView_.SizeInBytes = sizeof(uint32_t) * indexCount;
     indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
 
     uint32_t* indexData = nullptr;
-    indexBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&indexData));
+    if (FAILED(indexBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&indexData))) || !indexData) {
+        return fail("index");
+    }
 
     // 各面を内側から見た時に「時計回り」になるようにインデックスを設定
     // 右面
@@ -114,18 +132,41 @@ void SkyBox::Initialize(DirectXCommon* dxCommon, Camera* camera) {
 
     // 座標変換行列
     transformationResource_ = dxCommon_->CreateBufferResource(sizeof(TransformationMatrix));
-    transformationResource_->Map(0, nullptr, reinterpret_cast<void**>(&transformationData_));
+    if (!transformationResource_ ||
+        FAILED(transformationResource_->Map(0, nullptr, reinterpret_cast<void**>(&transformationData_))) ||
+        !transformationData_) {
+        return fail("transformation");
+    }
     transformationData_->World = MakeIdentity4x4();
     transformationData_->WVP = MakeIdentity4x4();
     transformationData_->WorldInverseTranspose = MakeIdentity4x4();
 
     // マテリアル
     materialResource_ = dxCommon_->CreateBufferResource(sizeof(Material));
-    materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+    if (!materialResource_ ||
+        FAILED(materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_))) ||
+        !materialData_) {
+        return fail("material");
+    }
     materialData_->color = { 1.0f, 1.0f, 1.0f, 1.0f }; // 白（テクスチャの色をそのまま出す）
     materialData_->enableLighting = 0;                  // ライティング無効
     materialData_->uvTransform = MakeIdentity4x4();
     materialData_->shininess = 0.0f;
+    return true;
+}
+
+// CPU側のMap先を無効化し、途中生成したBufferと借用先を一緒に外します。
+void SkyBox::ResetResources() {
+    transformationData_ = nullptr;
+    materialData_ = nullptr;
+    vertexBuffer_.Reset();
+    indexBuffer_.Reset();
+    transformationResource_.Reset();
+    materialResource_.Reset();
+    vertexBufferView_ = {};
+    indexBufferView_ = {};
+    dxCommon_ = nullptr;
+    camera_ = nullptr;
 }
 
 void SkyBox::Update() {
@@ -144,6 +185,7 @@ void SkyBox::Update() {
     transformationData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 }
 
+// SkyBoxを最初に描くSceneでも三角形の描画形式を確実に設定し、背景の描画漏れを防ぎます。
 void SkyBox::Draw() {
     // コマンドリストの取得
     ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
@@ -155,6 +197,7 @@ void SkyBox::Draw() {
     //Skybox専用のパイプラインとシグネチャに切り替える
     commandList->SetGraphicsRootSignature(object3dCommon->GetSkyboxRootSignature());
     commandList->SetPipelineState(object3dCommon->GetSkyboxPipelineState());
+    commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
     // ピクセルシェーダー側
     commandList->SetGraphicsRootConstantBufferView(0, transformationResource_->GetGPUVirtualAddress());

@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <memory>
 #include <numbers>
+#include <Windows.h>
 #include "../../externals/nlohmann/json.hpp"
 
 namespace
@@ -304,11 +305,13 @@ std::unique_ptr<LevelLoader::LevelData> LevelLoader::Load(const std::string& fil
 	return levelData;
 }
 
-// 開始演出・照明・配置物を従来の順にJSONへまとめ、一時ファイル経由で保存します。
+// 開始演出・照明・配置物を従来の順にJSONへまとめ、完成した一時ファイルで置き換えます。
 bool LevelLoader::Save(const std::string& fileName, const LevelData& levelData)
 {
-	const std::string fullPath = "resources/levels/" + fileName + ".json";
-	const std::string temporaryPath = fullPath + ".tmp";
+	const std::filesystem::path fullPath =
+		std::filesystem::path("resources/levels") / (fileName + ".json");
+	std::filesystem::path temporaryPath = fullPath;
+	temporaryPath += L".tmp";
 	const bool usesEngineCoordinates = levelData.coordinateSystem == "engine";
 
 	nlohmann::json serialized;
@@ -339,19 +342,18 @@ bool LevelLoader::Save(const std::string& fileName, const LevelData& levelData)
 			return false;
 		}
 		file << std::setw(4) << serialized << '\n';
+		file.close();
 		if (file.fail()) {
 			return false;
 		}
 	}
 
-	std::error_code error;
-	std::filesystem::copy_file(
-		temporaryPath,
-		fullPath,
-		std::filesystem::copy_options::overwrite_existing,
-		error);
-	std::filesystem::remove(temporaryPath);
-	return !error;
+	// 同じフォルダ内で移動し、完成前のJSONを既存ファイルへコピーしません。
+	// 置換できない時は一時ファイルを消さず、呼び出し元へ失敗を返します。
+	return MoveFileExW(
+		temporaryPath.c_str(),
+		fullPath.c_str(),
+		MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) != 0;
 }
 
 namespace

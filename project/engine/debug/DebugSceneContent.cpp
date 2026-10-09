@@ -6,6 +6,7 @@
 #include "Object3dFactory.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
+#include "TextureManager.h"
 #include <algorithm>
 
 // 棚の情報を使ってObject3dを生成し、必要なAnimationだけを設定します。
@@ -107,8 +108,14 @@ bool DebugSceneContent::AddTexture(
 	if (textureFilePath.empty() || !context.spriteCommon || !context.sprites) {
 		return false;
 	}
+	// 読み込みに失敗したSpriteをSceneへ登録すると、次のUpdateで画像情報を取得できなくなります。
+	if (!TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+		return false;
+	}
 	auto sprite = std::make_unique<Sprite>();
-	sprite->Initialize(context.spriteCommon, textureFilePath);
+	if (!sprite->Initialize(context.spriteCommon, textureFilePath)) {
+		return false;
+	}
 	sprite->SetAnchorPoint({ 0.5f, 0.5f });
 	const Vector2 originalSize = sprite->GetSize();
 	constexpr float kMaximumPreviewSize = 220.0f;

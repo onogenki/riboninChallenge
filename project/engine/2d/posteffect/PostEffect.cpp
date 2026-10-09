@@ -1,15 +1,18 @@
 #include "PostEffect.h"
 
 #include "Logger.h"
+#include "StringUtility.h"
 #include "TextureManager.h"
 
-#include <cassert>
 #include <stdexcept>
+#include <string>
 
+// 描画資源を順に作り、失敗時は未完成のBufferやShaderを使用させません。
 void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 {
-	assert(dxCommon);
-	assert(srvManager);
+	if (!dxCommon || !dxCommon->GetDevice() || !srvManager) {
+		throw std::runtime_error("PostEffect: DirectX device or SRV manager is unavailable");
+	}
 	dxCommon_ = dxCommon;
 	srvManager_ = srvManager;
 
@@ -17,9 +20,17 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	CreateGraphicsPipeline();
 
 	depthBasedOutlineResource_ = dxCommon_->CreateBufferResource(sizeof(DepthBasedOutlineData));
-	depthBasedOutlineResource_->Map(0, nullptr, reinterpret_cast<void**>(&depthBasedOutlineData_));
+	if (!depthBasedOutlineResource_ ||
+		FAILED(depthBasedOutlineResource_->Map(0, nullptr, reinterpret_cast<void**>(&depthBasedOutlineData_))) ||
+		!depthBasedOutlineData_) {
+		throw std::runtime_error("PostEffect: depth outline buffer creation or mapping failed");
+	}
 	dissolveResource_ = dxCommon_->CreateBufferResource(sizeof(DissolveData));
-	dissolveResource_->Map(0, nullptr, reinterpret_cast<void**>(&dissolveData_));
+	if (!dissolveResource_ ||
+		FAILED(dissolveResource_->Map(0, nullptr, reinterpret_cast<void**>(&dissolveData_))) ||
+		!dissolveData_) {
+		throw std::runtime_error("PostEffect: dissolve buffer creation or mapping failed");
+	}
 	dissolveData_->threshold = 0.5f;
 	dissolveData_->edgeWidth = 0.03f;
 	dissolveData_->edgeColor[0] = 1.0f;
@@ -27,7 +38,11 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	dissolveData_->edgeColor[2] = 0.3f;
 	dissolveData_->edgeColor[3] = 1.0f;
 	randomNoiseResource_ = dxCommon_->CreateBufferResource(sizeof(RandomNoiseData));
-	randomNoiseResource_->Map(0, nullptr, reinterpret_cast<void**>(&randomNoiseData_));
+	if (!randomNoiseResource_ ||
+		FAILED(randomNoiseResource_->Map(0, nullptr, reinterpret_cast<void**>(&randomNoiseData_))) ||
+		!randomNoiseData_) {
+		throw std::runtime_error("PostEffect: random noise buffer creation or mapping failed");
+	}
 	randomNoiseData_->time = 0.0f;
 	randomNoiseData_->intensity = 1.0f;
 
@@ -50,6 +65,25 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 		throw std::runtime_error(message);
 	}
 	dissolveMaskNoise1SrvIndex_ = TextureManager::GetInstance()->GetSrvIndex(dissolveMaskNoise1FilePath);
+}
+
+// Textureの実体はTextureManagerに任せ、PostEffectが所有するBufferとPipelineだけを解放します。
+void PostEffect::Finalize()
+{
+	depthBasedOutlineData_ = nullptr;
+	dissolveData_ = nullptr;
+	randomNoiseData_ = nullptr;
+	depthBasedOutlineResource_.Reset();
+	dissolveResource_.Reset();
+	randomNoiseResource_.Reset();
+	for (auto& pipelineState : graphicsPipelineStates_) {
+		pipelineState.Reset();
+	}
+	rootSignature_.Reset();
+	dissolveMaskSrvIndex_ = SrvManager::kInvalidSrvIndex;
+	dissolveMaskNoise1SrvIndex_ = SrvManager::kInvalidSrvIndex;
+	srvManager_ = nullptr;
+	dxCommon_ = nullptr;
 }
 
 void PostEffect::SetDissolveThreshold(float threshold)
@@ -167,6 +201,7 @@ void PostEffect::DrawWithPipeline(uint32_t sourceSrvIndex, PipelineType pipeline
 	commandList->DrawInstanced(3, 1, 0, 0);
 }
 
+// Shaderの結合位置を決め、失敗したRoot SignatureをPipelineへ渡さないようにします。
 void PostEffect::CreateRootSignature()
 {
 	// PixelShaderのt0でRenderTextureを読むためのDescriptorRange
@@ -227,14 +262,18 @@ void PostEffect::CreateRootSignature()
 		D3D_ROOT_SIGNATURE_VERSION_1,
 		&signatureBlob,
 		&errorBlob);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !signatureBlob) {
+		throw std::runtime_error("PostEffect: root signature serialization failed");
+	}
 
 	hr = dxCommon_->GetDevice()->CreateRootSignature(
 		0,
 		signatureBlob->GetBufferPointer(),
 		signatureBlob->GetBufferSize(),
 		IID_PPV_ARGS(&rootSignature_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !rootSignature_) {
+		throw std::runtime_error("PostEffect: root signature creation failed");
+	}
 }
 
 void PostEffect::CreateGraphicsPipeline()
@@ -254,6 +293,7 @@ void PostEffect::CreateGraphicsPipeline()
 	CreateGraphicsPipelineState(PipelineType::Smoothing, L"resources/shaders/BoxFilter.PS.hlsl");
 }
 
+// 各効果のShaderとPipelineを作り、未完成のPipelineを描画に使わせません。
 void PostEffect::CreateGraphicsPipelineState(PipelineType type, const wchar_t* pixelShaderPath)
 {
 	// SV_VertexIDから頂点を作るため、InputLayoutには何も設定しない
@@ -275,11 +315,15 @@ void PostEffect::CreateGraphicsPipelineState(PipelineType type, const wchar_t* p
 
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob =
 		dxCommon_->CompileShader(L"resources/shaders/Fullscreen.VS.hlsl", L"vs_6_0");
-	assert(vertexShaderBlob);
+	if (!vertexShaderBlob) {
+		throw std::runtime_error("PostEffect: fullscreen vertex shader is unavailable");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob =
 		dxCommon_->CompileShader(pixelShaderPath, L"ps_6_0");
-	assert(pixelShaderBlob);
+	if (!pixelShaderBlob) {
+		throw std::runtime_error("PostEffect: pixel shader is unavailable: " + StringUtility::ConvertString(pixelShaderPath));
+	}
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
 	pipelineDesc.pRootSignature = rootSignature_.Get();
@@ -304,5 +348,7 @@ void PostEffect::CreateGraphicsPipelineState(PipelineType type, const wchar_t* p
 	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
 		&pipelineDesc,
 		IID_PPV_ARGS(&graphicsPipelineStates_[static_cast<int>(type)]));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !graphicsPipelineStates_[static_cast<int>(type)]) {
+		throw std::runtime_error("PostEffect: graphics pipeline creation failed: " + StringUtility::ConvertString(pixelShaderPath));
+	}
 }

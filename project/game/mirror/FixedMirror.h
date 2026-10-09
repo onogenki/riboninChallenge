@@ -12,7 +12,7 @@ class DirectXCommon;
 class Object3dCommon;
 class SrvManager;
 
-	// 部屋やPlayerを映す、大型Mirrorです。
+// 部屋やPlayerを映す、大型Mirrorです。
 // 一枚ごとに専用の反射Cameraと描画先Textureを持ちます。
 class FixedMirror
 {

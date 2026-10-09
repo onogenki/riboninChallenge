@@ -2,12 +2,16 @@
 
 #include "Object3d.h"
 #include "ParticleManager.h"
+#include "TextureManager.h"
 #include <Windows.h>
+#include <filesystem>
 #include <fstream>
+#include <initializer_list>
+#include <limits>
 
 using namespace MyMath;
 
-// DebugSceneから渡された対象と操作窓口を使い、巻き戻し自動確認の初期状態を作ります。
+// DebugSceneの対象を使い、粒子画像の失敗経路と巻き戻し確認の初期状態を作ります。
 void DebugTimePlaybackSmoke::Start(
 	State& state,
 	bool isUiSmokeEnabled,
@@ -123,6 +127,70 @@ void DebugTimePlaybackSmoke::Start(
 	particleManager->SetReturning(false);
 	particleManager->SetAutoWindSwitchEnabled(false);
 	particleManager->SetWindEnabled(false);
+	particleManager->ClearAllParticles();
+
+	// 実素材には触れず、存在しない画像で既存Groupを置換しようとしても粒子が残るか確認します。
+	constexpr const char* kMissingParticleTexture =
+		"Resources/debug/__missing_particle_texture_smoke_7f9ab3__.png";
+	if (std::filesystem::exists(kMissingParticleTexture)) {
+		Finish(state, false, "The particle texture failure probe path already exists.");
+		return;
+	}
+	for (const char* groupName : { "Circle", "Ring", "Cylinder" }) {
+		particleManager->Emit(groupName, { 0.0f, 0.0f, 0.0f }, 1, false);
+		ParticlePlaybackSnapshot before{};
+		if (!particleManager->GetPlaybackSnapshot(groupName, before) || before.count != 1) {
+			Finish(state, false, "A particle group was missing before the texture failure probe.");
+			return;
+		}
+	}
+	const bool replacedCircle = particleManager->CreateParticleGroup("Circle", kMissingParticleTexture);
+	const bool replacedRing = particleManager->CreateRingParticleGroup("Ring", kMissingParticleTexture);
+	const bool replacedCylinder = particleManager->CreateCylinderParticleGroup("Cylinder", kMissingParticleTexture);
+	const bool createdMissingGroup = particleManager->CreateParticleGroup("MissingTextureProbe", kMissingParticleTexture);
+	ParticlePlaybackSnapshot after{};
+	for (const char* groupName : { "Circle", "Ring", "Cylinder" }) {
+		if (!particleManager->GetPlaybackSnapshot(groupName, after) || after.count != 1) {
+			Finish(state, false, "A valid particle group was replaced after its texture load failed.");
+			return;
+		}
+	}
+	if (replacedCircle || replacedRing || replacedCylinder || createdMissingGroup ||
+		particleManager->GetPlaybackSnapshot("MissingTextureProbe", after) ||
+		TextureManager::GetInstance()->Contains(kMissingParticleTexture)) {
+		Finish(state, false, "A missing particle texture or group was accepted or registered.");
+		return;
+	}
+	// Releaseでassertが無効でも、不正な円柱寸法が既存Groupを消さないことを確認します。
+	constexpr const char* kCylinderTexture = "Resources/debug/gradationLine.png";
+	const bool replacedWithInvalidCylinder = particleManager->CreateCylinderParticleGroup("Cylinder", kCylinderTexture, 2);
+	particleManager->CreateCylinderParticleGroup("Cylinder", kCylinderTexture, 32, 0.0f);
+	particleManager->CreateCylinderParticleGroup("Cylinder", kCylinderTexture, 32, 1.0f, 0.0f);
+	particleManager->CreateCylinderParticleGroup("Cylinder", kCylinderTexture, 32, 1.0f, 1.0f, 0.0f);
+	particleManager->CreateCylinderParticleGroup(
+		"Cylinder", kCylinderTexture, 32, std::numeric_limits<float>::infinity());
+	const bool replacedWithOversizedCylinder = particleManager->CreateCylinderParticleGroup(
+		"Cylinder", kCylinderTexture, (std::numeric_limits<uint32_t>::max)());
+	const bool createdInvalidCylinder = particleManager->CreateCylinderParticleGroup("InvalidCylinderProbe", kCylinderTexture, 2);
+	if (replacedWithInvalidCylinder || replacedWithOversizedCylinder || createdInvalidCylinder ||
+		!particleManager->GetPlaybackSnapshot("Cylinder", after) || after.count != 1 ||
+		particleManager->GetPlaybackSnapshot("InvalidCylinderProbe", after)) {
+		Finish(state, false, "Invalid cylinder dimensions replaced or registered a particle group.");
+		return;
+	}
+	// 完成した新Groupなら旧Groupだけが入れ替わり、三種類とも空の粒子一覧から再開します。
+	if (!particleManager->CreateParticleGroup("Circle", "Resources/debug/circle.png") ||
+		!particleManager->CreateRingParticleGroup("Ring", kCylinderTexture) ||
+		!particleManager->CreateCylinderParticleGroup("Cylinder", kCylinderTexture)) {
+		Finish(state, false, "A valid particle group could not replace an existing group.");
+		return;
+	}
+	for (const char* groupName : { "Circle", "Ring", "Cylinder" }) {
+		if (!particleManager->GetPlaybackSnapshot(groupName, after) || after.count != 0) {
+			Finish(state, false, "A replaced particle group kept particles from its previous instance.");
+			return;
+		}
+	}
 	particleManager->ClearAllParticles();
 
 	state.timePlaybackSmokeOrigin_ = context.objectPlane->GetTransform();
@@ -436,7 +504,12 @@ void DebugTimePlaybackSmoke::Update(
 		Finish(
 			state,
 			true,
-			"OK transform=2sTimeline+pause+move+return deleteStress=32 animation=return+autoResume particle=endless+finiteReturn+resume");
+			"OK transform=2sTimeline+pause+move+return deleteStress=32 "
+			"animation=return+autoResume particle=endless+finiteReturn+resume "
+			"missingParticleTexture=rejected+originalPreserved "
+			"invalidCylinder=rejected+originalPreserved "
+			"oversizedCylinder=rejected+originalPreserved "
+			"particleGroupReplacement=completedThenSwapped");
 		return;
 	}
 

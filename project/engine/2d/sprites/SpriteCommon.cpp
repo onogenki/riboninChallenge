@@ -1,14 +1,32 @@
 #include "SpriteCommon.h"
-#include <cassert>
+#include "Logger.h"
+#include <exception>
+#include <stdexcept>
+#include <string>
 
-void SpriteCommon::Initialize(DirectXCommon* dxCommon)
+// 全Spriteが共有する描画設定を作り、失敗時は未完成のPipelineを残しません。
+bool SpriteCommon::Initialize(DirectXCommon* dxCommon)
 {
-	assert(dxCommon);
-	//引数で受け取ってメンバ変数に記録する
+	rootSignature_.Reset();
+	graphicsPipelineState_.Reset();
+	dxCommon_ = nullptr;
+	if (!dxCommon || !dxCommon->GetDevice() || !dxCommon->GetCommandList()) {
+		Logger::Log("SpriteCommon initialization failed: DirectX resources are unavailable.");
+		return false;
+	}
 	dxCommon_ = dxCommon;
 
-	CreateRootSignature();
-	CreateGraphicsPipeline();
+	try {
+		CreateRootSignature();
+		CreateGraphicsPipeline();
+	} catch (const std::exception& error) {
+		Logger::Log(std::string("SpriteCommon initialization failed: ") + error.what());
+		rootSignature_.Reset();
+		graphicsPipelineState_.Reset();
+		dxCommon_ = nullptr;
+		return false;
+	}
+	return true;
 }
 
 void SpriteCommon::SetCommonDrawSetting()
@@ -23,6 +41,7 @@ void SpriteCommon::SetCommonDrawSetting()
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
+// Sprite用のShader結合位置を作り、失敗した結果をPipelineへ渡しません。
 void SpriteCommon::CreateRootSignature()
 {
 	// RootSignature作成
@@ -82,19 +101,21 @@ void SpriteCommon::CreateRootSignature()
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature,
 		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr))
+	if (FAILED(hr) || !signatureBlob)
 	{
-		assert(false);
+		throw std::runtime_error("SpriteCommon: root signature serialization failed");
 	}
 
 	// バイナリを元に生成
 	hr = dxCommon_->GetDevice()->CreateRootSignature(0,
 		signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
 		IID_PPV_ARGS(&rootSignature_)); // メンバ変数 rootSignature_ に保存
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !rootSignature_) {
+		throw std::runtime_error("SpriteCommon: root signature creation failed");
+	}
 }
 
-//グラフィックスパイプラインの生成
+// ShaderとPipelineを作り、失敗時は全Spriteの描画を始めないようにします。
 void SpriteCommon::CreateGraphicsPipeline()
 {
 	HRESULT hr = S_FALSE;
@@ -147,11 +168,15 @@ void SpriteCommon::CreateGraphicsPipeline()
 	// shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Sprite.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexShaderBlob != nullptr);
+	if (!vertexShaderBlob) {
+		throw std::runtime_error("SpriteCommon: Sprite.VS.hlsl is unavailable");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Sprite.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!pixelShaderBlob) {
+		throw std::runtime_error("SpriteCommon: Sprite.PS.hlsl is unavailable");
+	}
 
 	// DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -190,5 +215,7 @@ void SpriteCommon::CreateGraphicsPipeline()
 	// 実際に生成
 	hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
 		IID_PPV_ARGS(&graphicsPipelineState_)); // メンバ変数 graphicsPipelineState_ に保存
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !graphicsPipelineState_) {
+		throw std::runtime_error("SpriteCommon: graphics pipeline creation failed");
+	}
 }

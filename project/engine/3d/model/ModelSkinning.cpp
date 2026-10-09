@@ -1,5 +1,6 @@
 #include "Model.h"
 
+#include "Logger.h"
 #include "SrvManager.h"
 #include "TextureManager.h"
 
@@ -11,20 +12,58 @@ using namespace MyMath;
 
 // SkinClusterのGPU Resource作成、Palette更新、Compute Skinning、Skinned描画をまとめる。
 // 通常モデルの読込・描画と分け、骨ありモデルの処理だけを追えるようにする。
-Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& skeleton, const ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize)
+// 生成途中の失敗はDescriptorを返し、完成した時だけObject3dへ渡す。
+bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& skeleton, const ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, SkinCluster& result)
 {
-	SkinCluster skinCluster;
+	// 空の頂点や未初期化Deviceでは、Descriptorを取得する前に生成を止めます。
+	if (!device || !descriptorHeap || descriptorSize == 0 || !modelCommon_ ||
+		!modelCommon_->GetDxCommon() || !vertexResource ||
+		skeleton.joints.empty() || modelData.vertices.empty()) {
+		Logger::Log("Model: SkinCluster dependencies are unavailable.");
+		return false;
+	}
+	SkinCluster skinCluster{};
+	SrvManager* srvManager = SrvManager::GetInstance();
+	// 途中失敗時は、Map先・Buffer・取得済みDescriptorを同じ所有者から片付けます。
+	auto fail = [&](const char* message) {
+		Logger::Log(message);
+		if (skinCluster.paletteResource && skinCluster.mappedPalette.data()) {
+			skinCluster.paletteResource->Unmap(0, nullptr);
+		}
+		if (skinCluster.influenceResource && skinCluster.mappedInfluence.data()) {
+			skinCluster.influenceResource->Unmap(0, nullptr);
+		}
+		if (skinCluster.skinningInformationResource && skinCluster.mappedSkinningInformation) {
+			skinCluster.skinningInformationResource->Unmap(0, nullptr);
+		}
+		for (uint32_t index : { skinCluster.paletteSrvIndex, skinCluster.inputVertexSrvIndex,
+			skinCluster.influenceSrvIndex, skinCluster.outputVertexUavIndex }) {
+			if (index != UINT32_MAX) {
+				srvManager->Free(index);
+			}
+		}
+		return false;
+	};
 	//マネージャから次使っていい番号をもらう
-	uint32_t srvIndex = SrvManager::GetInstance()->Allocate();
+	uint32_t srvIndex = srvManager->Allocate();
+	if (srvIndex == SrvManager::kInvalidSrvIndex) {
+		return fail("Model: no palette SRV available for SkinCluster.");
+	}
 	skinCluster.paletteSrvIndex = srvIndex;
 
 	//paletter用のResourceを確保
 	skinCluster.paletteResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(WellForGPU) * skeleton.joints.size());
+	if (!skinCluster.paletteResource) {
+		return fail("Model: SkinCluster palette buffer creation failed.");
+	}
 	WellForGPU* mappedPalette = nullptr;
-	skinCluster.paletteResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedPalette));
+	const HRESULT paletteMapResult = skinCluster.paletteResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedPalette));
+	if (FAILED(paletteMapResult) || !mappedPalette) {
+		return fail("Model: SkinCluster palette buffer Map failed.");
+	}
 	skinCluster.mappedPalette = { mappedPalette,skeleton.joints.size() };//spanを使ってアクセスするようにする
-	skinCluster.paletteSrvHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(srvIndex);
-	skinCluster.paletteSrvHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(srvIndex);
+	skinCluster.paletteSrvHandle.first = srvManager->GetCPUDescriptorHandle(srvIndex);
+	skinCluster.paletteSrvHandle.second = srvManager->GetGPUDescriptorHandle(srvIndex);
 
 	//palette用のsrvを作成する。StructuredBufferでアクセスできるようにする。
 	D3D12_SHADER_RESOURCE_VIEW_DESC paletterSrvDesc{};
@@ -37,17 +76,26 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	paletterSrvDesc.Buffer.StructureByteStride = sizeof(WellForGPU);
 	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletterSrvDesc, skinCluster.paletteSrvHandle.first);
 
-	uint32_t inputVertexSrvIndex = SrvManager::GetInstance()->Allocate();
+	uint32_t inputVertexSrvIndex = srvManager->Allocate();
+	if (inputVertexSrvIndex == SrvManager::kInvalidSrvIndex) {
+		return fail("Model: no input vertex SRV available for SkinCluster.");
+	}
 	skinCluster.inputVertexSrvIndex = inputVertexSrvIndex;
-	skinCluster.inputVertexSrvHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(inputVertexSrvIndex);
-	skinCluster.inputVertexSrvHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(inputVertexSrvIndex);
-	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
+	skinCluster.inputVertexSrvHandle.first = srvManager->GetCPUDescriptorHandle(inputVertexSrvIndex);
+	skinCluster.inputVertexSrvHandle.second = srvManager->GetGPUDescriptorHandle(inputVertexSrvIndex);
+	srvManager->CreateSRVforStructuredBuffer(
 		inputVertexSrvIndex, vertexResource.Get(), UINT(modelData.vertices.size()), sizeof(VertexData));
 
 	//influence用のResourceを確保。頂点ごとにinfluence情報を追加できるようにする
 	skinCluster.influenceResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(VertexInfluence) * modelData.vertices.size());
+	if (!skinCluster.influenceResource) {
+		return fail("Model: SkinCluster influence buffer creation failed.");
+	}
 	VertexInfluence* mappedInfluence = nullptr;
-	skinCluster.influenceResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedInfluence));
+	const HRESULT influenceMapResult = skinCluster.influenceResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedInfluence));
+	if (FAILED(influenceMapResult) || !mappedInfluence) {
+		return fail("Model: SkinCluster influence buffer Map failed.");
+	}
 	std::memset(mappedInfluence, 0, sizeof(VertexInfluence) * modelData.vertices.size());//0埋め weightを0にしておく
 	skinCluster.mappedInfluence = { mappedInfluence,modelData.vertices.size() };
 
@@ -56,11 +104,14 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 	skinCluster.influenceBufferView.SizeInBytes = UINT(sizeof(VertexInfluence) * modelData.vertices.size());
 	skinCluster.influenceBufferView.StrideInBytes = sizeof(VertexInfluence);
 
-	uint32_t influenceSrvIndex = SrvManager::GetInstance()->Allocate();
+	uint32_t influenceSrvIndex = srvManager->Allocate();
+	if (influenceSrvIndex == SrvManager::kInvalidSrvIndex) {
+		return fail("Model: no influence SRV available for SkinCluster.");
+	}
 	skinCluster.influenceSrvIndex = influenceSrvIndex;
-	skinCluster.influenceSrvHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(influenceSrvIndex);
-	skinCluster.influenceSrvHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(influenceSrvIndex);
-	SrvManager::GetInstance()->CreateSRVforStructuredBuffer(
+	skinCluster.influenceSrvHandle.first = srvManager->GetCPUDescriptorHandle(influenceSrvIndex);
+	skinCluster.influenceSrvHandle.second = srvManager->GetGPUDescriptorHandle(influenceSrvIndex);
+	srvManager->CreateSRVforStructuredBuffer(
 		influenceSrvIndex, skinCluster.influenceResource.Get(), UINT(modelData.vertices.size()), sizeof(VertexInfluence));
 
 	D3D12_HEAP_PROPERTIES outputVertexHeapProperties{};
@@ -83,16 +134,21 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 		D3D12_RESOURCE_STATE_COMMON,
 		nullptr,
 		IID_PPV_ARGS(&skinCluster.outputVertexResource));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !skinCluster.outputVertexResource) {
+		return fail("Model: SkinCluster output vertex buffer creation failed.");
+	}
 
 	skinCluster.outputVertexBufferView.BufferLocation = skinCluster.outputVertexResource->GetGPUVirtualAddress();
 	skinCluster.outputVertexBufferView.SizeInBytes = UINT(sizeof(VertexData) * modelData.vertices.size());
 	skinCluster.outputVertexBufferView.StrideInBytes = sizeof(VertexData);
 
-	uint32_t outputVertexUavIndex = SrvManager::GetInstance()->Allocate();
+	uint32_t outputVertexUavIndex = srvManager->Allocate();
+	if (outputVertexUavIndex == SrvManager::kInvalidSrvIndex) {
+		return fail("Model: no output vertex UAV available for SkinCluster.");
+	}
 	skinCluster.outputVertexUavIndex = outputVertexUavIndex;
-	skinCluster.outputVertexUavHandle.first = SrvManager::GetInstance()->GetCPUDescriptorHandle(outputVertexUavIndex);
-	skinCluster.outputVertexUavHandle.second = SrvManager::GetInstance()->GetGPUDescriptorHandle(outputVertexUavIndex);
+	skinCluster.outputVertexUavHandle.first = srvManager->GetCPUDescriptorHandle(outputVertexUavIndex);
+	skinCluster.outputVertexUavHandle.second = srvManager->GetGPUDescriptorHandle(outputVertexUavIndex);
 
 	D3D12_UNORDERED_ACCESS_VIEW_DESC outputVertexUavDesc{};
 	outputVertexUavDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -107,8 +163,14 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 
 	skinCluster.skinningInformationResource =
 		modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(SkinCluster::SkinningInformation));
-	skinCluster.skinningInformationResource->Map(
+	if (!skinCluster.skinningInformationResource) {
+		return fail("Model: SkinCluster information buffer creation failed.");
+	}
+	const HRESULT informationMapResult = skinCluster.skinningInformationResource->Map(
 		0, nullptr, reinterpret_cast<void**>(&skinCluster.mappedSkinningInformation));
+	if (FAILED(informationMapResult) || !skinCluster.mappedSkinningInformation) {
+		return fail("Model: SkinCluster information buffer Map failed.");
+	}
 	skinCluster.mappedSkinningInformation->numVertices = UINT(modelData.vertices.size());
 
 	//InverseBindPoseMatrixを格納する場所を作成して、単位行列で埋める
@@ -123,10 +185,16 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 		{
 			continue;
 		}
+		if (it->second < 0 || static_cast<size_t>(it->second) >= skinCluster.inverseBindPoseMatrices.size()) {
+			return fail("Model: SkinCluster joint index is out of range.");
+		}
 		//(*it).secondにはjointのindexが入ってるので、該当のindexのinverseBindPoseMatrixを代入
 		skinCluster.inverseBindPoseMatrices[(*it).second] = jointWeight.second.inverseBindPoseMatrix;
 		for (const auto& vertexWeight : jointWeight.second.vertexWeights)
 		{
+			if (vertexWeight.vertexIndex >= skinCluster.mappedInfluence.size()) {
+				return fail("Model: SkinCluster vertex index is out of range.");
+			}
 			auto& currentInfluence = skinCluster.mappedInfluence[vertexWeight.vertexIndex];//該当のvertexIndexのinfluence情報を参照しておく
 			for (uint32_t index = 0; index < kNumMaxInfluence; ++index)//空いてるところに入れる
 			{
@@ -140,7 +208,8 @@ Model::SkinCluster Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12D
 		}
 	}
 
-	return skinCluster;
+	result = std::move(skinCluster);
+	return true;
 }
 
 void Model::Update(SkinCluster& skinCluster, const Skeleton& skeleton)

@@ -33,13 +33,17 @@ public:
         float shininess;
     };
 
-    void Initialize(DirectXCommon* dxCommon, Camera* camera);
+    // 四つのGPU Bufferを準備できた場合だけ、Factoryへ成功を返します。
+    bool Initialize(DirectXCommon* dxCommon, Camera* camera);
     void Update();
     void Draw();
     void SetTexture(const std::string& filePath) { texture_ = filePath; }//キューブマップのDDSのパスを指定
     void CreateRootSignature();
 
 private:
+    // 初期化途中で失敗した時に、自分のBufferと借用先を外します。
+    void ResetResources();
+
     DirectXCommon* dxCommon_ = nullptr;
     Camera* camera_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;

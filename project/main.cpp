@@ -10,8 +10,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	//インスタンス生成
 	std::unique_ptr<Framework> game = std::make_unique<Game>();
 
-	//実行
-	game->Run();
-
-	return 0;
+	//実行結果をOSへ返し、自動テストの失敗を成功扱いにしない。
+	return game->Run();
 }
