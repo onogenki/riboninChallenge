@@ -71,12 +71,13 @@ void Stage1::DrawStagePuzzleDebugUi()
 				return;
 			}
 			FixedMirror& fixedMirror = *fixedMirrors_.front();
-			Mirror& mirror = fixedMirror.GetMirror();
+			const Mirror& mirror = fixedMirror.GetMirror();
 			// Puzzleが毎フレーム角度を計算するので、編集角度を元の設定にも戻します。
 			// 進行中の回転量はJSONへ焼き込まず、基準角度だけを保存します。
-			StageLightPuzzle::Settings& settings = lightPuzzle_.GetSettings();
+			StageLightPuzzle::Settings settings = lightPuzzle_.GetSettings();
 			settings.largeMirrorBaseYaw = fixedMirror.GetYaw() -
 				settings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount();
+			lightPuzzle_.SetSettings(settings);
 			std::function<bool(std::vector<LevelLoader::ObjectData>&)> syncMirrorData;
 			syncMirrorData = [&](std::vector<LevelLoader::ObjectData>& objects)
 			{
@@ -104,23 +105,18 @@ void Stage1::DrawStagePuzzleDebugUi()
 		return;
 	}
 	StagePuzzleDebugUi::LightContext lightContext{};
-	StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
+	StageLightPuzzle::Settings puzzleSettings = lightPuzzle_.GetSettings();
 	lightContext.carryableMirror = carryableMirror_.get();
-	lightContext.laserOrigin = &puzzleSettings.laserOrigin;
-	lightContext.laserDirection = &puzzleSettings.laserDirection;
-	lightContext.doorLaserOrigin = &puzzleSettings.doorLaserOrigin;
-	lightContext.doorLaserDirection = &puzzleSettings.doorLaserDirection;
-	lightContext.laserVisualWidth = &puzzleSettings.laserVisualWidth;
-	lightContext.chargeSwitchPosition = &puzzleSettings.chargeSwitchPosition;
-	lightContext.doorSwitchPosition = &puzzleSettings.doorSwitchPosition;
-	lightContext.largeMirrorTargetYawOffset = &puzzleSettings.largeMirrorTargetYawOffset;
-	lightContext.isChargeSwitchReceivingLight = &lightPuzzle_.GetChargeSwitchReceivingLightForEdit();
-	lightContext.mirrorCharge = &lightPuzzle_.GetMirrorChargeForEdit();
-	lightContext.isLargeMirrorCharged = &lightPuzzle_.GetLargeMirrorChargedForEdit();
-	lightContext.largeMirrorRotationAmount = &lightPuzzle_.GetLargeMirrorRotationAmountForEdit();
-	lightContext.isDoorSwitchReceivingLight = &lightPuzzle_.GetDoorSwitchReceivingLightForEdit();
-	lightContext.doorOpenAmount = &lightPuzzle_.GetDoorOpenAmountForEdit();
-	lightContext.laserRenderer = lightPuzzle_.GetChargeLaserRenderer();
-	lightContext.doorLaserRenderer = lightPuzzle_.GetDoorLaserRenderer();
-	StagePuzzleDebugUi::DrawLightPuzzle(lightContext);
+	// 編集対象はSettingsだけ、進行状態は表示用の値だけをUIへ渡します。
+	lightContext.settings = &puzzleSettings;
+	lightContext.isChargeSwitchReceivingLight = lightPuzzle_.IsChargeSwitchReceivingLight();
+	lightContext.mirrorCharge = lightPuzzle_.GetMirrorCharge();
+	lightContext.isLargeMirrorCharged = lightPuzzle_.IsLargeMirrorCharged();
+	lightContext.largeMirrorRotationAmount = lightPuzzle_.GetLargeMirrorRotationAmount();
+	lightContext.isDoorSwitchReceivingLight = lightPuzzle_.IsDoorSwitchReceivingLight();
+	lightContext.doorOpenAmount = lightPuzzle_.GetDoorOpenAmount();
+	// UIが実際に設定を変更した時だけ、Puzzleと所有Rendererへまとめて反映します。
+	if (StagePuzzleDebugUi::DrawLightPuzzle(lightContext)) {
+		lightPuzzle_.SetSettings(puzzleSettings);
+	}
 }

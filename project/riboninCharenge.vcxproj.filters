@@ -620,10 +620,19 @@
     <ClCompile Include="game\stage1\StageTitleOverlay.cpp">
       <Filter>08_Game\Stage1</Filter>
     </ClCompile>
+    <ClCompile Include="game\stage1\StagePauseOverlay.cpp">
+      <Filter>08_Game\Stage1</Filter>
+    </ClCompile>
     <ClCompile Include="game\GameSceneRegistration.cpp">
       <Filter>08_Game</Filter>
     </ClCompile>
 	<ClCompile Include="game\loading\LoadingScene.cpp">
+	  <Filter>08_Game</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stageSelect\StageSelectScene.cpp">
+	  <Filter>08_Game</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stageSelect\StageSelectOverlay.cpp">
 	  <Filter>08_Game</Filter>
 	</ClCompile>
   </ItemGroup>
@@ -988,10 +997,19 @@
     <ClInclude Include="game\stage1\StageTitleOverlay.h">
       <Filter>08_Game\Stage1</Filter>
     </ClInclude>
+    <ClInclude Include="game\stage1\StagePauseOverlay.h">
+      <Filter>08_Game\Stage1</Filter>
+    </ClInclude>
     <ClInclude Include="game\GameSceneRegistration.h">
       <Filter>08_Game</Filter>
     </ClInclude>
 	<ClInclude Include="game\loading\LoadingScene.h">
+	  <Filter>08_Game</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stageSelect\StageSelectScene.h">
+	  <Filter>08_Game</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stageSelect\StageSelectOverlay.h">
 	  <Filter>08_Game</Filter>
 	</ClInclude>
   </ItemGroup>

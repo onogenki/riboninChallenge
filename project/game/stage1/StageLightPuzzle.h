@@ -62,9 +62,6 @@ public:
 	const Laser& GetDoorLaser() const { return doorLaser_; }
 	// Puzzleに属する二本のLaserを、通常CameraまたはMirror反射Cameraへ描画します。
 	void Draw(const Camera& camera) const;
-	// Debug UIが太さ変更を反映するため、Puzzle所有のRendererを返します。
-	LaserRenderer* GetChargeLaserRenderer() const { return chargeLaserRenderer_.get(); }
-	LaserRenderer* GetDoorLaserRenderer() const { return doorLaserRenderer_.get(); }
 	// Player・Doorの判定やDebug表示へ、現在のギミック状態を返します。
 	bool IsPlayerHitByLaser() const { return isPlayerHitByLaser_; }
 	bool IsChargeSwitchReceivingLight() const { return isChargeSwitchReceivingLight_; }
@@ -75,15 +72,9 @@ public:
 	float GetDoorOpenAmount() const { return doorOpenAmount_; }
 	const MyMath::OBB& GetDoorCollider() const { return doorCollider_; }
 
-	// Debug UIは現在状態を表示するため、既存UI用に非const参照を返します。
-	bool& GetChargeSwitchReceivingLightForEdit() { return isChargeSwitchReceivingLight_; }
-	float& GetMirrorChargeForEdit() { return mirrorCharge_; }
-	bool& GetLargeMirrorChargedForEdit() { return isLargeMirrorCharged_; }
-	float& GetLargeMirrorRotationAmountForEdit() { return largeMirrorRotationAmount_; }
-	bool& GetDoorSwitchReceivingLightForEdit() { return isDoorSwitchReceivingLight_; }
-	float& GetDoorOpenAmountForEdit() { return doorOpenAmount_; }
-	Settings& GetSettings() { return settings_; }
+	// 調整用の設定を読み取ります。変更はSetSettingsでRendererにも同時に反映します。
 	const Settings& GetSettings() const { return settings_; }
+	void SetSettings(const Settings& settings);
 
 private:
 	// Charge Laserの反射経路と、Player・Charge Switchへの接触を更新します。

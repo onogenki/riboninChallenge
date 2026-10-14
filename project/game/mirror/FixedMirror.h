@@ -44,7 +44,6 @@ public:
 
 	Object3d& GetObject() { return object_; }
 	const Object3d& GetObject() const { return object_; }
-	Mirror& GetMirror() { return mirror_; }
 	const Mirror& GetMirror() const { return mirror_; }
 	Camera& GetReflectionCamera() { return reflectionCamera_; }
 	const Camera& GetReflectionCamera() const { return reflectionCamera_; }
@@ -53,10 +52,13 @@ public:
 	// 床・壁一覧やLaser遮蔽へ渡す、鏡のOBB形状データを返します。
 	const MyMath::OBB& GetObb() const { return collider_.GetShape(); }
 	float GetYaw() const { return yaw_; }
-	float& GetYawForEdit() { return yaw_; }
 	float GetPitch() const { return pitch_; }
-	// 回転ギミック用に、鏡をX軸方向へ倒す角度を設定します。
-	void SetPitch(float pitch) { pitch_ = pitch; }
+	// 位置・角度・大きさを一度に反映し、反射面とColliderも同じ形へ同期します。
+	void SetSurface(const Vector3& center, float yaw, float width, float height);
+	// 回転ギミック用に、二軸の角度と反射面・Colliderを一度に同期します。
+	void SetOrientation(float pitch, float yaw);
+	// 鏡床だけは裏面からのLaserも反射するため、反射規則を切り替えます。
+	void SetReflectBackface(bool enabled) { mirror_.SetReflectBackface(enabled); }
 	bool IsReady() const { return reflectionTarget_.IsInitialized(); }
 	bool HasReflectionCapture() const { return hasReflectionCapture_; }
 

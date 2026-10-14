@@ -158,7 +158,7 @@ void Input::UpdateMouse()
 	hasPreviousMousePosition_ = true;
 }
 
-// 接続済みゲームパッドを更新し、未接続なら一定間隔で再検索します。
+// 未接続なら再検索し、取得失敗時は古い押下状態を残さず再取得します。
 void Input::UpdateGamepads()
 {
 	if (gamepads.empty()) {
@@ -178,13 +178,15 @@ void Input::UpdateGamepads()
 	for (size_t i = 0; i < gamepads.size(); i++) {
 		gamepads[i]->Poll();
 
-		// 現在の状態を取得
-		HRESULT hr = gamepads[i]->GetDeviceState(sizeof(DIJOYSTATE), &padStates[i]);
-
-		// もし取得に失敗（ウィンドウからフォーカスが外れた等）したら再取得を試みる
+		// 読めないフレームでは前回の押下を使わないよう、結果は新しい状態へ受け取ります。
+		DIJOYSTATE currentState{};
+		HRESULT hr = gamepads[i]->GetDeviceState(sizeof(DIJOYSTATE), &currentState);
 		if (FAILED(hr)) {
 			gamepads[i]->Acquire();
+			currentState = {};
+			hr = gamepads[i]->GetDeviceState(sizeof(DIJOYSTATE), &currentState);
 		}
+		padStates[i] = SUCCEEDED(hr) ? currentState : DIJOYSTATE{};
 	}
 }
 
@@ -294,6 +296,16 @@ bool Input::PushKey(BYTE keyNumber){
 bool Input::TriggerKey(BYTE keyNumber){
 	if (key[keyNumber] && !keyPre[keyNumber]){
 		return true;
+	}
+	return false;
+}
+// 押し続けを再入力扱いしないため、全キーの今回と前回だけを比較します。
+bool Input::TriggerAnyKeyExcept(BYTE excludedKey) const
+{
+	for (int index = 0; index < 256; ++index) {
+		if (index != excludedKey && key[index] && !keyPre[index]) {
+			return true;
+		}
 	}
 	return false;
 }

@@ -27,6 +27,8 @@ public:
 	virtual void Draw() = 0;
 	// 既存の状態照会APIです。現行のSceneManagerは参照せず、切替はChangeSceneで行います。
 	virtual bool IsFinished() const { return false; }
+	// 遷移先の必須資源がそろうまでは、白いフェードを解除しません。
+	virtual bool IsReadyForTransition() const { return true; }
 
 protected:
 	// Sceneが所有するCameraへ生成結果を渡し、指定位置・回転で最初の有効Cameraにします。

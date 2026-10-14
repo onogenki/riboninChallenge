@@ -9,6 +9,7 @@
 #include "PostEffect.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
+#include "SceneManager.h"
 #include "SrvManager.h"
 
 // RenderTextureへSceneを描画する前に、共通のDirectXとSRV設定を行います。
@@ -78,6 +79,8 @@ void SceneRenderPipeline::End(
 	}
 
 	PostEffect* postEffect = PostEffect::GetInstance();
+	// Scene固有のSpriteを描き終えた後に白フェードを重ねます。
+	SceneManager::GetInstance()->DrawFadeOverlay();
 	const bool isPostEffectEnabled = postEffect->IsEnabled();
 	if (isPostEffectEnabled) {
 		if (postEffect->IsGaussianFilter()) {

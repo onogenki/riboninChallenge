@@ -3,7 +3,6 @@
 #include "CarryableMirror.h"
 #include "FixedMirror.h"
 #include "ImGuiManager.h"
-#include "LaserRenderer.h"
 #include "MyMath.h"
 #include "Player.h"
 #include "StageCameraEvents.h"
@@ -18,69 +17,63 @@ void StagePuzzleDebugUi::DrawMirror(const MirrorContext& context)
 		return;
 	}
 
-	Mirror& mirror = context.fixedMirror->GetMirror();
+	// UIは現在値のコピーを編集し、変更が確定した時だけ鏡の所有者へ渡します。
+	Mirror mirror = context.fixedMirror->GetMirror();
+	float mirrorYaw = context.fixedMirror->GetYaw();
 	if (!ImGuiManager::GetInstance()->MirrorDebugWindow(
 		mirror,
-		context.fixedMirror->GetYawForEdit(),
+		mirrorYaw,
 		context.fixedMirror->GetReflectionCamera(),
 		context.fixedMirror->HasReflectionCapture())) {
 		return;
 	}
 
-	context.fixedMirror->SyncVisualAndCollider();
+	context.fixedMirror->SetSurface(
+		mirror.GetCenter(), mirrorYaw, mirror.GetWidth(), mirror.GetHeight());
 	if (context.onMirrorChanged) {
 		context.onMirrorChanged();
 	}
 }
 
 // Light Puzzleの編集値を表示し、長さ0の方向ベクトルを安全な向きへ戻します。
-void StagePuzzleDebugUi::DrawLightPuzzle(const LightContext& context)
+bool StagePuzzleDebugUi::DrawLightPuzzle(const LightContext& context)
 {
-	if (!context.carryableMirror || !context.laserOrigin || !context.laserDirection ||
-		!context.doorLaserOrigin || !context.doorLaserDirection || !context.laserVisualWidth ||
-		!context.chargeSwitchPosition || !context.doorSwitchPosition ||
-		!context.largeMirrorTargetYawOffset || !context.isChargeSwitchReceivingLight ||
-		!context.mirrorCharge || !context.isLargeMirrorCharged ||
-		!context.largeMirrorRotationAmount || !context.isDoorSwitchReceivingLight ||
-		!context.doorOpenAmount) {
-		return;
+	if (!context.carryableMirror || !context.settings) {
+		return false;
 	}
+	// 配置・方向・幅は設定として編集し、Puzzleの進行状態はコピーした値を表示します。
+	StageLightPuzzle::Settings& settings = *context.settings;
 
 	if (!ImGuiManager::GetInstance()->LightPuzzleDebugWindow(
-		*context.laserOrigin,
-		*context.laserDirection,
-		*context.doorLaserOrigin,
-		*context.doorLaserDirection,
-		*context.laserVisualWidth,
-		*context.chargeSwitchPosition,
-		*context.doorSwitchPosition,
-		*context.largeMirrorTargetYawOffset,
+		settings.laserOrigin,
+		settings.laserDirection,
+		settings.doorLaserOrigin,
+		settings.doorLaserDirection,
+		settings.laserVisualWidth,
+		settings.chargeSwitchPosition,
+		settings.doorSwitchPosition,
+		settings.largeMirrorTargetYawOffset,
 		context.carryableMirror->IsCarried(),
-		*context.isChargeSwitchReceivingLight,
-		*context.mirrorCharge,
-		*context.isLargeMirrorCharged,
-		*context.largeMirrorRotationAmount,
-		*context.isDoorSwitchReceivingLight,
-		*context.doorOpenAmount)) {
-		return;
+		context.isChargeSwitchReceivingLight,
+		context.mirrorCharge,
+		context.isLargeMirrorCharged,
+		context.largeMirrorRotationAmount,
+		context.isDoorSwitchReceivingLight,
+		context.doorOpenAmount)) {
+		return false;
 	}
 
-	if (Length(*context.laserDirection) > 0.0001f) {
-		*context.laserDirection = Normalize(*context.laserDirection);
+	if (Length(settings.laserDirection) > 0.0001f) {
+		settings.laserDirection = Normalize(settings.laserDirection);
 	} else {
-		*context.laserDirection = { 0.0f, 0.0f, -1.0f };
+		settings.laserDirection = { 0.0f, 0.0f, -1.0f };
 	}
-	if (Length(*context.doorLaserDirection) > 0.0001f) {
-		*context.doorLaserDirection = Normalize(*context.doorLaserDirection);
+	if (Length(settings.doorLaserDirection) > 0.0001f) {
+		settings.doorLaserDirection = Normalize(settings.doorLaserDirection);
 	} else {
-		*context.doorLaserDirection = { 1.0f, 0.0f, 0.0f };
+		settings.doorLaserDirection = { 1.0f, 0.0f, 0.0f };
 	}
-	if (context.laserRenderer) {
-		context.laserRenderer->SetBeamWidth(*context.laserVisualWidth);
-	}
-	if (context.doorLaserRenderer) {
-		context.doorLaserRenderer->SetBeamWidth(*context.laserVisualWidth);
-	}
+	return true;
 }
 
 // Stage1のCollider・Event・Camera位置を、Edit View用ワイヤーとして描画します。

@@ -2,8 +2,7 @@
 
 #include <string>
 
-// 撮影や入力を行わず、Loading開始後にテストが予約するScene切替とDrawだけを確認します。
-// 現在のTitleのEnterは同じStage1内で進むため、このテストの切替経路とは異なります。
+// 撮影や入力を行わず、通常起動から白フェードを通るScene切替とDrawを確認します。
 class StartupRouteSmoke
 {
 public:
@@ -24,12 +23,15 @@ private:
 	bool finished_ = false;
 	bool wasSuccessful_ = false;
 	bool stage1Requested_ = false;
+	bool stageSelectRequested_ = false;
 	std::string currentSceneName_;
 	int totalUpdateCount_ = 0;
 	int sceneUpdateCount_ = 0;
 	int loadingVisitCount_ = 0;
 	int firstLoadingDrawCount_ = 0;
 	int secondLoadingDrawCount_ = 0;
+	int thirdLoadingDrawCount_ = 0;
 	int titleDrawCount_ = 0;
+	int stageSelectDrawCount_ = 0;
 	int stage1DrawCount_ = 0;
 };

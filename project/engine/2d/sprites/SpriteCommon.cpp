@@ -9,6 +9,7 @@ bool SpriteCommon::Initialize(DirectXCommon* dxCommon)
 {
 	rootSignature_.Reset();
 	graphicsPipelineState_.Reset();
+	overlayPipelineState_.Reset();
 	dxCommon_ = nullptr;
 	if (!dxCommon || !dxCommon->GetDevice() || !dxCommon->GetCommandList()) {
 		Logger::Log("SpriteCommon initialization failed: DirectX resources are unavailable.");
@@ -23,6 +24,7 @@ bool SpriteCommon::Initialize(DirectXCommon* dxCommon)
 		Logger::Log(std::string("SpriteCommon initialization failed: ") + error.what());
 		rootSignature_.Reset();
 		graphicsPipelineState_.Reset();
+		overlayPipelineState_.Reset();
 		dxCommon_ = nullptr;
 		return false;
 	}
@@ -38,6 +40,15 @@ void SpriteCommon::SetCommonDrawSetting()
 	// パイプラインステートをセット
 	commandList->SetPipelineState(graphicsPipelineState_.Get());
 	// プリミティブトポロジーをセット (三角形リスト)
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+// フェードは最終重ね描きなので、通常Spriteの深度付き設定と分けます。
+void SpriteCommon::SetOverlayDrawSetting()
+{
+	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+	commandList->SetGraphicsRootSignature(rootSignature_.Get());
+	commandList->SetPipelineState(overlayPipelineState_.Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
@@ -217,5 +228,13 @@ void SpriteCommon::CreateGraphicsPipeline()
 		IID_PPV_ARGS(&graphicsPipelineState_)); // メンバ変数 graphicsPipelineState_ に保存
 	if (FAILED(hr) || !graphicsPipelineState_) {
 		throw std::runtime_error("SpriteCommon: graphics pipeline creation failed");
+	}
+	// 白フェードだけは深度判定と書き込みを切り、既存の3D深度やPostEffectを保ちます。
+	graphicsPipelineStateDesc.DepthStencilState.DepthEnable = FALSE;
+	graphicsPipelineStateDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
+		IID_PPV_ARGS(&overlayPipelineState_));
+	if (FAILED(hr) || !overlayPipelineState_) {
+		throw std::runtime_error("SpriteCommon: overlay pipeline creation failed");
 	}
 }

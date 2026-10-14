@@ -12,7 +12,7 @@ void StartupRouteSmoke::Initialize(bool requested, bool startsWithLoading)
 	}
 }
 
-// テストだけがTitleからLoading経由のStage1切替を予約し、SceneManagerの描画順を確認します。
+// テストだけがEnterの代わりにフェードを予約し、通常のScene順と描画回数を確認します。
 void StartupRouteSmoke::Update()
 {
 	if (!enabled_ || finished_) {
@@ -32,7 +32,7 @@ void StartupRouteSmoke::Update()
 	++totalUpdateCount_;
 
 	if (sceneName == "TITLE" && sceneUpdateCount_ >= 8 &&
-		titleDrawCount_ > 0 && !stage1Requested_ && !sceneManager->HasPendingScene()) {
+		titleDrawCount_ > 0 && !stageSelectRequested_ && !sceneManager->HasPendingScene()) {
 		// 未登録名やLoading自身を行き先にして、白画面だけが予約されないか確認します。
 		if (sceneManager->ChangeSceneWithLoading("__INVALID_LOADING_DESTINATION_SMOKE__") ||
 			sceneManager->ChangeSceneWithLoading("LOADING") ||
@@ -40,15 +40,20 @@ void StartupRouteSmoke::Update()
 			Finish(false, "An invalid destination changed to Loading.");
 			return;
 		}
-		stage1Requested_ = sceneManager->ChangeSceneWithLoading("STAGE1");
+		stageSelectRequested_ = sceneManager->ChangeSceneWithFade("STAGE_SELECT");
+	}
+	if (sceneName == "STAGE_SELECT" && sceneUpdateCount_ >= 8 &&
+		stageSelectDrawCount_ > 0 && !stage1Requested_ && !sceneManager->HasPendingScene()) {
+		stage1Requested_ = sceneManager->ChangeSceneWithFade("STAGE1");
 	}
 	if (sceneName == "STAGE1" && sceneUpdateCount_ >= 8 && stage1DrawCount_ > 0) {
 		const bool passed =
-			loadingVisitCount_ == 2 &&
+			loadingVisitCount_ == 3 &&
 			firstLoadingDrawCount_ > 0 &&
 			secondLoadingDrawCount_ > 0 &&
-			titleDrawCount_ > 0;
-		Finish(passed, passed ? "All four scenes drew in order." : "A scene was skipped or not drawn.");
+			thirdLoadingDrawCount_ > 0 &&
+			titleDrawCount_ > 0 && stageSelectDrawCount_ > 0;
+		Finish(passed, passed ? "Fade route drew Loading, Title, StageSelect and Stage1 in order." : "A fade route scene was skipped or not drawn.");
 	} else if (totalUpdateCount_ >= 600) {
 		Finish(false, "The route did not reach Stage1 within 600 updates.");
 	}
@@ -65,8 +70,12 @@ void StartupRouteSmoke::AfterDraw()
 		++firstLoadingDrawCount_;
 	} else if (sceneName == "LOADING" && loadingVisitCount_ == 2) {
 		++secondLoadingDrawCount_;
+	} else if (sceneName == "LOADING" && loadingVisitCount_ == 3) {
+		++thirdLoadingDrawCount_;
 	} else if (sceneName == "TITLE") {
 		++titleDrawCount_;
+	} else if (sceneName == "STAGE_SELECT") {
+		++stageSelectDrawCount_;
 	} else if (sceneName == "STAGE1") {
 		++stage1DrawCount_;
 	}
@@ -86,7 +95,9 @@ void StartupRouteSmoke::Finish(bool success, const std::string& reason)
 			<< " loadingVisits=" << loadingVisitCount_
 			<< " firstLoadingDraws=" << firstLoadingDrawCount_
 			<< " titleDraws=" << titleDrawCount_
+			<< " stageSelectDraws=" << stageSelectDrawCount_
 			<< " secondLoadingDraws=" << secondLoadingDrawCount_
+			<< " thirdLoadingDraws=" << thirdLoadingDrawCount_
 			<< " stage1Draws=" << stage1DrawCount_ << '\n';
 	}
 	finished_ = true;

@@ -23,6 +23,10 @@ public:
 	bool ChangeScene(const std::string& sceneName);
 	// Loading自身以外の登録済みsceneNameだけを予約し、失敗時は白画面へ切り替えません。
 	bool ChangeSceneWithLoading(const std::string& sceneName);
+	// 白く覆ってからLoadingを経由し、準備済みの行き先を徐々に表示します。
+	bool ChangeSceneWithFade(const std::string& sceneName);
+	// SceneRenderPipelineが最後に白Spriteを重ねるための描画口です。
+	void DrawFadeOverlay();
 	// Loadingの切替先を一度だけ取り出し、Manager側の登録を空にして返します。
 	std::string TakeLoadingDestinationSceneName();
 	// 現在のScene名で作り直しを予約し、予約できた時だけtrueを返します。
@@ -44,6 +48,10 @@ private:
 
 	// 予約済みSceneを安全に終了・初期化して、現在Sceneとして確定します。
 	void ApplyPendingSceneChange();
+	// Scene切替の状態と白Spriteの透明度を、更新順に沿って進めます。
+	void UpdateFade();
+	// 画面全体を覆うSpriteを一度だけ生成します。
+	bool PrepareFadeSprite();
 
 	// シングルトン化：コンストラクタとデストラクタをprivateにする
 	SceneManager() = default;
@@ -65,5 +73,11 @@ private:
 
 	//シーンファクトリー(借りてくる)
 	AbstractSceneFactory* sceneFactory_ = nullptr;
+	enum class FadePhase { kNone, kFadeIn, kWaitingForDestination, kFadeOut };
+	FadePhase fadePhase_ = FadePhase::kNone;
+	std::string fadeDestination_;
+	std::unique_ptr<class Sprite> fadeSprite_;
+	float fadeAlpha_ = 0.0f;
+	bool destinationDrawn_ = false;
 };
 

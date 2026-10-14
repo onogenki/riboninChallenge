@@ -28,6 +28,7 @@
 #include "StageReflectionRenderer.h"
 #include "StageSceneRenderer.h"
 #include "StageTitleOverlay.h"
+#include "StagePauseOverlay.h"
 #include "debug/StagePuzzleDebugUi.h"
 #include <cmath>
 #include <dinput.h>
@@ -56,23 +57,26 @@ namespace
 	const Vector3 kTemporaryTitleCameraRotationDegrees{ 0.335f, -183.0f, 0.0f };
 }
 
-// 通常のStage1直起動は変えず、Titleとして生成された時だけ待機画面を使います。
+// 仮Titleと本編の案内を別々に所有し、Sceneごとの表示条件を混ぜません。
 Stage1::Stage1(bool startsWithTemporaryTitle)
 	: startsWithTemporaryTitle_(startsWithTemporaryTitle)
 {
 	if (startsWithTemporaryTitle_) {
 		stageTitleOverlay_ = std::make_unique<StageTitleOverlay>();
+	} else {
+		stagePauseOverlay_ = std::make_unique<StagePauseOverlay>();
 	}
 }
 
 // Stage1が所有するPlayer・Mirror・Rendererを、完全な型を知る場所で破棄します。
 Stage1::~Stage1() = default;
 
-// 必須部品を順にそろえ、途中で失敗したStageを更新・描画へ進めません。
+// 3Dの必須部品と使用する画面の案内を順にそろえ、欠けたStageを描画へ進めません。
 void Stage1::Initialize()
 {
 	isStageReady_ = false;
 	isTemporaryTitleActive_ = startsWithTemporaryTitle_;
+	pauseState_ = PauseState::kPlaying;
 	hasStageFrameBeenDrawn_ = false;
 	hasStageBgmStarted_ = false;
 	if (!InitializeRenderSystems()) {
@@ -111,6 +115,12 @@ void Stage1::Initialize()
 		!stageTitleOverlay_->Initialize(SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
 		// Titleの共通Pipelineが未完成なら描画へ進めず、素材欠損も同じ失敗として止めます。
 		Logger::Log("Temporary title initialization failed: Sprite pipeline or texture could not be prepared.");
+		PostQuitMessage(1);
+		return;
+	}
+	if (stagePauseOverlay_ &&
+		!stagePauseOverlay_->Initialize(SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
+		Logger::Log("Stage1 initialization failed: pause Sprite pipeline or texture could not be prepared.");
 		PostQuitMessage(1);
 		return;
 	}
@@ -320,7 +330,7 @@ bool Stage1::InitializePlayerAndCamera()
 	return true;
 }
 
-// Title中は開始せず、Enter後に本編と同じ設定でPlayer登場演出を開始します。
+// Title中は開始せず、Stage1本編の初期化時にPlayer登場演出を開始します。
 void Stage1::BeginStageStart()
 {
 	if (!stageStart_ || !player_ || !mainCamera) {
@@ -364,7 +374,7 @@ void Stage1::InitializeGameplaySmoke()
 	});
 }
 
-// 初期化途中で終了した場合も、生成済みの所有物だけを安全に解放します。
+// 初期化途中でもTitle・Pause案内を含む生成済みの所有物だけを安全に解放します。
 void Stage1::Finalize()
 {
 	isStageReady_ = false;
@@ -372,6 +382,9 @@ void Stage1::Finalize()
 	// SceneManager がこの関数の前に GPU の処理完了を待機します。
 	if (stageTitleOverlay_) {
 		stageTitleOverlay_->Finalize();
+	}
+	if (stagePauseOverlay_) {
+		stagePauseOverlay_->Finalize();
 	}
 	skyBox_.reset();
 	stageCameraEvents_.Clear(cameraManager.get());
@@ -397,10 +410,47 @@ void Stage1::Finalize()
 	player_.reset();
 }
 
-// 必須部品が未準備なら、PlayerやCameraを参照する通常更新を行いません。
+// 停止へ入ったフレームと解除したフレームも、従来どおり本編更新を次フレームまで待ちます。
+bool Stage1::UpdatePauseState()
+{
+	if (isTemporaryTitleActive_) {
+		return false;
+	}
+	const bool isGameViewActive = ImGuiManager::GetInstance()->IsGameViewActive();
+	Input* input = Input::GetInstance();
+	if (pauseState_ == PauseState::kPlaying) {
+		if (!isGameViewActive || !input->TriggerKey(DIK_TAB)) {
+			return false;
+		}
+		pauseState_ = PauseState::kPaused;
+	} else if (pauseState_ == PauseState::kPaused && isGameViewActive) {
+		if (input->TriggerKey(DIK_BACK)) {
+			if (SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_SELECT")) {
+				pauseState_ = PauseState::kLeavingToStageSelect;
+			}
+		} else if (input->TriggerAnyKeyExcept(DIK_BACK)) {
+			pauseState_ = PauseState::kPlaying;
+		}
+	}
+	// 停止中にもBegin/Endしたフレームだけ描画し、既存のImGui順を保ちます。
+	ImGuiManager::GetInstance()->Begin("Stage1");
+	ImGuiManager::GetInstance()->End();
+	PrepareStageRenderObjects();
+	return true;
+}
+
+// Pauseで早期終了するフレームも案内を更新し、PlayerやCameraの更新順は変えません。
 void Stage1::Update()
 {
 	if (!isStageReady_) {
+		return;
+	}
+	if (stagePauseOverlay_) {
+		stagePauseOverlay_->Update(
+			static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth()),
+			static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight()));
+	}
+	if (UpdatePauseState()) {
 		return;
 	}
 	// 提出用TitleではStageの描画だけを準備し、Player・Camera追従・BGMは進めません。
@@ -424,19 +474,16 @@ void Stage1::Update()
 			ImGuiManager::GetInstance()->IsGameViewActive() &&
 			(Input::GetInstance()->TriggerKey(DIK_RETURN) ||
 				Input::GetInstance()->IsPadButtonPressed(0, 3));
-		if (!startRequested) {
-			cameraManager->Update();
-			UpdateReflectionCameras();
-			// DevelopmentではBegin/EndしたFrameだけGame Viewへ描画結果を渡せます。
-			ImGuiManager::GetInstance()->Begin("Stage1");
-			ImGuiManager::GetInstance()->End();
-			PrepareStageRenderObjects();
-			return;
+		if (startRequested) {
+			SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_SELECT");
 		}
-		// Sceneの再読込を挟まず、このフレームから従来のStageStartへ引き渡します。
-		isTemporaryTitleActive_ = false;
-		BeginStageStart();
-		Logger::Log("Temporary title: Enter started Stage1 gameplay.");
+		cameraManager->Update();
+		UpdateReflectionCameras();
+		// DevelopmentではBegin/EndしたFrameだけGame Viewへ描画結果を渡せます。
+		ImGuiManager::GetInstance()->Begin("Stage1");
+		ImGuiManager::GetInstance()->End();
+		PrepareStageRenderObjects();
+		return;
 	}
 	// ---------- Stage1マップのホットリロード ----------
 	UpdateStageMapHotReload();
@@ -487,11 +534,6 @@ void Stage1::Update()
 	ImGuiManager::GetInstance()->End();
 
 	PrepareStageRenderObjects();
-	// Game ViewのBackSpaceだけで戻り、Stage1の解放中は共通Loading画面を表示します。
-	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
-		Input::GetInstance()->TriggerKey(DIK_BACK)) {
-		SceneManager::GetInstance()->ChangeSceneWithLoading("TITLE");
-	}
 }
 
 // Titleと本編が同じCamera・Light・モデルの描画準備を使い、表示差を作りません。
@@ -523,7 +565,7 @@ void Stage1::PrepareStageRenderObjects()
 	skyBox_->Update();
 }
 
-// 必須部品が未準備なら、反射用Textureとゲーム画面を描画しません。
+// 3Dの後に本編のTab案内とPause案内を重ね、反射と画面提示の順番を保ちます。
 void Stage1::Draw()
 {
 	if (!isStageReady_) {
@@ -564,6 +606,15 @@ void Stage1::Draw()
 		// 3Dの後に透過Spriteを重ね、指定したStage1の景色を隠さずにTitleを見せます。
 		SceneRenderPipeline::DrawSprites(
 			SpriteCommon::GetInstance(), stageTitleOverlay_->GetSprites());
+	}
+	if (stagePauseOverlay_) {
+		// Tabは本編とPauseの両方で表示し、停止時だけ二枚の案内を追加します。
+		SceneRenderPipeline::DrawSprites(
+			SpriteCommon::GetInstance(), stagePauseOverlay_->GetTabSprites());
+		if (pauseState_ != PauseState::kPlaying) {
+			SceneRenderPipeline::DrawSprites(
+				SpriteCommon::GetInstance(), stagePauseOverlay_->GetPauseSprites());
+		}
 	}
 
 	// PostEffect・SwapChain・ImGui・Presentは、全Scene共通のPipelineへ任せます。
@@ -995,11 +1046,13 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	}
 	// Inspector・JSONで変えた基準角度をPuzzleにも渡し、次の更新で元へ戻るのを防ぎます。
 	// プレイ中の充電による回転量は保持し、Levelデータとは分けて扱います。
-	StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
+	StageLightPuzzle::Settings puzzleSettings = lightPuzzle_.GetSettings();
 	puzzleSettings.largeMirrorBaseYaw = mirrorDataList.front()->rotation.y;
-	fixedMirrors_.front()->GetYawForEdit() = puzzleSettings.largeMirrorBaseYaw +
-		puzzleSettings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount();
-	fixedMirrors_.front()->SyncVisualAndCollider();
+	lightPuzzle_.SetSettings(puzzleSettings);
+	fixedMirrors_.front()->SetOrientation(
+		fixedMirrors_.front()->GetPitch(),
+		puzzleSettings.largeMirrorBaseYaw +
+		puzzleSettings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount());
 
 	if (rebuildRuntimeObjects) {
 		stageMapRuntime_ = std::move(rebuiltMapRuntime);
