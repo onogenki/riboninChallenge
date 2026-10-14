@@ -421,6 +421,8 @@
     <ClCompile Include="game\GameSceneRegistration.cpp" />
 	<ClCompile Include="game\StartupRouteSmoke.cpp" />
 	<ClCompile Include="game\loading\LoadingScene.cpp" />
+	<ClCompile Include="game\stageSelect\StageSelectScene.cpp" />
+	<ClCompile Include="game\stageSelect\StageSelectOverlay.cpp" />
     <ClCompile Include="game\mirror\CarryableMirror.cpp" />
     <ClCompile Include="game\mirror\FixedMirror.cpp" />
     <ClCompile Include="game\mirror\StageMirrorFactory.cpp" />
@@ -447,11 +449,14 @@
     <ClCompile Include="game\stage1\StageSceneRenderer.cpp" />
     <ClCompile Include="game\stage1\StageStart.cpp" />
     <ClCompile Include="game\stage1\StageTitleOverlay.cpp" />
+    <ClCompile Include="game\stage1\StagePauseOverlay.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game\GameSceneRegistration.h" />
 	<ClInclude Include="game\StartupRouteSmoke.h" />
 	<ClInclude Include="game\loading\LoadingScene.h" />
+	<ClInclude Include="game\stageSelect\StageSelectScene.h" />
+	<ClInclude Include="game\stageSelect\StageSelectOverlay.h" />
     <ClInclude Include="game\mirror\CarryableMirror.h" />
     <ClInclude Include="game\mirror\FixedMirror.h" />
     <ClInclude Include="game\mirror\StageMirrorFactory.h" />
@@ -474,6 +479,7 @@
     <ClInclude Include="game\stage1\StageSceneRenderer.h" />
     <ClInclude Include="game\stage1\StageStart.h" />
     <ClInclude Include="game\stage1\StageTitleOverlay.h" />
+    <ClInclude Include="game\stage1\StagePauseOverlay.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\2d\particles\ParticleEmitter.h" />

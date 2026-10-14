@@ -55,6 +55,18 @@ void StageLightPuzzle::Finalize()
 	doorLaserRenderer_.reset();
 }
 
+// 調整値をPuzzleへ確定し、所有する二本のRendererへ光の太さを同じフレームで同期します。
+void StageLightPuzzle::SetSettings(const Settings& settings)
+{
+	settings_ = settings;
+	if (chargeLaserRenderer_) {
+		chargeLaserRenderer_->SetBeamWidth(settings_.laserVisualWidth);
+	}
+	if (doorLaserRenderer_) {
+		doorLaserRenderer_->SetBeamWidth(settings_.laserVisualWidth);
+	}
+}
+
 // Charge/Door Laserを同じCameraへ描画し、通常画面とMirror反射画面の見た目をそろえます。
 void StageLightPuzzle::Draw(const Camera& camera) const
 {
@@ -131,11 +143,10 @@ void StageLightPuzzle::UpdateLargeMirror(float deltaTime, FixedMirror& largeMirr
 	const float mirrorRotationRate = (std::min)(1.8f * (std::max)(deltaTime, 0.0f), 1.0f);
 	largeMirrorRotationAmount_ +=
 		(mirrorRotationTarget - largeMirrorRotationAmount_) * mirrorRotationRate;
-	largeMirror.SetPitch(0.0f);
-	largeMirror.GetYawForEdit() =
+	largeMirror.SetOrientation(
+		0.0f,
 		settings_.largeMirrorBaseYaw +
-		settings_.largeMirrorTargetYawOffset * largeMirrorRotationAmount_;
-	largeMirror.SyncVisualAndCollider();
+		settings_.largeMirrorTargetYawOffset * largeMirrorRotationAmount_);
 }
 
 // Door Laserを更新し、PlayerとDoor Switchへ届くかを記録します。

@@ -33,6 +33,8 @@ public:
 
 	bool PushKey(BYTE keyNumber);
 	bool TriggerKey(BYTE keyNumber);
+	// 除外キー以外の新しい押下が一つでもあるか、ポーズ解除用に調べます。
+	bool TriggerAnyKeyExcept(BYTE excludedKey) const;
 
 	// マウス
 	LONG GetMouseX() const { return mouseState.lX; }

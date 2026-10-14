@@ -89,7 +89,7 @@ namespace
 		std::vector<std::unique_ptr<FixedMirror>> mirrors;
 		mirrors.push_back(std::make_unique<FixedMirror>());
 		mirrors.push_back(std::make_unique<FixedMirror>());
-		mirrors.front()->GetMirror().SetCenter({ 1.0f, 2.0f, 3.0f });
+		mirrors.front()->SetSurface({ 1.0f, 2.0f, 3.0f }, 0.0f, 4.0f, 4.0f);
 		LevelLoader::ObjectData firstEdit{};
 		firstEdit.translation = { 4.0f, 5.0f, 6.0f };
 		const std::vector<const LevelLoader::ObjectData*> edits{ &firstEdit, nullptr };

@@ -90,6 +90,23 @@ void FixedMirror::SyncVisualAndCollider()
 	collider_.SyncTransform(object_.GetTransform());
 }
 
+// 編集後の面の値をFixedMirrorへ確定し、板・反射法線・Colliderを同時に更新します。
+void FixedMirror::SetSurface(const Vector3& center, float yaw, float width, float height)
+{
+	mirror_.SetCenter(center);
+	mirror_.SetSize(width, height);
+	yaw_ = yaw;
+	SyncVisualAndCollider();
+}
+
+// 回転角の変更を反射面とColliderへ同じフレームで反映します。
+void FixedMirror::SetOrientation(float pitch, float yaw)
+{
+	pitch_ = pitch;
+	yaw_ = yaw;
+	SyncVisualAndCollider();
+}
+
 void FixedMirror::SetColliderShape(const Vector3& localCenter, const Vector3& localHalfSize)
 {
 	const Vector3 safeLocalHalfSize{

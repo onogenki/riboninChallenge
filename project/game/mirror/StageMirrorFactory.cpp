@@ -62,10 +62,9 @@ std::unique_ptr<FixedMirror> StageMirrorFactory::CreateMirrorFloor(
 		256)) {
 		return nullptr;
 	}
-	mirror->SetPitch(-1.57079633f);
-	mirror->SyncVisualAndCollider();
+	mirror->SetOrientation(-1.57079633f, 0.0f);
 	// 鏡床は上下どちらから来たLightも反射する特殊ギミックです。
-	mirror->GetMirror().SetReflectBackface(true);
+	mirror->SetReflectBackface(true);
 	return mirror;
 }
 
@@ -122,15 +121,13 @@ bool StageMirrorFactory::ApplyFixedMirrorEdits(
 	for (size_t index = 0; index < mirrorDataList.size(); ++index) {
 		const LevelLoader::ObjectData* mirrorData = mirrorDataList[index];
 		FixedMirror* fixedMirror = fixedMirrors[index].get();
-		fixedMirror->GetYawForEdit() = mirrorData->rotation.y;
-		fixedMirror->GetMirror().SetCenter(mirrorData->translation);
-		fixedMirror->GetMirror().SetSize(
+		fixedMirror->SetSurface(
+			mirrorData->translation,
+			mirrorData->rotation.y,
 			std::abs(mirrorData->scaling.x) * 2.0f,
 			std::abs(mirrorData->scaling.y) * 2.0f);
-		if (!ApplyBoxColliderData(*fixedMirror, *mirrorData)) {
-			// BOX指定がない編集でも既存のローカル形状は残し、Transformだけを同期します。
-			fixedMirror->SyncVisualAndCollider();
-		}
+		// BOX指定があればローカル形状だけ上書きし、指定がなければ既存形状を保ちます。
+		ApplyBoxColliderData(*fixedMirror, *mirrorData);
 	}
 	return true;
 }

@@ -22,6 +22,8 @@ public:
 
 	// Sprite::Drawより先に共通Pipelineと三角形描画を設定します。
 	void SetCommonDrawSetting();
+	// 最後に重ねる白フェードだけ、既存の深度を変更せず描画します。
+	void SetOverlayDrawSetting();
 
 	// GPU資源作成用のDeviceと、描画命令を書き込むCommand Listを返します。
 	ID3D12Device* GetDevice() const { return dxCommon_->GetDevice(); }
@@ -40,6 +42,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	// グラフィックスパイプライン
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> overlayPipelineState_;
 
 	//ルートシグネチャの作成
 	void CreateRootSignature();

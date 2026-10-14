@@ -27,6 +27,7 @@ class FixedMirror;
 class Player;
 class SkyBox;
 class StageTitleOverlay;
+class StagePauseOverlay;
 class CameraManager;
 class Object3dCommon;
 
@@ -47,6 +48,7 @@ public:
 	void Update() override;
 	// 毎フレーム、SkyBox・部屋・球・鏡の板を画面に描画します。
 	void Draw() override;
+	bool IsReadyForTransition() const override { return isStageReady_; }
 
 private:
 	// Stage1専用のCameraを所有し、描画共通設定はManagerから借ります。
@@ -72,13 +74,15 @@ private:
 	bool InitializeStageMap();
 	// Player、通常追従Camera、開始演出Cameraを順に作成します。
 	bool InitializePlayerAndCamera();
-	// 提出用Titleを終えた時にも、従来のPlayer登場演出を同じ設定で開始します。
+	// Stage1本編の初期化時に、従来のPlayer登場演出を同じ設定で開始します。
 	void BeginStageStart();
 	// 本編を所有しない自動動作確認へ、必要なStage固有データだけを渡します。
 	void InitializeGameplaySmoke();
 
 	// ---------- 更新・描画の補助関数 ----------
 
+	// Tabで停止し、停止中のBackspace・その他のキーを一か所で判定します。
+	bool UpdatePauseState();
 	// StageMapRuntimeが所有するJSON配置物を生成します。Camera・LightはUpdateで一括設定します。
 	std::unique_ptr<Object3d> CreateRuntimeObject(const std::string& modelName);
 	// 開始演出・自動確認・通常入力のいずれかでPlayerを更新し、開始演出中ならtrueを返します。
@@ -205,9 +209,14 @@ private:
 	// 必須モデル・マップ・PlayerがそろうまではUpdateとDrawを行いません。
 	bool isStageReady_ = false;
 	bool isTemporaryTitleActive_ = false;
+	// 三つの排他的な状態だけを持ち、停止とScene切替中の入力を混同しません。
+	enum class PauseState { kPlaying, kPaused, kLeavingToStageSelect };
+	PauseState pauseState_ = PauseState::kPlaying;
 	Vector3 stageStartGameplayCameraPosition_{};
 	Vector3 stageStartGameplayCameraRotate_{};
 	std::unique_ptr<StageTitleOverlay> stageTitleOverlay_;
+	// 本編だけが持つTab・Pause案内です。仮TitleのSpriteとは寿命と表示条件を分けます。
+	std::unique_ptr<StagePauseOverlay> stagePauseOverlay_;
 	// stage1.jsonのstage_startから読み込む、開始演出の調整値です。
 	StageStart::Settings stageStartSettings_{};
 	// Loading完了後のStage1画面が出てから再生する、Stage1用のループBGMです。
