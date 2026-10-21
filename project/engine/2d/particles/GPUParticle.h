@@ -63,6 +63,9 @@ public:
 	void Finalize();
 
 private:
+	// 更新Shaderが同時に使う五つのUAV数を、Root Signatureと更新後バリアで共有します。
+	static constexpr uint32_t kSimulationUavCount = 5;
+
 	enum ComputeRootParameter : uint32_t
 	{
 		kComputeRootParameterUav,

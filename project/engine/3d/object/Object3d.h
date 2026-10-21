@@ -139,14 +139,17 @@ public:
 	float GetTransformPlaybackTime() const { return transformPlayback_.GetPlaybackTime(); }
 	float GetTransformPlaybackDuration() const { return transformPlayback_.GetDuration(); }
 
-	//スケルトン(アニメーションするか)を取得
-	Model::Skeleton& GetSkeleton() { return skeleton_; }
+	// 描画用のSkeletonを読み取り専用で返し、外部からJointの状態を変更させません。
+	const Model::Skeleton& GetSkeleton() const { return skeleton_; }
 
-	/// setter
-	void SetScale(const Vector3& scale) { transform.scale = scale; }
-	void SetRotate(const Vector3& rotate) { transform.rotate = rotate; }
-	void SetTranslate(const Vector3& translate) { transform.translate = translate; }
-	void SetCamera(Camera* camera) { this->camera = camera; }
+	// 位置・回転・拡大率をObject自身へ保存し、次のUpdateで描画行列へ反映します。
+	void SetScale(const Vector3& scale) { transform_.scale = scale; }
+	void SetRotate(const Vector3& rotate) { transform_.rotate = rotate; }
+	void SetTranslate(const Vector3& translate) { transform_.translate = translate; }
+	// 編集済みの三要素をまとめて反映し、内部Transformの変更経路をObject3dに限定します。
+	void SetTransform(const Transform& newTransform) { transform_ = newTransform; }
+	// 描画時に借りるCameraだけを切り替え、Camera自体の所有権は移しません。
+	void SetCamera(Camera* camera) { camera_ = camera; }
 
 	//構造体(color,direction,intensity)全部入ってるsetter
 	void SetDirectionalLight(const DirectionalLight& light);
@@ -162,22 +165,24 @@ public:
 	bool SetTextureOverride(const std::string& texturePath);
 	void ClearTextureOverride() { textureSrvIndexOverride_ = UINT32_MAX; }
 
-	//getter
-	const Vector3& GetScale()const { return transform.scale; }
-	const Vector3& GetRotate()const { return transform.rotate; }
-	const Vector3& GetTranslate()const { return transform.translate; }
+	// 描画と当たり判定が同じ値を読めるよう、Transformの各要素を読み取り専用で返します。
+	const Vector3& GetScale()const { return transform_.scale; }
+	const Vector3& GetRotate()const { return transform_.rotate; }
+	const Vector3& GetTranslate()const { return transform_.translate; }
 	const DirectionalLight& GetDirectionalLight() const;
 	// このObjectが借りている共有Modelの環境反射率を読みます。
 	float GetEnvironmentCoefficient() const;
-	Model* GetModel() const { return model_; }
+	// 編集できるObjectからは、従来どおり共有Modelへの参照を貸します。
+	Model* GetModel() { return model_; }
+	// 読み取り専用Objectからは共有Modelの材質や頂点を変更させません。
+	const Model* GetModel() const { return model_; }
 	const std::string& GetModelName() const { return modelName_; }
 
 	//外部からアニメーションモデルかどうか判定
 	bool IsSkeletal() const { return isSkeletal_; }
 
-	// モデル
-	Transform& GetTransform() { return transform; }
-	const Transform& GetTransform() const { return transform; }
+	// 描画・当たり判定・編集履歴が同じ値を参照できるよう、Transformを読み取り専用で返します。
+	const Transform& GetTransform() const { return transform_; }
 
 private:
 	// Object3dを描画可能な状態へ準備する手順は、Factoryだけが実行します。
@@ -191,16 +196,16 @@ private:
 
 	void ReleaseSkinClusterDescriptors();
 
-	Object3dCommon* object3dCommon = nullptr;
+	Object3dCommon* object3dCommon_ = nullptr;
 
 	Model* model_ = nullptr;
 	std::string modelName_;
 	uint32_t textureSrvIndexOverride_ = UINT32_MAX;
 
-	Camera* camera = nullptr;
+	Camera* camera_ = nullptr;
 
 	//3Dオブジェクト自身のトランスフォーム
-	Transform transform{};
+	Transform transform_{};
 	Matrix4x4 parentWorldMatrix_{};
 	bool hasParentWorldMatrix_ = false;
 

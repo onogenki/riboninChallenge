@@ -17,20 +17,7 @@ StageLightPuzzle::~StageLightPuzzle() = default;
 bool StageLightPuzzle::Initialize(DirectXCommon* directXCommon)
 {
 	// Sceneを再初期化しても前回の充電・Door状態を持ち越さないよう、実行中の値だけを戻します。
-	chargeLaser_ = {};
-	doorLaser_ = {};
-	doorCollider_ = {};
-	isPlayerHitByLaser_ = false;
-	isChargeSwitchReceivingLight_ = false;
-	mirrorCharge_ = 0.0f;
-	isLargeMirrorCharged_ = false;
-	largeMirrorRotationAmount_ = 0.0f;
-	isDoorSwitchReceivingLight_ = false;
-	doorOpenAmount_ = 0.0f;
-	chargeLaser_.SetMaxDistance(30.0f);
-	chargeLaser_.SetMaxReflectionCount(8);
-	doorLaser_.SetMaxDistance(20.0f);
-	doorLaser_.SetMaxReflectionCount(2);
+	ResetProgress();
 	chargeLaserRenderer_ = std::make_unique<LaserRenderer>();
 	if (!chargeLaserRenderer_->Initialize(directXCommon, 32)) {
 		chargeLaserRenderer_.reset();
@@ -46,6 +33,25 @@ bool StageLightPuzzle::Initialize(DirectXCommon* directXCommon)
 	doorLaserRenderer_->SetBeamWidth(settings_.laserVisualWidth);
 	doorLaserRenderer_->SetColor({ 1.00f, 0.38f, 0.05f, 1.0f });
 	return true;
+}
+
+// Stage間でPuzzleの進行だけを持ち越さないよう、描画Rendererを残して実行値を初期化します。
+void StageLightPuzzle::ResetProgress()
+{
+	chargeLaser_ = {};
+	doorLaser_ = {};
+	chargeLaser_.SetMaxDistance(30.0f);
+	chargeLaser_.SetMaxReflectionCount(8);
+	doorLaser_.SetMaxDistance(20.0f);
+	doorLaser_.SetMaxReflectionCount(2);
+	doorCollider_ = {};
+	isPlayerHitByLaser_ = false;
+	isChargeSwitchReceivingLight_ = false;
+	mirrorCharge_ = 0.0f;
+	isLargeMirrorCharged_ = false;
+	largeMirrorRotationAmount_ = 0.0f;
+	isDoorSwitchReceivingLight_ = false;
+	doorOpenAmount_ = 0.0f;
 }
 
 // Puzzleが所有するRendererを先に解放し、Sceneが次に初期化される準備をします。

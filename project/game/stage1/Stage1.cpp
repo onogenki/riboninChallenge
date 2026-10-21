@@ -22,7 +22,6 @@
 #include "SpriteCommon.h"
 #include "SrvManager.h"
 #include "StageMapObjectIndex.h"
-#include "MapChipRegistry.h"
 #include "StageMapChipFactory.h"
 #include "StageMirrorFactory.h"
 #include "StageReflectionRenderer.h"
@@ -40,10 +39,7 @@ using namespace MyMath;
 
 namespace
 {
-	constexpr const char* kStageMapFilePath = "resources/levels/stage1.json";
-	constexpr const char* kStageMapFileName = "stage1";
 	constexpr const char* kSkyBoxTexturePath = "Resources/backGround/skybox-night-cube.dds";
-	constexpr const char* kStageMapChipFilePath = "resources/maps/stage1.csv";
 	// CSVの一マスを、ゲーム内でも1x1x1のブロックとして配置します。
 	constexpr float kStageMapChipCellSize = 1.0f;
 	// P0が従来と同じX=24、Z=35になるよう、CSV左上の座標を決めます。
@@ -58,8 +54,9 @@ namespace
 }
 
 // 仮Titleと本編の案内を別々に所有し、Sceneごとの表示条件を混ぜません。
-Stage1::Stage1(bool startsWithTemporaryTitle)
-	: startsWithTemporaryTitle_(startsWithTemporaryTitle)
+Stage::Stage(int initialStageId, bool startsWithTemporaryTitle)
+	: stageMapSelection_(initialStageId)
+	, startsWithTemporaryTitle_(startsWithTemporaryTitle)
 {
 	if (startsWithTemporaryTitle_) {
 		stageTitleOverlay_ = std::make_unique<StageTitleOverlay>();
@@ -69,7 +66,7 @@ Stage1::Stage1(bool startsWithTemporaryTitle)
 }
 
 // Stage1が所有するPlayer・Mirror・Rendererを、完全な型を知る場所で破棄します。
-Stage1::~Stage1() = default;
+Stage::~Stage() = default;
 
 // 3Dの必須部品と使用する画面の案内を順にそろえ、欠けたStageを描画へ進めません。
 void Stage1::Initialize()
@@ -86,7 +83,7 @@ void Stage1::Initialize()
 	}
 	// BGMの再生役だけを準備し、音声ファイルの読込はStage1画面の表示後まで遅らせます。
 	stageBgm_.Initialize(Audio::GetInstance());
-	InitializeDefaultLighting();
+	stageLighting_.InitializeDefaults();
 	if (!InitializeStageGimmicks()) {
 		Logger::Log("Stage1 initialization failed: required stage gimmick model, texture or light renderer could not be prepared.");
 		PostQuitMessage(1);
@@ -105,7 +102,7 @@ void Stage1::Initialize()
 	}
 	// 仮Titleと本編のどちらでも、完成したCameraを使う夜空を一度だけ生成します。
 	skyBox_ = Object3dFactory::CreateSkyBox(
-		DirectXCommon::GetInstance(), cameraManager->GetActiveCamera(), kSkyBoxTexturePath);
+		DirectXCommon::GetInstance(), cameraManager_->GetActiveCamera(), kSkyBoxTexturePath);
 	if (!skyBox_) {
 		Logger::Log(std::string("Stage1 initialization failed: SkyBox texture could not be loaded: ") + kSkyBoxTexturePath);
 		PostQuitMessage(1);
@@ -139,27 +136,12 @@ bool Stage1::InitializeRenderSystems()
 	PostEffect::GetInstance()->SetSepia(false);
 
 	// Playerが部屋を見る通常Cameraを、まず作成します。
-	InitializeMainCamera(cameraManager, mainCamera, { 0.0f, 1.0f, -12.0f });
-	object3dCommon = Object3dCommon::GetInstance();
-	object3dCommon->Initialize(dxCommon);
-	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
-	sceneObjects_.Initialize(object3dCommon);
+	InitializeMainCamera(cameraManager_, mainCamera_, { 0.0f, 1.0f, -12.0f });
+	object3dCommon_ = Object3dCommon::GetInstance();
+	object3dCommon_->Initialize(dxCommon);
+	object3dCommon_->SetDefaultCamera(cameraManager_->GetActiveCamera());
+	sceneObjects_.Initialize(object3dCommon_);
 	return true;
-}
-
-// JSONにLightingがない場合にも使える、Stage1の初期照明を設定します。
-void Stage1::InitializeDefaultLighting()
-{
-	directionalLight_.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionalLight_.direction = Normalize({ 0.5f, -1.0f, 0.5f });
-	directionalLight_.intensity = 0.3f;
-	directionalLight_.ambientColor = { 1.0f, 1.0f, 1.0f };
-	directionalLight_.ambientIntensity = 0.0f;
-	pointLight_.color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	pointLight_.position = { 0.0f, 3.0f, -2.0f };
-	pointLight_.intensity = 5.0f;
-	pointLight_.radius = 20.0f;
-	pointLight_.decay = 1.0f;
 }
 
 // CollectionとFactoryへ生成を依頼し、設定を変更せず必須部品がそろったか確認します。
@@ -180,7 +162,7 @@ bool Stage1::InitializeStageGimmicks()
 
 	// 実際の配置は後でstage1.jsonから反映します。Factoryは所持状態へ切り替えません。
 	carryableMirror_ = StageMirrorFactory::CreateCarryableMirror(
-		object3dCommon,
+		object3dCommon_,
 		// 以前から携帯Mirrorに使っていた白い板Modelを使います。
 		"debug/plane.obj",
 		{ -2.5f, -0.8f, 4.5f },
@@ -193,7 +175,7 @@ bool Stage1::InitializeStageGimmicks()
 
 	// 鏡床は従来通り任意の部品です。生成失敗ならnullptrのまま、ほかの部品を準備します。
 	mirrorFloor_ = StageMirrorFactory::CreateMirrorFloor(
-		object3dCommon,
+		object3dCommon_,
 		"debug/plane.obj",
 		mirrorFloorPosition_,
 		mirrorFloorWidth_,
@@ -266,9 +248,7 @@ bool Stage1::InitializeStageGimmicks()
 // Stage1用JSONとCSVを読み、ColliderとHot Reload監視を開始します。
 bool Stage1::InitializeStageMap()
 {
-	stageMapHotReload_.SetFilePath(kStageMapFilePath);
-	stageMapChipHotReload_.SetFilePath(kStageMapChipFilePath);
-	if (!ReloadStageMap()) {
+	if (!LoadStage(stageMapSelection_.GetStageId(), false)) {
 		return false;
 	}
 	// 最初のPlayer更新より前に、閉じたDoorのColliderとLaser経路を作ります。
@@ -281,8 +261,6 @@ bool Stage1::InitializeStageMap()
 		&stageMapRuntime_,
 		lightDoor_ != nullptr,
 	});
-	stageMapHotReload_.Synchronize();
-	stageMapChipHotReload_.Synchronize();
 	return true;
 }
 
@@ -293,7 +271,7 @@ bool Stage1::InitializePlayerAndCamera()
 		? stagePlayerStartPosition_
 		: Vector3{ 0.0f, -0.8f, 5.0f };
 	player_ = std::make_unique<Player>();
-	if (!player_->Initialize(object3dCommon, "debug/sphere.obj", playerStartPosition, 1.2f)) {
+	if (!player_->Initialize(object3dCommon_, "debug/sphere.obj", playerStartPosition, 1.2f)) {
 		// Playerモデルを作れない状態で、Cameraや開始演出がnullptrを参照しないよう中断します。
 		player_.reset();
 		return false;
@@ -306,19 +284,19 @@ bool Stage1::InitializePlayerAndCamera()
 
 	// Camera本体とは別のControllerに、Playerを追従する規則を任せます。
 	cameraController_ = std::make_unique<CameraController>();
-	cameraController_->Initialize(mainCamera.get(), player_->GetPosition());
+	cameraController_->Initialize(mainCamera_.get(), player_->GetPosition());
 	cameraController_->SetAutoRecenterEnabled(false);
 	// 建物の外壁だけは越えないようにし、室内壁の向こうはシルエット表示を優先します。
 	cameraController_->SetWallAvoidanceEnabled(true);
 
 	// 本編Cameraの完成位置を保存し、Title中は登場演出をまだ進めません。
 	stageStart_ = std::make_unique<StageStart>();
-	stageStartGameplayCameraPosition_ = mainCamera->GetTranslate();
-	stageStartGameplayCameraRotate_ = mainCamera->GetRotate();
+	stageStartGameplayCameraPosition_ = mainCamera_->GetTranslate();
+	stageStartGameplayCameraRotate_ = mainCamera_->GetRotate();
 	if (isTemporaryTitleActive_) {
 		constexpr float kDegreeToRadian = std::numbers::pi_v<float> / 180.0f;
-		mainCamera->SetTranslate(kTemporaryTitleCameraPosition);
-		mainCamera->SetRotate({
+		mainCamera_->SetTranslate(kTemporaryTitleCameraPosition);
+		mainCamera_->SetRotate({
 			kTemporaryTitleCameraRotationDegrees.x * kDegreeToRadian,
 			kTemporaryTitleCameraRotationDegrees.y * kDegreeToRadian,
 			kTemporaryTitleCameraRotationDegrees.z * kDegreeToRadian,
@@ -333,7 +311,7 @@ bool Stage1::InitializePlayerAndCamera()
 // Title中は開始せず、Stage1本編の初期化時にPlayer登場演出を開始します。
 void Stage1::BeginStageStart()
 {
-	if (!stageStart_ || !player_ || !mainCamera) {
+	if (!stageStart_ || !player_ || !mainCamera_) {
 		return;
 	}
 	const Vector3 playerStartPosition = hasStagePlayerStart_
@@ -341,7 +319,7 @@ void Stage1::BeginStageStart()
 		: Vector3{ 0.0f, -0.8f, 5.0f };
 	stageStart_->Begin(
 		*player_,
-		*mainCamera,
+		*mainCamera_,
 		playerStartPosition,
 		stageStartGameplayCameraPosition_,
 		stageStartGameplayCameraRotate_,
@@ -366,7 +344,7 @@ void Stage1::InitializeGameplaySmoke()
 		puzzleSettings.doorSwitchRadius,
 		puzzleSettings.largeMirrorBaseYaw,
 		puzzleSettings.largeMirrorTargetYawOffset,
-		object3dCommon,
+		object3dCommon_,
 		[this](const std::vector<LaserSegment>& sourceSegments)
 		{
 			return ReflectHazardLightSegments(sourceSegments);
@@ -387,7 +365,7 @@ void Stage1::Finalize()
 		stagePauseOverlay_->Finalize();
 	}
 	skyBox_.reset();
-	stageCameraEvents_.Clear(cameraManager.get());
+	stageCameraEvents_.Clear(cameraManager_.get());
 	stageEditor_.Finalize();
 	sceneObjects_.Clear();
 	stageMapRuntime_.Clear();
@@ -469,7 +447,7 @@ void Stage1::Update()
 			{
 				return ReflectHazardLightSegments(sourceSegments);
 			});
-		UpdateLaserSpotLights();
+		stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
 		const bool startRequested =
 			ImGuiManager::GetInstance()->IsGameViewActive() &&
 			(Input::GetInstance()->TriggerKey(DIK_RETURN) ||
@@ -477,7 +455,7 @@ void Stage1::Update()
 		if (startRequested) {
 			SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_SELECT");
 		}
-		cameraManager->Update();
+		cameraManager_->Update();
 		UpdateReflectionCameras();
 		// DevelopmentではBegin/EndしたFrameだけGame Viewへ描画結果を渡せます。
 		ImGuiManager::GetInstance()->Begin("Stage1");
@@ -486,6 +464,7 @@ void Stage1::Update()
 		return;
 	}
 	// ---------- Stage1マップのホットリロード ----------
+	ApplyRequestedStageChange();
 	UpdateStageMapHotReload();
 	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
 		stageMapRuntime_.UpdatePaths(DirectXCommon::GetInstance()->GetDeltaTime());
@@ -515,7 +494,7 @@ void Stage1::Update()
 			return ReflectHazardLightSegments(sourceSegments);
 		});
 	// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
-	UpdateLaserSpotLights();
+	stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
 
 	// ---------- カメラとデバッグ UI の更新 ----------
 	UpdateStageCamera(deltaTime, isStageStartPlaying);
@@ -525,7 +504,7 @@ void Stage1::Update()
 	if (player_) {
 		ImGuiManager::GetInstance()->DrawPlayerCollisionDebug(
 			player_->GetSphere(),
-			cameraManager->GetActiveCamera(),
+			cameraManager_->GetActiveCamera(),
 			player_->IsColliding(),
 			lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit());
 	}
@@ -541,10 +520,10 @@ void Stage1::PrepareStageRenderObjects()
 {
 	// Stage1全体で同じCamera・Lightを一回だけまとめ、全Objectへ適用します。
 	Object3dRenderContext renderContext(
-		cameraManager ? cameraManager->GetActiveCamera() : nullptr,
-		directionalLight_,
-		pointLight_,
-		spotLights_);
+		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr,
+		stageLighting_.GetDirectionalLight(),
+		stageLighting_.GetPointLight(),
+		stageLighting_.GetSpotLights());
 	renderContext.UpdateObjects(sceneObjects_.GetObjects());
 	stageMapRuntime_.UpdateRenderObjects(renderContext);
 	for (const auto& fixedMirror : fixedMirrors_) {
@@ -575,8 +554,8 @@ void Stage1::Draw()
 	SrvManager::GetInstance()->PreDraw();
 	StageReflectionRenderer::Context reflectionContext{};
 	reflectionContext.directXCommon = DirectXCommon::GetInstance();
-	reflectionContext.object3dCommon = object3dCommon;
-	reflectionContext.activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	reflectionContext.object3dCommon = object3dCommon_;
+	reflectionContext.activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	reflectionContext.sceneObjects = &sceneObjects_.GetObjects();
 	reflectionContext.stageMapRuntime = &stageMapRuntime_;
 	reflectionContext.fixedMirrors = &fixedMirrors_;
@@ -590,8 +569,8 @@ void Stage1::Draw()
 	// ---------- ゲーム画面への描画 ----------
 	DirectXCommon::GetInstance()->PreDraw();
 	StageSceneRenderer::Context sceneRendererContext{};
-	sceneRendererContext.object3dCommon = object3dCommon;
-	sceneRendererContext.activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	sceneRendererContext.object3dCommon = object3dCommon_;
+	sceneRendererContext.activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	sceneRendererContext.skyBox = skyBox_.get();
 	sceneRendererContext.sceneObjects = &sceneObjects_.GetObjects();
 	sceneRendererContext.stageMapRuntime = &stageMapRuntime_;
@@ -620,7 +599,7 @@ void Stage1::Draw()
 	// PostEffect・SwapChain・ImGui・Presentは、全Scene共通のPipelineへ任せます。
 	SceneRenderPipeline::End(
 		DirectXCommon::GetInstance(),
-		cameraManager ? cameraManager->GetActiveCamera() : nullptr);
+		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr);
 	// 次のUpdateからBGMを読み込めるよう、最初の本編画面が出たことを記録します。
 	hasStageFrameBeenDrawn_ = true;
 }
@@ -628,7 +607,7 @@ void Stage1::Draw()
 std::unique_ptr<Object3d> Stage1::CreateRuntimeObject(const std::string& modelName)
 {
 	// 生成時はモデル読込とObject3d初期化だけを行い、Camera・LightはUpdateで一括設定します。
-	return Object3dFactory::Create(object3dCommon, modelName);
+	return Object3dFactory::Create(object3dCommon_, modelName);
 }
 
 // 開始演出・自動確認・通常入力のいずれかでPlayerを更新し、開始演出中ならtrueを返します。
@@ -650,7 +629,7 @@ bool Stage1::UpdateStagePlayer(float deltaTime)
 	const bool isStageStartPlaying =
 		isGameViewActive &&
 		stageStart_ &&
-		stageStart_->Update(deltaTime, *player_, *mainCamera);
+		stageStart_->Update(deltaTime, *player_, *mainCamera_);
 	if (isStageStartPlaying) {
 		// 開始演出中はPlayer入力・Jump・Mirror操作を受け付けません。
 		return true;
@@ -681,8 +660,8 @@ bool Stage1::UpdateStagePlayer(float deltaTime)
 	player_->SetMirrorGuardMode(isMirrorGuarding);
 	// 現在画面に映しているCameraの正面を渡し、WASDを画面基準の移動へ変換します。
 	Vector3 cameraForward{ 0.0f, 0.0f, 1.0f };
-	if (cameraManager) {
-		if (Camera* activeCamera = cameraManager->GetActiveCamera()) {
+	if (cameraManager_) {
+		if (Camera* activeCamera = cameraManager_->GetActiveCamera()) {
 			cameraForward = GetCameraForward(*activeCamera);
 		}
 	}
@@ -693,7 +672,7 @@ bool Stage1::UpdateStagePlayer(float deltaTime)
 // 固定鏡の位置・向きから、各鏡面用Cameraの反射行列を更新します。
 void Stage1::UpdateReflectionCameras()
 {
-	Camera* sourceCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	Camera* sourceCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	if (!sourceCamera) {
 		return;
 	}
@@ -733,31 +712,31 @@ void Stage1::UpdateLightPuzzle(float deltaTime)
 // 開始演出・通常追従・Event Cameraの優先順位で、Stage1のCameraを更新します。
 void Stage1::UpdateStageCamera(float deltaTime, bool isStageStartPlaying)
 {
-	if (!cameraManager) {
+	if (!cameraManager_) {
 		return;
 	}
 
 	if (ImGuiManager::GetInstance()->IsGameViewActive() && !isStageStartPlaying) {
 		UpdateMainCamera();
-		if (stageStart_ && mainCamera && stageStart_->IsCameraHandoffPlaying()) {
+		if (stageStart_ && mainCamera_ && stageStart_->IsCameraHandoffPlaying()) {
 			// 通常Cameraの壁回避・追従結果へ、開始演出Cameraを滑らかに近づけます。
-			stageStart_->UpdateCameraHandoff(deltaTime, *mainCamera);
+			stageStart_->UpdateCameraHandoff(deltaTime, *mainCamera_);
 		}
 		if (player_) {
 			stageCameraEvents_.UpdateEventCamera(
 				*player_,
-				*cameraManager,
+				*cameraManager_,
 				collisionWorld_.GetCameraBoundaryObbs(),
 				deltaTime);
 			if (const std::string status = stageCameraEvents_.ConsumeStatus(); !status.empty()) {
-				stageMapReloadStatus_ = status;
+				stageEditor_.SetReloadStatus(status);
 			}
 		}
 	} else if (!stageCameraEvents_.GetActiveEventCameraName().empty()) {
 		// Edit Viewではイベントカメラへ自動切替せず、編集用のMainCameraを維持します。
-		stageCameraEvents_.RestoreMainCamera(*cameraManager);
+		stageCameraEvents_.RestoreMainCamera(*cameraManager_);
 	}
-	cameraManager->Update();
+	cameraManager_->Update();
 }
 
 // 直起動では最初の描画後に、Title経由ではEnter後の本編UpdateでBGMを始めます。
@@ -785,7 +764,7 @@ void Stage1::UpdateMainCamera()
 	// 壁がCameraとPlayerの間にある時だけは、CameraControllerの壁回避が優先されます。
 	cameraController_->SetDistanceLock(carryableMirror_ && carryableMirror_->IsCarried());
 	if (const std::string status = stageCameraEvents_.ConsumeStatus(); !status.empty()) {
-		stageMapReloadStatus_ = status;
+		stageEditor_.SetReloadStatus(status);
 	}
 
 	// 通常時のCameraは、矢印キー一回につき一段階だけ位置を変更する
@@ -822,61 +801,6 @@ Vector3 Stage1::GetCameraForward(const Camera& camera) const
 	// このプロジェクトでは、カメラのローカル座標 +Z が正面です。
 	const Matrix4x4& worldMatrix = camera.GetWorldMatrix();
 	return Normalize({ worldMatrix.m[2][0], worldMatrix.m[2][1], worldMatrix.m[2][2] });
-}
-
-// 読込済みLevelDataの照明設定を、Stage1全体で共有するLightへ反映します。
-void Stage1::ApplyStageLighting()
-{
-	stageSpotLights_.clear();
-	if (!stageMapData_ || !stageMapData_->hasLighting) {
-		return;
-	}
-
-	const LevelLoader::LightingData& lighting = stageMapData_->lighting;
-	directionalLight_.color = {
-		lighting.directionalColor.x,
-		lighting.directionalColor.y,
-		lighting.directionalColor.z,
-		1.0f,
-	};
-	directionalLight_.direction = Normalize(lighting.directionalDirection);
-	directionalLight_.intensity = lighting.directionalIntensity;
-	directionalLight_.ambientColor = lighting.ambientColor;
-	directionalLight_.ambientIntensity = lighting.ambientIntensity;
-	pointLight_.color = {
-		lighting.pointColor.x,
-		lighting.pointColor.y,
-		lighting.pointColor.z,
-		1.0f,
-	};
-	pointLight_.position = lighting.pointPosition;
-	pointLight_.intensity = lighting.pointIntensity;
-	pointLight_.radius = lighting.pointRadius;
-	pointLight_.decay = lighting.pointDecay;
-	for (const LevelLoader::SpotLightData& spotLightData : lighting.spotLights) {
-		if (stageSpotLights_.size() >= kStageLightingSpotLightCount) {
-			break;
-		}
-		if (spotLightData.intensity <= 0.0f || spotLightData.distance <= 0.0f) {
-			continue;
-		}
-
-		Object3d::SpotLight spotLight{};
-		spotLight.color = {
-			spotLightData.color.x,
-			spotLightData.color.y,
-			spotLightData.color.z,
-			1.0f,
-		};
-		spotLight.position = spotLightData.position;
-		spotLight.intensity = spotLightData.intensity;
-		spotLight.direction = Normalize(spotLightData.direction);
-		spotLight.distance = spotLightData.distance;
-		spotLight.decay = spotLightData.decay;
-		spotLight.cosAngle = spotLightData.cosAngle;
-		spotLight.cosFalloffStart = spotLightData.cosFalloffStart;
-		stageSpotLights_.push_back(spotLight);
-	}
 }
 
 // Player開始位置、持てるMirror位置、StageStart演出設定を読込済みLevelDataから反映します。
@@ -979,30 +903,10 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	const std::vector<const LevelLoader::ObjectData*>& eventTriggerDataList = objectIndex.GetEventTriggers();
 	const std::vector<const LevelLoader::ObjectData*>& eventCameraDataList = objectIndex.GetEventCameras();
 	const std::vector<const LevelLoader::ObjectData*>& cameraAreaDataList = objectIndex.GetCameraAreas();
-	std::vector<LevelLoader::ObjectData> mapChipObjectDataList;
-
-	// Stage1が使う番号だけを登録します。追加時は種類・番号と処理をここへ一組増やします。
-	// E0・G0・C0・L0は未登録なので、今は表示も当たり判定も持ちません。
-	MapChipRegistry chipRegistry;
-	const MapChipField::Chip* csvPlayerStartChip = nullptr;
-	chipRegistry.Register(MapChipType::PlayerStart, 0,
-		[&csvPlayerStartChip](const MapChipField::Chip& chip)
-		{
-			if (!csvPlayerStartChip) {
-				csvPlayerStartChip = &chip;
-			}
-		});
-	chipRegistry.Register(MapChipType::Block, 0,
-		[this, &mapChipObjectDataList](const MapChipField::Chip& chip)
-		{
-			mapChipObjectDataList.push_back(StageMapChipFactory::CreateBlockData(
-				stageMapChipField_, chip, kStageMapChipOrigin,
-				kStageMapChipCellSize, kStageMapChipFloorY));
-		});
-	for (const MapChipField::Chip& chip : stageMapChipField_.GetChips()) {
-		chipRegistry.Run(chip);
-	}
-	for (const LevelLoader::ObjectData& blockData : mapChipObjectDataList) {
+	// Chipの対応表とObjectData生成はFactoryへ任せ、Sceneは採用順だけを決めます。
+	StageMapChipFactory::StageChipData mapChipData = StageMapChipFactory::BuildStageData(
+		stageMapChipField_, kStageMapChipOrigin, kStageMapChipCellSize, kStageMapChipFloorY);
+	for (const LevelLoader::ObjectData& blockData : mapChipData.blockData) {
 		additionalObjects.push_back(&blockData);
 	}
 
@@ -1016,7 +920,7 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 		rebuildRuntimeObjects || fixedMirrors_.size() != mirrorDataList.size();
 	std::vector<std::unique_ptr<FixedMirror>> rebuiltFixedMirrors;
 	if (rebuildFixedMirrors) {
-		if (!StageMirrorFactory::CreateFixedMirrors(object3dCommon, mirrorDataList, rebuiltFixedMirrors)) {
+		if (!StageMirrorFactory::CreateFixedMirrors(object3dCommon_, mirrorDataList, rebuiltFixedMirrors)) {
 			return false;
 		}
 	} else {
@@ -1034,8 +938,8 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 	}
 
 	// 失敗し得る生成が終わってから、Sceneが所有する状態をまとめて更新します。
-	ApplyStageStartSettings(playerStartData, carryableMirrorData, csvPlayerStartChip);
-	ApplyStageLighting();
+	ApplyStageStartSettings(playerStartData, carryableMirrorData, mapChipData.playerStartChip);
+	stageLighting_.ApplyLevel(stageMapData_->hasLighting ? &stageMapData_->lighting : nullptr);
 	ApplyFloorData(*floorData);
 
 	// ---------- 鏡データの反映 ----------
@@ -1060,7 +964,7 @@ bool Stage1::ApplyStageMapData(bool rebuildRuntimeObjects)
 			eventTriggerDataList,
 			eventCameraDataList,
 			cameraAreaDataList,
-			cameraManager.get(),
+			cameraManager_.get(),
 			cameraController_.get());
 	} else {
 		ApplyStageRuntimeEdits(

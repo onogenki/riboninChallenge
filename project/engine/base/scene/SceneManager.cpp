@@ -6,7 +6,9 @@
 #include "SpriteCommon.h"
 #include "TextureManager.h"
 #include <algorithm>
+#include <exception>
 #include <utility>
+#include <Windows.h>
 
 // アプリ全体で共有する一つのSceneManagerを返します。
 SceneManager* SceneManager::GetInstance()
@@ -18,7 +20,9 @@ SceneManager* SceneManager::GetInstance()
 void SceneManager::Update()
 {
 	// 予約中のSceneを先に確定し、その後に現在Sceneを一回だけ更新します。
-	ApplyPendingSceneChange();
+	if (!ApplyPendingSceneChange()) {
+		return;
+	}
 
 	if (scene_) {
 		scene_->Update();
@@ -29,11 +33,11 @@ void SceneManager::Update()
 	}
 }
 
-// 予約済みSceneを終了・初期化して、次フレームから通常更新できる状態へ切り替えます。
-void SceneManager::ApplyPendingSceneChange()
+// 新しいSceneの初期化失敗時は、未完成のSceneをUpdate・Drawへ渡さず終了します。
+bool SceneManager::ApplyPendingSceneChange()
 {
 	if (!nextScene_) {
-		return;
+		return true;
 	}
 
 	isChangingScene_ = true;
@@ -49,10 +53,20 @@ void SceneManager::ApplyPendingSceneChange()
 	scene_ = std::move(nextScene_);
 	currentSceneName_ = pendingSceneName_;
 	pendingSceneName_.clear();
-	scene_->Initialize();
+	try {
+		scene_->Initialize();
+	} catch (const std::exception& error) {
+		Logger::Log("Scene initialization failed: " + currentSceneName_ + ": " + error.what());
+		scene_.reset();
+		currentSceneName_.clear();
+		isChangingScene_ = false;
+		PostQuitMessage(1);
+		return false;
+	}
 	destinationDrawn_ = false;
 	sceneChangeCooldownFrames_ = kSceneChangeCooldownFrames;
 	isChangingScene_ = false;
+	return true;
 }
 
 void SceneManager::Draw()

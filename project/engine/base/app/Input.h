@@ -37,13 +37,15 @@ public:
 	bool TriggerAnyKeyExcept(BYTE excludedKey) const;
 
 	// マウス
-	LONG GetMouseX() const { return mouseState.lX; }
-	LONG GetMouseY() const { return mouseState.lY; }
-	LONG GetMouseWheel() const { return mouseState.lZ; }
+	// フレームで取得した移動量を返し、Camera操作とUI判定で同じ値を使います。
+	LONG GetMouseX() const { return mouseState_.lX; }
+	LONG GetMouseY() const { return mouseState_.lY; }
+	LONG GetMouseWheel() const { return mouseState_.lZ; }
+	// Windowsのクライアント座標を返し、Game View内の判定に使います。
 	Vector2 GetMouseScreen() const {
 		return Vector2{
-static_cast<float>(mouseScreenX),
-static_cast<float>(mouseScreenY)
+static_cast<float>(mouseScreenX_),
+static_cast<float>(mouseScreenY_)
 		};
 	}
 	bool IsMouseButtonPressed(int button);
@@ -57,40 +59,39 @@ static_cast<float>(mouseScreenY)
 	float GetPadRightAxisX(int padIndex);
 	float GetPadRightAxisY(int padIndex);
 
-	//現在の操作機種を取得する関数
+	// 最後に操作された機器を返し、画面の操作案内を切り替えます。
 	InputDevice GetCurrentDevice() const { return currentDevice_; }
 
 private:
 	// シングルトンインスタンス
-	static std::unique_ptr <Input> instance;
+	static std::unique_ptr <Input> instance_;
 
 	//DirectInputのインスタンス
-	ComPtr<IDirectInput8>directInput = nullptr;
+	ComPtr<IDirectInput8>directInput_ = nullptr;
 
 	//キーボードのデバイス
-	ComPtr<IDirectInputDevice8>keyboard = nullptr;
+	ComPtr<IDirectInputDevice8>keyboard_ = nullptr;
 	//今回の全キーの状態
-	BYTE key[256] = {};
+	BYTE key_[256] = {};
 	//前回の全キーの状態
-	BYTE keyPre[256] = {};
+	BYTE keyPre_[256] = {};
 	// 前面表示中にキーボード取得が失敗した時だけ、一度ログへ知らせます。
 	bool keyboardUnavailableLogged_ = false;
 
 	// マウス
-	ComPtr<IDirectInputDevice8> mouse = nullptr;
-	DIMOUSESTATE mouseStatePre{};
-	DIMOUSESTATE mouseState{}; // マウスの状態
-	int mouseScreenX = 0; // マウスのスクリーン座標X
-	int mouseScreenY = 0; // マウスのスクリーン座標Y
+	ComPtr<IDirectInputDevice8> mouse_ = nullptr;
+	DIMOUSESTATE mouseStatePre_{};
+	DIMOUSESTATE mouseState_{}; // マウスの状態
+	int mouseScreenX_ = 0; // マウスのスクリーン座標X
+	int mouseScreenY_ = 0; // マウスのスクリーン座標Y
 	POINT previousMousePosition_{};
 	bool hasPreviousMousePosition_ = false;
 	bool mouseFallbackLogged_ = false;
 
 	// ゲームパッド
-	std::vector<ComPtr<IDirectInputDevice8>> gamepads;
-	ComPtr<IDirectInputDevice8> newGamepad;
-	std::vector<DIJOYSTATE> padStates;
-	std::vector<DIJOYSTATE> padStatesPre;
+	std::vector<ComPtr<IDirectInputDevice8>> gamepads_;
+	std::vector<DIJOYSTATE> padStates_;
+	std::vector<DIJOYSTATE> padStatesPre_;
 
 	//現在の操作機種を記憶する変数を追加(初期値はキーボード)
 	InputDevice currentDevice_ = InputDevice::Keyboard;

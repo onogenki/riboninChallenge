@@ -3,9 +3,11 @@
 #include "LevelLoader.h"
 #include "StageEditViewport.h"
 #include "StageLevelEditor.h"
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 class Camera;
@@ -26,15 +28,11 @@ public:
 	{
 		// Edit View以外では何も表示しないための状態です。
 		bool isEditViewActive = false;
-		// Hot Reloadウィンドウが編集するStage1所有の設定です。
-		bool* autoMapReload = nullptr;
 		std::string mapFilePath;
-		std::string* mapReloadStatus = nullptr;
 		// JSONと実行中のStageデータはStage1が所有します。
 		LevelLoader::LevelData* levelData = nullptr;
 		Vector3 playerPosition{};
 		bool playerStartFromCsv = false;
-		int* selectedObjectIndex = nullptr;
 		Player* player = nullptr;
 		const MyMath::OBB* floorObb = nullptr;
 		Object3d* floor = nullptr;
@@ -59,6 +57,12 @@ public:
 	void Draw(Context& context);
 	// Scene終了時に、Model ShelfとViewportの選択状態を破棄します。
 	void Finalize();
+	// 自動再読込の選択は編集UIが所有し、Sceneは更新時に結果だけを参照します。
+	bool IsAutoMapReloadEnabled() const { return autoMapReload_; }
+	// Scene側で起きた読込・Cameraの結果を、同じ編集UIの通知欄へ表示します。
+	void SetReloadStatus(std::string status) { mapReloadStatus_ = std::move(status); }
+	// JSONのオブジェクト数が変わった時だけ、編集対象の番号を有効範囲へ戻します。
+	void ClampSelectedObjectIndex(std::size_t objectCount);
 
 private:
 	// 現在のPlayerと通常Cameraの角度、次回のPlayerStartを別々に表示します。
@@ -68,7 +72,7 @@ private:
 	// Stage1が所有するColliderを、Edit View上へ確認用ワイヤーとして描画します。
 	void DrawCollision(const Context& context) const;
 	// StageLevelEditorへ渡す、Stage1所有データと再構築・保存の窓口を作ります。
-	StageLevelEditor::Context MakeLevelEditorContext(Context& context) const;
+	StageLevelEditor::Context MakeLevelEditorContext(Context& context);
 	// 再読込で所有データが入れ替わった時だけtrueを返し、古い参照の使用を止めます。
 	bool DrawLevelControls(
 		Context& context,
@@ -78,4 +82,8 @@ private:
 	// Model追加・削除とViewport操作を担当する既存の小さなUI部品です。
 	StageLevelEditor levelEditor_{};
 	StageEditViewport editViewport_{};
+	// Edit Viewだけが使う状態は、Sceneのゲーム進行データと分けて所有します。
+	bool autoMapReload_ = true;
+	std::string mapReloadStatus_ = "Not loaded yet.";
+	int selectedObjectIndex_ = 0;
 };

@@ -79,7 +79,9 @@ namespace MyMath {
 	// 行列の積
 	Matrix4x4 Multiply(const Matrix4x4& matrix1, const Matrix4x4& matrix2);
 
-	// 逆行列
+	// @brief 変換を打ち消す逆行列を作ります。Cameraのビュー行列などに使います。
+	// @param m 逆変換したい4x4行列。逆行列が必要な箇所では可逆な行列を渡します。
+	// @return 行列式が0なら零行列、それ以外はmの逆行列です。
 	Matrix4x4 Inverse(const Matrix4x4& m);
 
 	//4x4行列の転置
@@ -125,7 +127,12 @@ namespace MyMath {
 
 	// --- 座標変換・投影 ---
 
-	// 透視投影行列
+	// @brief Cameraの画角と描画範囲から透視投影行列を作ります。
+	// @param fovY 縦方向の画角。単位はラジアンです。
+	// @param aspectRatio 描画先の幅を高さで割った値です。
+	// @param nearClip カメラから手前の描画境界までの距離です。
+	// @param farClip カメラから奥の描画境界までの距離です。
+	// @return 行ベクトル用の透視投影行列です。
 	Matrix4x4 MakePerspectiveFovMatrix(float fovY, float aspectRatio, float nearClip, float farClip);
 
 	// 正射影行列
@@ -133,11 +140,6 @@ namespace MyMath {
 
 	// ビューポート変換行列
 	Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, float minDepth, float maxDepth);
-
-	inline void MatrixScreenPrintf() {};
-
-	inline constexpr int kRowHeight = 20;
-	inline constexpr int kColumnWidth = 60;
 
 	// cot 関数
 	float Cot(float x);

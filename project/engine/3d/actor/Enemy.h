@@ -9,8 +9,8 @@ class Object3dCommon;
 class Object3dRenderContext;
 
 // EnemyManagerが所有する一体分の敵です。見た目と球Colliderを持ち、位置を同期します。
-// 現在は追跡AIや攻撃を持たず、Sceneから渡された描画Contextで更新します。
-class Enemy
+// 現在は追跡AIや攻撃を持たず、利用側から渡された描画Contextで更新する具象クラスです。
+class Enemy final
 {
 public:
 	struct SpawnData
@@ -25,16 +25,16 @@ public:
 		bool initializeAnimation = false;
 	};
 
-	// 前方宣言したObject3dを安全に扱うため、生成・破棄の実装はEnemy.cppに置きます。
+	// ManagerはEnemyを直接所有するため、前方宣言したObject3dの破棄をEnemy.cppで行います。
 	Enemy();
-	virtual ~Enemy();
+	~Enemy();
 
 	// モデル・位置・Colliderを作り、一体のEnemyを出現できる状態にします。
 	bool Initialize(Object3dCommon* object3dCommon, const SpawnData& spawnData);
-	// Sceneが一度作った描画Contextを使い、Enemyの見た目とColliderを更新します。
-	virtual void Update(const Object3dRenderContext& renderContext);
+	// 利用側から借りた描画Contextで、Enemyの見た目とColliderを更新します。
+	void Update(const Object3dRenderContext& renderContext);
 	// 更新済みのEnemyモデルを描画します。
-	virtual void Draw() const;
+	void Draw() const;
 
 	void SetPosition(const Vector3& position);
 	const Vector3& GetPosition() const { return position_; }

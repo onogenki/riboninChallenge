@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-class GameViewCapture;
+class CaptureManager;
 class Object3d;
 class Sprite;
 
@@ -94,8 +94,8 @@ public:
 		std::function<void()> clearAddedSceneModels;
 		// モデルの見た目から簡易AABBを作る関数です。
 		std::function<bool(const Object3d&, MyMath::AABB&)> buildWorldAabb;
-		// Draw後にGame Viewを保存する道具です。所有しません。
-		GameViewCapture* gameViewCapture = nullptr;
+		// Draw後にGame Viewを保存する共通Managerです。所有しません。
+		CaptureManager* captureManager = nullptr;
 	};
 
 	// 環境変数が有効な時に、UI操作の自動確認を開始します。

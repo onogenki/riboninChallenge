@@ -1,4 +1,32 @@
 #include "StageMapChipFactory.h"
+#include "MapChipRegistry.h"
+
+// CSVの並び順でP0とB0を処理し、生成物の所有とScene進行を分離します。
+StageMapChipFactory::StageChipData StageMapChipFactory::BuildStageData(
+	const MapChipField& field,
+	const Vector3& origin,
+	float cellSize,
+	float floorY)
+{
+	StageChipData result;
+	MapChipRegistry chipRegistry;
+	chipRegistry.Register(MapChipType::PlayerStart, 0,
+		[&result](const MapChipField::Chip& chip)
+		{
+			if (!result.playerStartChip) {
+				result.playerStartChip = &chip;
+			}
+		});
+	chipRegistry.Register(MapChipType::Block, 0,
+		[&result, &field, &origin, cellSize, floorY](const MapChipField::Chip& chip)
+		{
+			result.blockData.push_back(CreateBlockData(field, chip, origin, cellSize, floorY));
+		});
+	for (const MapChipField::Chip& chip : field.GetChips()) {
+		chipRegistry.Run(chip);
+	}
+	return result;
+}
 
 // Stage1のB0がどのモデル・座標・当たり判定になるかを一か所にそろえます。
 LevelLoader::ObjectData StageMapChipFactory::CreateBlockData(

@@ -10,6 +10,9 @@
 // 描画資源を順に作り、失敗時は未完成のBufferやShaderを使用させません。
 void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 {
+	// 画面効果の初期値を明示し、演出側から調整する値と区別します。
+	constexpr float kDefaultDissolveThreshold = 0.5f;
+	constexpr float kDefaultDissolveEdgeWidth = 0.03f;
 	if (!dxCommon || !dxCommon->GetDevice() || !srvManager) {
 		throw std::runtime_error("PostEffect: DirectX device or SRV manager is unavailable");
 	}
@@ -31,8 +34,8 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 		!dissolveData_) {
 		throw std::runtime_error("PostEffect: dissolve buffer creation or mapping failed");
 	}
-	dissolveData_->threshold = 0.5f;
-	dissolveData_->edgeWidth = 0.03f;
+	dissolveData_->threshold = kDefaultDissolveThreshold;
+	dissolveData_->edgeWidth = kDefaultDissolveEdgeWidth;
 	dissolveData_->edgeColor[0] = 1.0f;
 	dissolveData_->edgeColor[1] = 0.4f;
 	dissolveData_->edgeColor[2] = 0.3f;

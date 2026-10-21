@@ -57,7 +57,7 @@ bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 		ResetGpuResources();
 		return false;
 	}
-	for (MaterialData& material : modelData.materials)
+	for (MaterialData& material : modelData_.materials)
 	{
 		const std::filesystem::path texturePath = material.textureFilePath;
 		// 空・None・先頭が*の画像参照は、従来どおり確認用画像へ置き換えます。
@@ -85,25 +85,26 @@ bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 	return true;
 }
 
+// 通常モデルの頂点・材質Bufferを設定し、各Meshに対応するTextureで描画します。
 void Model::Draw(uint32_t textureSrvIndexOverride)
 {
 	ID3D12GraphicsCommandList* commandList = modelCommon_->GetDxCommon()->GetCommandList();
 
 	// 1. 頂点バッファビューを設定 (通常のVBVは1つだけ)
-	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 
 	// インデックスバッファをセット
-	commandList->IASetIndexBuffer(&indexBufferView);
+	commandList->IASetIndexBuffer(&indexBufferView_);
 
 	// 2. 形状を設定 (三角形リスト)
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// 3. マテリアルCBufferの設定 (RootParameter 0)
-	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 
-	for (const MeshData& mesh : modelData.meshes)
+	for (const MeshData& mesh : modelData_.meshes)
 	{
-		const MaterialData& material = modelData.materials[mesh.materialIndex];
+		const MaterialData& material = modelData_.materials[mesh.materialIndex];
 		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
 			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
 			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
@@ -112,13 +113,14 @@ void Model::Draw(uint32_t textureSrvIndexOverride)
 	}
 }
 
+// 反射など別の描画設定を使う経路へ、形状だけを同じ順番で渡します。
 void Model::DrawGeometry()
 {
 	ID3D12GraphicsCommandList* commandList = modelCommon_->GetDxCommon()->GetCommandList();
-	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
-	commandList->IASetIndexBuffer(&indexBufferView);
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+	commandList->IASetIndexBuffer(&indexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	for (const MeshData& mesh : modelData.meshes) {
+	for (const MeshData& mesh : modelData_.meshes) {
 		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
 	}
 }
@@ -130,7 +132,7 @@ void Model::SetTexture(const std::string& filePath)
 		Logger::Log("Model: texture load failed: " + filePath);
 		return;
 	}
-	for (MaterialData& material : modelData.materials)
+	for (MaterialData& material : modelData_.materials)
 	{
 		material.textureFilePath = filePath;
 	}
@@ -140,7 +142,7 @@ void Model::SetTexture(const std::string& filePath)
 // ファイル由来の頂点・材質一覧は新しいまま、実行中に調整した材質値と明示画像だけを引き継ぎます。
 bool Model::CopyRuntimeSettingsFrom(const Model& previous)
 {
-	if (!materialData || !previous.materialData) {
+	if (!materialData_ || !previous.materialData_) {
 		return false;
 	}
 	if (previous.runtimeTextureOverride_ &&
@@ -148,14 +150,14 @@ bool Model::CopyRuntimeSettingsFrom(const Model& previous)
 		return false;
 	}
 
-	materialData->color = previous.materialData->color;
-	materialData->enableLighting = previous.materialData->enableLighting;
-	materialData->uvTransform = previous.materialData->uvTransform;
-	materialData->shininess = previous.materialData->shininess;
-	materialData->environmentCoefficient = previous.materialData->environmentCoefficient;
-	materialData->specularIntensity = previous.materialData->specularIntensity;
+	materialData_->color = previous.materialData_->color;
+	materialData_->enableLighting = previous.materialData_->enableLighting;
+	materialData_->uvTransform = previous.materialData_->uvTransform;
+	materialData_->shininess = previous.materialData_->shininess;
+	materialData_->environmentCoefficient = previous.materialData_->environmentCoefficient;
+	materialData_->specularIntensity = previous.materialData_->specularIntensity;
 	if (previous.runtimeTextureOverride_) {
-		for (MaterialData& material : modelData.materials) {
+		for (MaterialData& material : modelData_.materials) {
 			material.textureFilePath = *previous.runtimeTextureOverride_;
 		}
 		runtimeTextureOverride_ = previous.runtimeTextureOverride_;
@@ -167,69 +169,69 @@ bool Model::CopyRuntimeSettingsFrom(const Model& previous)
 // IndexをGPUへ渡すBufferを作り、生成・Mapの失敗を上位へ伝えます。
 bool Model::CreateIndexData()
 {
-	if (modelData.indices.empty()) {
+	if (modelData_.indices.empty()) {
 		Logger::Log("Model: index data is empty");
 		return false;
 	}
 	// --- インデックスバッファの作成 ---
-	indexResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * modelData.indices.size());
-	if (!indexResource) {
+	indexResource_ = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(uint32_t) * modelData_.indices.size());
+	if (!indexResource_) {
 		Logger::Log("Model: index buffer creation failed");
 		return false;
 	}
 
 	// インデックスバッファビューの設定
-	indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
-	indexBufferView.SizeInBytes = sizeof(uint32_t) * static_cast<uint32_t>(modelData.indices.size());
-	indexBufferView.Format = DXGI_FORMAT_R32_UINT;
+	indexBufferView_.BufferLocation = indexResource_->GetGPUVirtualAddress();
+	indexBufferView_.SizeInBytes = sizeof(uint32_t) * static_cast<uint32_t>(modelData_.indices.size());
+	indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
 
 	// --- データのマップとコピー ---
 	uint32_t* mappedIndex = nullptr;
-	const HRESULT mapResult = indexResource->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
+	const HRESULT mapResult = indexResource_->Map(0, nullptr, reinterpret_cast<void**>(&mappedIndex));
 	if (FAILED(mapResult) || !mappedIndex) {
 		Logger::Log("Model: index buffer Map failed");
 		return false;
 	}
-	std::memcpy(mappedIndex, modelData.indices.data(), sizeof(uint32_t) * modelData.indices.size());
-	indexResource->Unmap(0, nullptr);
+	std::memcpy(mappedIndex, modelData_.indices.data(), sizeof(uint32_t) * modelData_.indices.size());
+	indexResource_->Unmap(0, nullptr);
 	return true;
 }
 
 // 頂点Bufferが完成した時だけ、描画用のViewとMap先を有効にします。
 bool Model::CreateVertexData()
 {
-	if (modelData.vertices.empty()) {
+	if (modelData_.vertices.empty()) {
 		Logger::Log("Model: vertex data is empty");
 		return false;
 	}
 	// 書き込むデータのサイズ（頂点データ全体のバイト数）
-	size_t sizeInBytes = sizeof(VertexData) * modelData.vertices.size();
+	size_t sizeInBytes = sizeof(VertexData) * modelData_.vertices.size();
 
 	// 1. 頂点リソースを作る (Spriteから持ってきたヘルパー関数を使用)
-	vertexResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeInBytes);
-	if (!vertexResource) {
+	vertexResource_ = modelCommon_->GetDxCommon()->CreateBufferResource(sizeInBytes);
+	if (!vertexResource_) {
 		Logger::Log("Model: vertex buffer creation failed");
 		return false;
 	}
 
 	// 2. 頂点バッファビューを作成
 	// リソースの先頭のアドレスから使う
-	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
+	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
 	// 使用するリソース of サイズ
-	vertexBufferView.SizeInBytes = static_cast<UINT>(sizeInBytes);
+	vertexBufferView_.SizeInBytes = static_cast<UINT>(sizeInBytes);
 	// 1頂点あたりのサイズ
-	vertexBufferView.StrideInBytes = sizeof(VertexData);
+	vertexBufferView_.StrideInBytes = sizeof(VertexData);
 
 	// 3. データを書き込む
 	// 書き込むためのアドレスを取得
-	const HRESULT mapResult = vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-	if (FAILED(mapResult) || !vertexData) {
+	const HRESULT mapResult = vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData_));
+	if (FAILED(mapResult) || !vertexData_) {
 		Logger::Log("Model: vertex buffer Map failed");
 		return false;
 	}
 
-	// 読み込んだモデルデータ(std::vector)の中身を、マップしたメモリ(vertexData)へ一括コピー
-	std::memcpy(vertexData, modelData.vertices.data(), sizeInBytes);
+	// 読み込んだモデルデータ(std::vector)の中身を、マップしたメモリ(vertexData_)へ一括コピー
+	std::memcpy(vertexData_, modelData_.vertices.data(), sizeInBytes);
 	return true;
 }
 
@@ -237,59 +239,60 @@ bool Model::CreateVertexData()
 bool Model::CreateMaterialData()
 {
 	// 1. マテリアルリソースを作る (サイズは Material 構造体1つ分)
-	materialResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(Material));
-	if (!materialResource) {
+	materialResource_ = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(Material));
+	if (!materialResource_) {
 		Logger::Log("Model: material buffer creation failed");
 		return false;
 	}
 
-	// 2. データを書き込むためのアドレスを取得して materialData に割り当てる
-	const HRESULT mapResult = materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));
-	if (FAILED(mapResult) || !materialData) {
+	// 2. データを書き込むためのアドレスを取得して materialData_ に割り当てる
+	const HRESULT mapResult = materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
+	if (FAILED(mapResult) || !materialData_) {
 		Logger::Log("Model: material buffer Map failed");
 		return false;
 	}
 
 	// 3. マテリアルデータの初期値を書き込む
-	materialData->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	materialData_->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
-	materialData->enableLighting = true;
+	materialData_->enableLighting = true;
 
-	materialData->shininess = 50.0f;
+	materialData_->shininess = 50.0f;
 
-	materialData->environmentCoefficient = 0.0f;
+	materialData_->environmentCoefficient = 0.0f;
 	// 通常のModelはLightの反射をそのまま使います。
-	materialData->specularIntensity = 1.0f;
+	materialData_->specularIntensity = 1.0f;
 
-	materialData->uvTransform = MakeIdentity4x4();
+	materialData_->uvTransform = MakeIdentity4x4();
 	return true;
 }
 
 // Modelが所有するBufferとCPUのMap先を一緒に無効にし、失敗後の再利用を防ぎます。
 void Model::ResetGpuResources()
 {
-	if (vertexResource && vertexData) {
-		vertexResource->Unmap(0, nullptr);
+	if (vertexResource_ && vertexData_) {
+		vertexResource_->Unmap(0, nullptr);
 	}
-	if (materialResource && materialData) {
-		materialResource->Unmap(0, nullptr);
+	if (materialResource_ && materialData_) {
+		materialResource_->Unmap(0, nullptr);
 	}
-	vertexData = nullptr;
-	materialData = nullptr;
-	indexBufferView = {};
-	vertexBufferView = {};
-	indexResource.Reset();
-	vertexResource.Reset();
-	materialResource.Reset();
+	vertexData_ = nullptr;
+	materialData_ = nullptr;
+	indexBufferView_ = {};
+	vertexBufferView_ = {};
+	indexResource_.Reset();
+	vertexResource_.Reset();
+	materialResource_.Reset();
 }
 
+// モデルファイルから頂点・材質・骨情報を読み、GPU Buffer生成前のCPUデータをそろえます。
 bool Model::LoadModelFile(const std::string& directoryPath, const std::string& filename)
 {
 	// メンバ変数をクリアしておく
-	modelData.vertices.clear();
-	modelData.indices.clear();
-	modelData.materials.clear();
-	modelData.meshes.clear();
+	modelData_.vertices.clear();
+	modelData_.indices.clear();
+	modelData_.materials.clear();
+	modelData_.meshes.clear();
 
 	//assimpでobjを読む
 	Assimp::Importer importer;
@@ -308,7 +311,7 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 		return false;
 	}
 
-	modelData.rootNode = ReadNode(scene->mRootNode);
+	modelData_.rootNode = ReadNode(scene->mRootNode);
 	const std::filesystem::path modelPath = std::filesystem::path(directoryPath) / filename;
 	for (uint32_t materialIndex = 0; materialIndex < scene->mNumMaterials; ++materialIndex)
 	{
@@ -323,11 +326,11 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 				? texturePath.generic_string()
 				: (modelPath.parent_path() / texturePath).generic_string();
 		}
-		modelData.materials.push_back(std::move(materialData));
+		modelData_.materials.push_back(std::move(materialData));
 	}
-	if (modelData.materials.empty())
+	if (modelData_.materials.empty())
 	{
-		modelData.materials.push_back({});
+		modelData_.materials.push_back({});
 	}
 
 	for (uint32_t meshIndex = 0; meshIndex < scene->mNumMeshes; ++meshIndex)//mesh解析
@@ -337,10 +340,10 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 		if (!mesh->HasPositions() || !mesh->HasFaces()) {
 			continue;
 		}
-		uint32_t vertexOffset = static_cast<uint32_t>(modelData.vertices.size());
+		uint32_t vertexOffset = static_cast<uint32_t>(modelData_.vertices.size());
 		MeshData meshData{};
-		meshData.indexOffset = static_cast<uint32_t>(modelData.indices.size());
-		meshData.materialIndex = (std::min)(mesh->mMaterialIndex, static_cast<uint32_t>(modelData.materials.size() - 1));
+		meshData.indexOffset = static_cast<uint32_t>(modelData_.indices.size());
+		meshData.materialIndex = (std::min)(mesh->mMaterialIndex, static_cast<uint32_t>(modelData_.materials.size() - 1));
 
 		//まず頂点をすべて解析して配列に突っ込む
 		for (uint32_t v = 0; v < mesh->mNumVertices; ++v)
@@ -356,7 +359,7 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 			//aiProcess_MakeLeftHandedはz*=-1で右手->左手に変換するので手動で対処
 			vertex.position.x *= -1.0f;
 			vertex.normal.x *= -1.0f;
-			modelData.vertices.push_back(vertex);
+			modelData_.vertices.push_back(vertex);
 		}
 
 		//面インデックスを解析して配列に突っ込む
@@ -370,13 +373,13 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 			{
 				uint32_t vertexIndex = face.mIndices[element];
 				//オフセットを足してインデックスを保存する
-				modelData.indices.push_back(vertexIndex + vertexOffset);
+				modelData_.indices.push_back(vertexIndex + vertexOffset);
 			}
 		}
-		meshData.indexCount = static_cast<uint32_t>(modelData.indices.size()) - meshData.indexOffset;
+		meshData.indexCount = static_cast<uint32_t>(modelData_.indices.size()) - meshData.indexOffset;
 		if (meshData.indexCount != 0)
 		{
-			modelData.meshes.push_back(meshData);
+			modelData_.meshes.push_back(meshData);
 		}
 
 		//SkinCluster
@@ -385,7 +388,7 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 			//Jointごとに格納領域を作る
 			aiBone* bone = mesh->mBones[boneIndex];
 			std::string jointName = bone->mName.C_Str();
-			JointWeightData& jointWeightData = modelData.skinClusterData[jointName];
+			JointWeightData& jointWeightData = modelData_.skinClusterData[jointName];
 
 			aiMatrix4x4 bindPoseMatrixAssimp = bone->mOffsetMatrix.Inverse();//BindPoseMatrixに戻す
 			aiVector3D scale, translate;
@@ -406,5 +409,5 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 			}
 		}
 	}
-	return !modelData.vertices.empty() && !modelData.indices.empty() && !modelData.meshes.empty();
+	return !modelData_.vertices.empty() && !modelData_.indices.empty() && !modelData_.meshes.empty();
 }

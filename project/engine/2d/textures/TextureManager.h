@@ -19,13 +19,17 @@ public:
 	//シングルトンインスタンスの取得
 	static TextureManager* GetInstance();
 
-	// 初期化済みのDirectXとSRV管理を借り、Texture登録を始めます。
+	// @brief 初期化済みのDirectXとSRV管理を借り、Texture登録を始めます。
+	// @param dxCommon GPU資源を生成する共通部。TextureManagerより長く生存させます。
+	// @param srvManager SRV番号の所有者。Finalizeまで生存させます。
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 
 	// 所有する全TextureのSRVを返却し、登録を消します。
 	void Finalize();
 
-	// filePathの読込に成功、または登録済みならtrueを返します。失敗時は登録しません。
+	// @brief 読込とSRV作成に成功したTextureだけを登録し、失敗を空の登録で隠しません。
+	// @param filePath 実行時の作業ディレクトリから参照する画像パスです。
+	// @return 読込済み、または今回の読込・登録に成功した時だけtrueです。
 	bool LoadTexture(const std::string& filePath);
 	// 保存時刻が変わったTextureだけを、同じSRV番号のまま再読込します。
 	// Frameworkから毎フレーム呼んでも、ファイルが変わらない限りGPU処理は行いません。
@@ -33,16 +37,22 @@ public:
 	// 保存時刻に関係なく、現在読み込み済みの全Textureを再読込します。
 	void ReloadAllLoadedTextures();
 
-	//メタデータを取得
+	// @brief 登録済みTextureの寸法・形式を借りて返します。取得だけでは登録しません。
+	// @param filePath LoadTextureがtrueを返した画像パスです。
+	// @return 登録済みTextureのメタデータへの参照です。未登録名はDebugでassertし、他構成ではatが例外を投げます。
 	const DirectX::TexMetadata& GetMetaData(const std::string& filePath);
-	//SRVインデックスの取得
+	// @brief 登録済みTextureのSRV番号を返します。取得だけでは登録しません。
+	// @param filePath LoadTextureがtrueを返した画像パスです。
+	// @return 登録済みTextureのSRV番号です。未登録名はDebugでassertし、他構成ではatが例外を投げます。
 	uint32_t GetSrvIndex(const std::string& filePath);
-	//GPUハンドルの取得
+	// @brief 登録済みTextureのGPUハンドルを返します。取得だけでは登録しません。
+	// @param filePath LoadTextureがtrueを返した画像パスです。
+	// @return 登録済みTextureのGPUハンドルです。未登録名はDebugでassertし、他構成ではatが例外を投げます。
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(const std::string& filePath);
 
-	//テクスチャが読み込み済みかチェック
+	// 未登録画像を追加せず、読込済みかだけを確認します。
 	bool Contains(const std::string& filePath) const {
-		return textureDatas.contains(filePath);
+		return textureDatas_.contains(filePath);
 	}
 
 private:
@@ -57,14 +67,14 @@ private:
 	//テクスチャ1枚分のデータ
 	struct TextureData
 	{
-		std::string filePath;
-		DirectX::TexMetadata metadata{};
-		Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-		uint32_t srvIndex = UINT32_MAX;
-		D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU{};
-		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU{};
-		std::filesystem::file_time_type lastWriteTime{};
-		bool hasWriteTime = false;
+		std::string filePath_;
+		DirectX::TexMetadata metadata_{};
+		Microsoft::WRL::ComPtr<ID3D12Resource> resource_;
+		uint32_t srvIndex_ = UINT32_MAX;
+		D3D12_CPU_DESCRIPTOR_HANDLE srvHandleCPU_{};
+		D3D12_GPU_DESCRIPTOR_HANDLE srvHandleGPU_{};
+		std::filesystem::file_time_type lastWriteTime_{};
+		bool hasWriteTime_ = false;
 	};
 
 	// 画像読込・GPU転送・SRV作成をまとめ、初回読込と再読込で共有します。
@@ -73,7 +83,7 @@ private:
 	void ReloadTexture(const std::string& filePath, TextureData& textureData);
 
 	//テクスチャデータ
-	std::unordered_map<std::string, TextureData>textureDatas;
+	std::unordered_map<std::string, TextureData> textureDatas_;
 
 };
 

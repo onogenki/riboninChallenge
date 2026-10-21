@@ -114,6 +114,12 @@ void GPUParticle::CreateParticleDescriptors()
 // 板ポリゴンとCamera・Emitter・時間・外力・Lightの初期値をGPUへ渡します。
 void GPUParticle::CreateDrawAndControlBuffers()
 {
+	// Emitterの初期形状・発生間隔と外力を、既存の値のまま名前で区別します。
+	constexpr float kDefaultEmitterRadius = 0.15f;
+	constexpr float kDefaultEmitterBoxHalfWidth = 0.15f;
+	constexpr float kDefaultEmitterBoxHalfHeight = 0.20f;
+	constexpr float kDefaultEmitterFrequency = 0.15f;
+	constexpr float kDefaultFieldAccelerationY = -0.5f;
 	// 各Upload Bufferの生成とMapを同じ順序で確認し、空ポインタへの書込みを避けます。
 	auto createMappedBuffer = [this](size_t sizeInBytes, auto& resource, auto*& mappedData, const char* resourceName)
 	{
@@ -143,10 +149,10 @@ void GPUParticle::CreateDrawAndControlBuffers()
 	{
 		createMappedBuffer(sizeof(Emitter), emitterResources_[emitterIndex], emitterData_[emitterIndex], "emitter");
 		emitterData_[emitterIndex]->translate = { 0.0f, 0.0f, 0.0f };
-		emitterData_[emitterIndex]->radius = 0.15f;
-		emitterData_[emitterIndex]->boxSize = { 0.15f, 0.20f, 0.15f };
+		emitterData_[emitterIndex]->radius = kDefaultEmitterRadius;
+		emitterData_[emitterIndex]->boxSize = { kDefaultEmitterBoxHalfWidth, kDefaultEmitterBoxHalfHeight, kDefaultEmitterBoxHalfWidth };
 		emitterData_[emitterIndex]->count = 1;
-		emitterData_[emitterIndex]->frequency = 0.15f;
+		emitterData_[emitterIndex]->frequency = kDefaultEmitterFrequency;
 		emitterData_[emitterIndex]->frequencyTime = 0.0f;
 		emitterData_[emitterIndex]->emit = 0;
 		emitterData_[emitterIndex]->type = static_cast<uint32_t>(EmitterType::Sphere);
@@ -156,7 +162,7 @@ void GPUParticle::CreateDrawAndControlBuffers()
 	perFrameData_->time = 0.0f;
 	perFrameData_->deltaTime = 0.0f;
 	createMappedBuffer(sizeof(Field), fieldResource_, fieldData_, "field");
-	fieldData_->acceleration = { 0.0f, -0.5f, 0.0f };
+	fieldData_->acceleration = { 0.0f, kDefaultFieldAccelerationY, 0.0f };
 	fieldData_->drag = 0.0f;
 	createMappedBuffer(sizeof(DirectionalLight), directionalLightResource_, directionalLightData_, "directional light");
 	directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -289,7 +295,7 @@ void GPUParticle::DispatchParticleSimulation()
 	commandList->SetComputeRootConstantBufferView(kComputeRootParameterField, fieldResource_->GetGPUVirtualAddress());
 	commandList->Dispatch(1, 1, 1);
 
-	D3D12_RESOURCE_BARRIER updateUavBarriers[5] = {};
+	D3D12_RESOURCE_BARRIER updateUavBarriers[kSimulationUavCount] = {};
 	updateUavBarriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
 	updateUavBarriers[0].UAV.pResource = particleResource_.Get();
 	updateUavBarriers[1].Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
@@ -404,7 +410,7 @@ void GPUParticle::CreateComputePipeline()
 {
 	D3D12_DESCRIPTOR_RANGE descriptorRange{};
 	descriptorRange.BaseShaderRegister = 0;
-	descriptorRange.NumDescriptors = 5;
+	descriptorRange.NumDescriptors = kSimulationUavCount;
 	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
 	descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 

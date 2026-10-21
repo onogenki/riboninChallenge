@@ -14,16 +14,19 @@ using namespace Logger;
 
 // Shaderコンパイル、Descriptor、Texture・Buffer Resource作成と転送をまとめる。
 // Device初期化やフレーム描画パスから分離し、GPU Resource操作だけを追えるようにする。
+// SRV Heapの幅で指定Indexを進め、CPU側でDescriptorを登録する位置を返します。
 D3D12_CPU_DESCRIPTOR_HANDLE DirectXCommon::GetSRVCPUDescriptorHandle(uint32_t index)
 {
-	return GetCPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, index);
+	return GetCPUDescriptorHandle(srvDescriptorHeap_, descriptorSizeSRV_, index);
 }
 
+// SRV Heapの幅で指定Indexを進め、Shaderから参照するGPU側の位置を返します。
 D3D12_GPU_DESCRIPTOR_HANDLE DirectXCommon::GetSRVGPUDescriptorHandle(uint32_t index)
 {
-	return GetGPUDescriptorHandle(srvDescriptorHeap, descriptorSizeSRV, index);
+	return GetGPUDescriptorHandle(srvDescriptorHeap_, descriptorSizeSRV_, index);
 }
 
+// DXCでShaderを読み込み・コンパイルし、失敗時は空のBlobを渡さず例外で知らせます。
 Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	//CompilerするShaderファイルへのパス
 	const std::wstring& filePath,
@@ -35,7 +38,7 @@ Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 	Log(StringUtility::ConvertString(std::format(L"Begin CompileShader,path:{},profile:{}\n", filePath, profile)));
 	//hlslファイルを読む
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource = nullptr;
-	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, &shaderSource);
+	HRESULT hr = dxcUtils_->LoadFile(filePath.c_str(), nullptr, &shaderSource);
 	// 読込失敗を呼び出し元へ伝え、空のShaderを参照しないようにします。
 	if (FAILED(hr) || !shaderSource) {
 		const std::string message = "CompileShader: shader file could not be loaded: " + StringUtility::ConvertString(filePath);
@@ -57,11 +60,11 @@ Microsoft::WRL::ComPtr < IDxcBlob> DirectXCommon::CompileShader(
 		L"-Zpr",//メモリレイアウトは行優先
 	};
 	Microsoft::WRL::ComPtr < IDxcResult> shaderResult = nullptr;
-	hr = dxcCompiler->Compile(
+	hr = dxcCompiler_->Compile(
 		&shaderSourceBuffer,//読み込んだファイル
 		arguments,//コンバイルオプション
 		_countof(arguments),//コンバイルオプションの数
-		includeHandler.Get(),//includeが含まれた諸々
+		includeHandler_.Get(),//includeが含まれた諸々
 		IID_PPV_ARGS(&shaderResult)//コンパイル結果
 	);
 	// DXC自体が失敗した時も、結果を参照する前に止めます。
@@ -220,7 +223,7 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 	assert(renderTextureResource_);
 	assert(postEffectTextureResource_);
 	assert(gaussianBlurTextureResource_);
-	assert(depthStencilResource);
+	assert(depthStencilResource_);
 
 	// RenderTextureの描画結果をShaderから読めるよう、SRVの場所を1個確保する
 	if (renderTextureSrvIndex_ == UINT32_MAX) {
@@ -264,7 +267,7 @@ void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 	depthStencilSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	depthStencilSrvDesc.Texture2D.MipLevels = 1;
 	device_->CreateShaderResourceView(
-		depthStencilResource.Get(),
+		depthStencilResource_.Get(),
 		&depthStencilSrvDesc,
 		srvManager->GetCPUDescriptorHandle(depthStencilSrvIndex_));
 }
@@ -426,7 +429,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateBufferResource(size_
 // 中間Buffer・Command Listの失敗時はコピーせず、TextureManagerへ失敗を返します。
 bool DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages)
 {
-	if (!device_ || !commandQueue || !texture) {
+	if (!device_ || !commandQueue_ || !texture) {
 		Log("DirectXCommon: texture transfer resources are unavailable.");
 		return false;
 	}
@@ -465,7 +468,7 @@ bool DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Re
 
 	// 実行するコマンドリストを「tempCommandList.Get()」にする
 	ID3D12CommandList* commandLists[] = { tempCommandList.Get() };
-	commandQueue->ExecuteCommandLists(1, commandLists);
+	commandQueue_->ExecuteCommandLists(1, commandLists);
 
 	// GPUの実行完了を安全に待つ
 	WaitForGPU();

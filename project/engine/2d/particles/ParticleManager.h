@@ -65,14 +65,14 @@ public:
     void EmitLightSpiral(const std::string& name, uint32_t count, const Vector3& translate, float scaleMultiplier = 1.0f);
 
     // 名前とTextureで通常粒子用グループを作り、登録できた時だけtrueを返します。
-    // 置換時の参照切れを避けるため、名前とTextureは値として受け取ります。
-	bool CreateParticleGroup(const std::string name, const std::string textureFilePath);
+    // 引数ではコピーせず、保持が必要な名前とTextureだけを登録時に所有します。
+	bool CreateParticleGroup(const std::string& name, const std::string& textureFilePath);
     // 通常粒子と同じ管理下に円環頂点を作り、登録できた時だけtrueを返します。
-    bool CreateRingParticleGroup(const std::string name, const std::string textureFilePath);
+    bool CreateRingParticleGroup(const std::string& name, const std::string& textureFilePath);
     // 分割数と寸法を使って円柱を作り、寸法・Texture・登録が有効な時だけtrueを返します。
     bool CreateCylinderParticleGroup(
-        const std::string name,
-        const std::string textureFilePath,
+        const std::string& name,
+        const std::string& textureFilePath,
         uint32_t divide = 32,
         float topRadius = 1.0f,
         float bottomRadius = 1.0f,

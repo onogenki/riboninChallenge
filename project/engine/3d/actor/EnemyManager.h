@@ -8,7 +8,7 @@ class Object3dCommon;
 class Object3dRenderContext;
 
 // Enemyの一覧と寿命を所有し、Sceneから出現処理を依頼されるクラスです。
-// Stageは個別Enemyをnewせず、必ずEnemyManager::Spawnで追加します。
+// 現在はStage1GameplaySmokeで生成・解放を確認し、Stage1本編には配置していません。
 class EnemyManager
 {
 public:
@@ -22,9 +22,9 @@ public:
 		const std::string& modelName,
 		const Vector3& position,
 		float colliderRadius = 0.5f);
-	// Stageが持つ出現データ一覧からEnemyをまとめて生成し、生成成功分の操作用ポインタを返します。
+	// 出現データ一覧からEnemyをまとめて生成し、生成成功分の操作用ポインタを返します。
 	std::vector<Enemy*> SpawnAll(const std::vector<Enemy::SpawnData>& spawnDataList);
-	// 管理中の全Enemyを、Sceneが一度作った共通の描画Contextで更新します。
+	// 管理中の全Enemyを、利用側から借りた共通の描画Contextで更新します。
 	void Update(const Object3dRenderContext& renderContext);
 	// 管理中の全Enemyを描画します。
 	void Draw() const;

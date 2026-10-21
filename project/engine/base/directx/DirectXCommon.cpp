@@ -13,15 +13,16 @@ using namespace Logger;
 #pragma comment(lib, "dxcompiler.lib")
 using namespace Microsoft::WRL;
 
+// WinAppの画面サイズを保持し、依存順にGPU資源を作って描画開始に備えます。
 void DirectXCommon::Initialize(WinApp* winApp)
 {
 	//NULL検出
 	assert(winApp);
 
 	//メンバ変数に記録
-	this->winApp = winApp;
-	width = winApp->GetClientWidth();
-	height = winApp->GetClientHeight();
+	winApp_ = winApp;
+	width_ = winApp->GetClientWidth();
+	height_ = winApp->GetClientHeight();
 
 	//FPS固定初期化
 	InitializeFixFPS();
@@ -40,33 +41,33 @@ void DirectXCommon::Initialize(WinApp* winApp)
 	CreateDxcCompiler();
 }
 
+// WinAppの現在サイズを確認し、変更がある時だけGPU待ち後に描画先を作り直します。
 void DirectXCommon::ResizeIfNeeded()
 {
-	const uint32_t newWidth = winApp->GetClientWidth();
-	const uint32_t newHeight = winApp->GetClientHeight();
-	if (newWidth == 0 || newHeight == 0 || (newWidth == width && newHeight == height)) {
+	const uint32_t newWidth = winApp_->GetClientWidth();
+	const uint32_t newHeight = winApp_->GetClientHeight();
+	if (newWidth == 0 || newHeight == 0 || (newWidth == width_ && newHeight == height_)) {
 		return;
 	}
 
 	WaitForGPU();
-	for (auto& swapChainResource : swapChainResources) {
+	for (auto& swapChainResource : swapChainResources_) {
 		swapChainResource.Reset();
 	}
 	renderTextureResource_.Reset();
 	postEffectTextureResource_.Reset();
 	gaussianBlurTextureResource_.Reset();
-	depthStencilResource.Reset();
-	resource.Reset();
+	depthStencilResource_.Reset();
 
-	width = newWidth;
-	height = newHeight;
-	const HRESULT resizeResult = swapChain->ResizeBuffers(
-		static_cast<UINT>(GetSwapChainResourcesNum()), width, height,
+	width_ = newWidth;
+	height_ = newHeight;
+	const HRESULT resizeResult = swapChain_->ResizeBuffers(
+		static_cast<UINT>(GetSwapChainResourcesNum()), width_, height_,
 		swapChainDesc_.Format, swapChainDesc_.Flags);
 	assert(SUCCEEDED(resizeResult));
 
 	for (UINT i = 0; i < GetSwapChainResourcesNum(); ++i) {
-		const HRESULT getBufferResult = swapChain->GetBuffer(i, IID_PPV_ARGS(&swapChainResources[i]));
+		const HRESULT getBufferResult = swapChain_->GetBuffer(i, IID_PPV_ARGS(&swapChainResources_[i]));
 		assert(SUCCEEDED(getBufferResult));
 	}
 
@@ -82,6 +83,7 @@ void DirectXCommon::ResizeIfNeeded()
 	isDepthStencilShaderResource_ = false;
 }
 
+// DXGI FactoryとDeviceを作り、以後のSwapChain・GPU資源生成の土台を用意します。
 void DirectXCommon::CreateDevice()
 {
 	HRESULT hr;
@@ -97,14 +99,14 @@ void DirectXCommon::CreateDevice()
 #endif
 	//HRESULTはWindows系のエラーコードであり、
 	//関数が成功したかどうかをSUCCEEDEDマクロで判定できる
-	hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory));
+	hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory_));
 	//初期化の根本的な部分でエラーが出た場合はプログラムが間違ってるか、
 	// どうにもできない場合が多いのでassertにしておく
 	assert(SUCCEEDED(hr));
 
 	ComPtr < IDXGIAdapter4> useAdapter = nullptr;
 	//良い順にアダプタを頼む
-	for (UINT i = 0; dxgiFactory->EnumAdapterByGpuPreference(
+	for (UINT i = 0; dxgiFactory_->EnumAdapterByGpuPreference(
 		i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter)) !=
 		DXGI_ERROR_NOT_FOUND; ++i)
 	{
@@ -116,7 +118,7 @@ void DirectXCommon::CreateDevice()
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE))
 		{
 			//採用したアダプタの情報をログに出力。wstringの方なので注意
-			Logger::Log(StringUtility::ConvertString(std::format(L"Use Adapater:{}\n", adapterDesc.Description)));
+			Logger::Log(StringUtility::ConvertString(std::format(L"Use Adapter:{}\n", adapterDesc.Description)));
 			break;
 		}
 		useAdapter = nullptr;//ソフトウェアアダプタの場合は見なかったことにする
@@ -174,8 +176,11 @@ void DirectXCommon::CreateDevice()
 #endif
 }
 
+// GPU命令の記録先と実行キューを生成し、各フレームの描画を開始できるようにします。
 void DirectXCommon::CreateCommandObjects()
 {
+	// 生成結果はこの初期化処理の中だけで使い、別フレームへ持ち越しません。
+	HRESULT hr = S_OK;
 	//コマンドアロケータ
 	for (auto& commandAllocator : commandAllocators_) {
 		hr = device_->CreateCommandAllocator(
@@ -187,7 +192,7 @@ void DirectXCommon::CreateCommandObjects()
 
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
 	hr = device_->CreateCommandQueue(&commandQueueDesc,
-		IID_PPV_ARGS(&commandQueue));
+		IID_PPV_ARGS(&commandQueue_));
 	//コマンドキューの生成がうまくいかなかったので起動できない
 	assert(SUCCEEDED(hr));
 
@@ -201,37 +206,40 @@ void DirectXCommon::CreateCommandObjects()
 	assert(SUCCEEDED(hr));
 }
 
+// 作成済みの実行キューとWinAppのウィンドウを結び、表示用の二枚の描画先を作ります。
 void DirectXCommon::CreateSwapChain()
 {
+	// SwapChainとBack Bufferの生成結果を、この処理内で順に確認します。
+	HRESULT hr = S_OK;
 	// スワップチェーンと二枚のバックバッファを生成する。
 	swapChainDesc_.Width = WinApp::kClientWidth;//画面の幅。ウィンドウのクライアント領域を同じものにしておく
 	swapChainDesc_.Height = WinApp::kClientHeight;//画面の高さ。ウィンドウのクライアント領域を同じものにしておく
 	swapChainDesc_.Format = DXGI_FORMAT_R8G8B8A8_UNORM;//色の形式
 	swapChainDesc_.SampleDesc.Count = 1;//マルチサンプルしない
 	swapChainDesc_.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;//描画のターゲットとして利用する
-	swapChainDesc_.BufferCount = 2;//ダブルバッファ
+	swapChainDesc_.BufferCount = static_cast<UINT>(kSwapChainBufferCount);//ダブルバッファ
 	swapChainDesc_.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;//モニタにうつしたら、中身を破棄
 	//コマンドキュー、ウィンドウハンドル、設定を渡して生成する
-	swapChainDesc_.Width = width;
-	swapChainDesc_.Height = height;
-	hr = dxgiFactory->CreateSwapChainForHwnd(commandQueue.Get(), winApp->GetHwnd(), &swapChainDesc_, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain.GetAddressOf()));
+	swapChainDesc_.Width = width_;
+	swapChainDesc_.Height = height_;
+	hr = dxgiFactory_->CreateSwapChainForHwnd(commandQueue_.Get(), winApp_->GetHwnd(), &swapChainDesc_, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain_.GetAddressOf()));
 	assert(SUCCEEDED(hr));
 
-	//SwapChainからResourceを引っ張ってくる
-	hr = swapChain->GetBuffer(0, IID_PPV_ARGS(&swapChainResources[0]));
-	//うまく取得できなければ起動できない
-	assert(SUCCEEDED(hr));
-	hr = swapChain->GetBuffer(1, IID_PPV_ARGS(&swapChainResources[1]));
-	assert(SUCCEEDED(hr));
+	// 設定した枚数だけBack Bufferを取得し、後続のRTV作成と配列の範囲を一致させます。
+	for (UINT index = 0; index < kSwapChainBufferCount; ++index) {
+		hr = swapChain_->GetBuffer(index, IID_PPV_ARGS(&swapChainResources_[index]));
+		assert(SUCCEEDED(hr));
+	}
 }
 
+// 現在の画面サイズで深度とステンシルを共有できるTextureを作ります。
 void DirectXCommon::CreateDepthStencilResource()
 {
 
 	//生成するResourceの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
-	resourceDesc.Width = width;//Textureの幅
-	resourceDesc.Height = height;//Textureの高さ
+	resourceDesc.Width = width_;//Textureの幅
+	resourceDesc.Height = height_;//Textureの高さ
 	resourceDesc.MipLevels = 1;//mipmapの数
 	resourceDesc.DepthOrArraySize = 1;//奥行き or 配列Textureの配列数
 	resourceDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;//DepthStencilとSRVの両方で利用可能なフォーマット
@@ -254,32 +262,32 @@ void DirectXCommon::CreateDepthStencilResource()
 		&resourceDesc,
 		D3D12_RESOURCE_STATE_DEPTH_WRITE,
 		&depthClearValue,
-		IID_PPV_ARGS(&resource));
+		IID_PPV_ARGS(&depthStencilResource_));
 	assert(SUCCEEDED(hr));
-
-	depthStencilResource = resource;
-
-
 }
 
+// SwapChainとオフスクリーン描画先のRTVを、生成する枚数に合わせて確保します。
 void DirectXCommon::CreateDescriptorHeaps()
 {
 	//RTV,SRV,DSVデスクリプタヒープの生成
 	//DescriptorSizeを取得しておく
-	descriptorSizeSRV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	descriptorSizeRTV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	descriptorSizeDSV = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
+	descriptorSizeSRV_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	descriptorSizeRTV_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	descriptorSizeDSV_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 	//ディスクリプタヒープの生成
-	//RTV用のヒープでディスクリプタの数は2。RTVはShader内で触るものではないので、ShaderVisibleはfalse
-	// SwapChainの2枚にRenderTextureとPostEffect用の2枚を加え、RTVを5個確保する
-	rtvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 5, false);
+	// RenderTexture・PostEffect・GaussianBlurの3枚とSwapChainの枚数を合計します。
+	// RTVはShaderから直接参照しないため、ShaderVisibleはfalseです。
+	constexpr UINT kOffscreenRenderTargetCount = 3;
+	const UINT renderTargetCount = static_cast<UINT>(GetSwapChainResourcesNum()) + kOffscreenRenderTargetCount;
+	rtvDescriptorHeap_ = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, renderTargetCount, false);
 	//SRV用のヒープでディスクリプタのの数は128。SRVはShader内で触るものなので、ShaderVisibleはtrue
-	srvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
+	srvDescriptorHeap_ = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
 	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないので、ShaderVisibleはfalse
-	dsvDescriptorHeap = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+	dsvDescriptorHeap_ = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
 }
 
+// SwapChainと各オフスクリーンTextureへRTVを割り当て、描画先を使えるようにします。
 void DirectXCommon::CreateRenderTargetViews()
 {//レンダーターゲットビューの初期化
 	 // RTV 設定
@@ -289,17 +297,17 @@ void DirectXCommon::CreateRenderTargetViews()
 	 
 	// ディスクリプタの先頭
 	D3D12_CPU_DESCRIPTOR_HANDLE handle =
-		rtvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		rtvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
 
 	rtvDesc_.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
 	rtvDesc_.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
-	// 2つのバックバッファに対して RTV を作成
-	for (int i = 0; i < 2; ++i)
+	// SwapChainが所有する二枚のBack BufferそれぞれへRTVを作成します。
+	for (UINT i = 0; i < kSwapChainBufferCount; ++i)
 	{
-		assert(swapChainResources[i]);
+		assert(swapChainResources_[i]);
 		device_->CreateRenderTargetView(
-			swapChainResources[i].Get(),
+			swapChainResources_[i].Get(),
 			&rtvDesc_,
 			handle
 		);
@@ -312,8 +320,8 @@ void DirectXCommon::CreateRenderTargetViews()
 
 	// Sceneを描画するRenderTextureをSwapChainと同じ大きさ・Formatで生成する
 	renderTextureResource_ = CreateRenderTextureResource(
-		width,
-		height,
+		width_,
+		height_,
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		renderTextureClearColor_);
 
@@ -327,8 +335,8 @@ void DirectXCommon::CreateRenderTargetViews()
 	handle.ptr += increment;
 
 	postEffectTextureResource_ = CreateRenderTextureResource(
-		width,
-		height,
+		width_,
+		height_,
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		renderTextureClearColor_);
 
@@ -341,8 +349,8 @@ void DirectXCommon::CreateRenderTargetViews()
 	handle.ptr += increment;
 
 	gaussianBlurTextureResource_ = CreateRenderTextureResource(
-		width,
-		height,
+		width_,
+		height_,
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		renderTextureClearColor_);
 
@@ -353,14 +361,15 @@ void DirectXCommon::CreateRenderTargetViews()
 		gaussianBlurTextureRtvHandle_);
 }
 
+// 深度TextureとDSV Heapを結び、Scene描画時に深度・ステンシルを使えるようにします。
 void DirectXCommon::CreateDepthStencilView()
 {
 	assert(device_);
-	assert(dsvDescriptorHeap);
-	assert(depthStencilResource);
+	assert(dsvDescriptorHeap_);
+	assert(depthStencilResource_);
 	//深度ステンシルビューの初期化
 	//描画先のRTVとDSVを設定する
-	dsvHandle_ = dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	dsvHandle_ = dsvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
 
 	//DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
@@ -368,13 +377,15 @@ void DirectXCommon::CreateDepthStencilView()
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
 
 	//DSVHeapの先頭にDSVを作る
-	device_->CreateDepthStencilView(depthStencilResource.Get(), &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	device_->CreateDepthStencilView(depthStencilResource_.Get(), &dsvDesc, dsvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart());
 
 }
 
+// 描画・撮影・転送が共有するFenceを生成し、GPU完了待ちのEventを用意します。
 void DirectXCommon::CreateFence()
 {
-	hr = device_->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+	// Fenceの成否を生成時だけ判定し、後続フレームに一時結果を残しません。
+	const HRESULT hr = device_->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_));
 	assert(SUCCEEDED(hr));
 
 	fenceEvent_ = CreateEvent(NULL, FALSE, FALSE, NULL);
@@ -382,38 +393,43 @@ void DirectXCommon::CreateFence()
 	assert(fenceEvent_ != nullptr);
 }
 
+// 現在の画面サイズにViewportを合わせ、描画範囲がResize後もずれないようにします。
 void DirectXCommon::ConfigureViewport()
 {
 	//ビューポート矩形の設定
 
 	//クライアント領域のサイズと一緒にして画面全体に表示
-	viewport_.Width = static_cast<float>(width);
-	viewport_.Height = static_cast<float>(height);
+	viewport_.Width = static_cast<float>(width_);
+	viewport_.Height = static_cast<float>(height_);
 	viewport_.TopLeftX = 0;
 	viewport_.TopLeftY = 0;
 	viewport_.MinDepth = 0.0f;
 	viewport_.MaxDepth = 1.0f;
 }
 
+// 現在の画面サイズで切り取り範囲を更新し、画面外への描画を防ぎます。
 void DirectXCommon::ConfigureScissorRect()
 {
 	//基本的にはビューポートと同じ短形が構成されるようにする
 	scissorRect_.left = 0;
-	scissorRect_.right = static_cast<LONG>(width);
+	scissorRect_.right = static_cast<LONG>(width_);
 	scissorRect_.top = 0;
-	scissorRect_.bottom = static_cast<LONG>(height);
+	scissorRect_.bottom = static_cast<LONG>(height_);
 }
 
 
+// シェーダー読込とコンパイルに必要なDXC一式を、Shader使用前に準備します。
 void DirectXCommon::CreateDxcCompiler()
 {
+	// DXCの各生成結果をこの処理内で確認し、共有状態にしません。
+	HRESULT hr = S_OK;
 	//DXCコンパイラの生成
-	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils));
+	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils_));
 	assert(SUCCEEDED(hr));
-	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler));
+	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler_));
 	assert(SUCCEEDED(hr));
 
-	hr = dxcUtils->CreateDefaultIncludeHandler(&includeHandler);
+	hr = dxcUtils_->CreateDefaultIncludeHandler(&includeHandler_);
 	assert(SUCCEEDED(hr));
 }
 
@@ -449,18 +465,19 @@ void DirectXCommon::UpdateFixFPS()
 }
 
 
+// キューに送った命令の完了をFenceで待ち、転送資源などを安全に再利用します。
 void DirectXCommon::WaitForGPU() {
 	// 1. フェンス値を加算してシグナルを送る
-	fenceVal++;
-	commandQueue->Signal(fence.Get(), fenceVal);
+	signaledFenceValue_++;
+	commandQueue_->Signal(fence_.Get(), signaledFenceValue_);
 
 	// 2. GPUがその値に到達するまで待機する
-	if (fence->GetCompletedValue() < fenceVal) {
-		fence->SetEventOnCompletion(fenceVal, fenceEvent_);
+	if (fence_->GetCompletedValue() < signaledFenceValue_) {
+		fence_->SetEventOnCompletion(signaledFenceValue_, fenceEvent_);
 		WaitForSingleObject(fenceEvent_, INFINITE);
 	}
 	for (UINT64& frameFenceValue : frameFenceValues_) {
-		frameFenceValue = fenceVal;
+		frameFenceValue = signaledFenceValue_;
 	}
 }
 

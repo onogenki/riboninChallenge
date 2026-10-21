@@ -20,74 +20,130 @@
 
 // AVI・MP4の保存と、動画エンコーダースレッドをまとめる実装ファイル。
 // スクリーンショット、リプレイ、ImGuiの操作とは責任を分けて読みやすくする。
+// 通常録画と自動確認の一枚保存で、AVIハンドルの寿命と画素の行順を共通管理します。
+struct CaptureManager::AviOutput
+{
+	PAVIFILE file = nullptr;
+	PAVISTREAM stream = nullptr;
+	bool initialized = false;
+
+	~AviOutput()
+	{
+		Close();
+	}
+
+	// 保存先を用意し、失敗した途中段階のAVIハンドルも必ず解放します。
+	bool Open(const std::filesystem::path& filePath, int width, int height, int frameRate)
+	{
+		Close();
+		if (width <= 0 || height <= 0 || frameRate <= 0) {
+			return false;
+		}
+		std::error_code errorCode;
+		std::filesystem::create_directories(filePath.parent_path(), errorCode);
+		if (errorCode) {
+			return false;
+		}
+		AVIFileInit();
+		initialized = true;
+		HRESULT result = AVIFileOpenW(&file, filePath.wstring().c_str(), OF_WRITE | OF_CREATE, nullptr);
+		if (FAILED(result)) {
+			Close();
+			return false;
+		}
+
+		AVISTREAMINFOW streamInfo{};
+		streamInfo.fccType = streamtypeVIDEO;
+		streamInfo.dwScale = 1;
+		streamInfo.dwRate = static_cast<DWORD>(frameRate);
+		streamInfo.dwSuggestedBufferSize = static_cast<DWORD>(width * height * 4);
+		SetRect(&streamInfo.rcFrame, 0, 0, width, height);
+		result = AVIFileCreateStreamW(file, &stream, &streamInfo);
+		if (FAILED(result)) {
+			Close();
+			return false;
+		}
+
+		BITMAPINFOHEADER bitmapHeader{};
+		bitmapHeader.biSize = sizeof(BITMAPINFOHEADER);
+		bitmapHeader.biWidth = width;
+		bitmapHeader.biHeight = height;
+		bitmapHeader.biPlanes = 1;
+		bitmapHeader.biBitCount = 32;
+		bitmapHeader.biCompression = BI_RGB;
+		bitmapHeader.biSizeImage = static_cast<DWORD>(width * height * 4);
+		result = AVIStreamSetFormat(stream, 0, &bitmapHeader, sizeof(bitmapHeader));
+		if (FAILED(result)) {
+			Close();
+			return false;
+		}
+		return true;
+	}
+
+	// RenderTextureの上から下への行順を、AVIが期待する下から上へ変換します。
+	bool Append(const std::vector<unsigned char>& pixels, int width, int height, int frameIndex)
+	{
+		if (!stream || width <= 0 || height <= 0 ||
+			pixels.size() < static_cast<size_t>(width) * static_cast<size_t>(height) * 4) {
+			return false;
+		}
+		const size_t rowSize = static_cast<size_t>(width) * 4;
+		std::vector<unsigned char> bottomUpPixels(pixels.size());
+		for (int y = 0; y < height; ++y) {
+			const unsigned char* source = pixels.data() + static_cast<size_t>(height - 1 - y) * rowSize;
+			unsigned char* destination = bottomUpPixels.data() + static_cast<size_t>(y) * rowSize;
+			std::memcpy(destination, source, rowSize);
+		}
+		const HRESULT result = AVIStreamWrite(
+			stream, frameIndex, 1, bottomUpPixels.data(),
+			static_cast<LONG>(bottomUpPixels.size()), AVIIF_KEYFRAME, nullptr, nullptr);
+		return SUCCEEDED(result);
+	}
+
+	// ストリーム→ファイル→AVIライブラリの順で閉じ、録画終了後の資源を残しません。
+	void Close()
+	{
+		if (stream) {
+			AVIStreamRelease(stream);
+			stream = nullptr;
+		}
+		if (file) {
+			AVIFileRelease(file);
+			file = nullptr;
+		}
+		if (initialized) {
+			AVIFileExit();
+			initialized = false;
+		}
+	}
+};
+
+CaptureManager::CaptureManager() = default;
+CaptureManager::~CaptureManager() = default;
+
+// 通常録画のAVI出力先を開き、失敗時に未完成のハンドルを保持しません。
 bool CaptureManager::BeginRecordingAvi(const std::filesystem::path& filePath, int width, int height, int frameRate)
 {
-	if (width <= 0 || height <= 0 || frameRate <= 0) {
-		return false;
-	}
 	EndRecordingAvi();
-
-	std::error_code errorCode;
-	std::filesystem::create_directories(filePath.parent_path(), errorCode);
-	if (errorCode) {
+	auto output = std::make_unique<AviOutput>();
+	if (!output->Open(filePath, width, height, frameRate)) {
 		return false;
 	}
-
-	AVIFileInit();
-	aviInitialized_ = true;
-	PAVIFILE aviFile = nullptr;
-	HRESULT result = AVIFileOpenW(&aviFile, filePath.wstring().c_str(), OF_WRITE | OF_CREATE, nullptr);
-	if (FAILED(result)) {
-		EndRecordingAvi();
-		return false;
-	}
-
-	AVISTREAMINFOW streamInfo{};
-	streamInfo.fccType = streamtypeVIDEO;
-	streamInfo.dwScale = 1;
-	streamInfo.dwRate = static_cast<DWORD>(frameRate);
-	streamInfo.dwSuggestedBufferSize = static_cast<DWORD>(width * height * 4);
-	SetRect(&streamInfo.rcFrame, 0, 0, width, height);
-
-	PAVISTREAM aviStream = nullptr;
-	result = AVIFileCreateStreamW(aviFile, &aviStream, &streamInfo);
-	if (FAILED(result)) {
-		AVIFileRelease(aviFile);
-		EndRecordingAvi();
-		return false;
-	}
-
-	BITMAPINFOHEADER bitmapHeader{};
-	bitmapHeader.biSize = sizeof(BITMAPINFOHEADER);
-	bitmapHeader.biWidth = width;
-	bitmapHeader.biHeight = height;
-	bitmapHeader.biPlanes = 1;
-	bitmapHeader.biBitCount = 32;
-	bitmapHeader.biCompression = BI_RGB;
-	bitmapHeader.biSizeImage = static_cast<DWORD>(width * height * 4);
-	result = AVIStreamSetFormat(aviStream, 0, &bitmapHeader, sizeof(bitmapHeader));
-	if (FAILED(result)) {
-		AVIStreamRelease(aviStream);
-		AVIFileRelease(aviFile);
-		EndRecordingAvi();
-		return false;
-	}
-
-	recordingAviFile_ = aviFile;
-	recordingAviStream_ = aviStream;
+	aviOutput_ = std::move(output);
 	recordingVideoPath_ = filePath;
 	recordingVideoWidth_ = width;
 	recordingVideoHeight_ = height;
 	return true;
 }
 
+// 通常録画では解像度の変化だけを補正し、AVIへの書き込みは共通出力先に任せます。
 bool CaptureManager::AppendRecordingFrame(
 	const std::vector<unsigned char>& pixels,
 	int width,
 	int height,
 	int frameIndex)
 {
-	if (!recordingAviStream_ || width <= 0 || height <= 0 || pixels.empty()) {
+	if (!aviOutput_ || width <= 0 || height <= 0 || pixels.empty()) {
 		return false;
 	}
 
@@ -99,46 +155,27 @@ bool CaptureManager::AppendRecordingFrame(
 		width = recordingVideoWidth_;
 		height = recordingVideoHeight_;
 	}
-	if (framePixels->size() < static_cast<size_t>(width) * static_cast<size_t>(height) * 4) {
-		return false;
-	}
-
-	const size_t rowSize = static_cast<size_t>(width) * 4;
-	std::vector<unsigned char> bottomUpPixels(framePixels->size());
-	for (int y = 0; y < height; ++y) {
-		const unsigned char* source = framePixels->data() + static_cast<size_t>(height - 1 - y) * rowSize;
-		unsigned char* destination = bottomUpPixels.data() + static_cast<size_t>(y) * rowSize;
-		std::memcpy(destination, source, rowSize);
-	}
-
-	const HRESULT result = AVIStreamWrite(
-		static_cast<PAVISTREAM>(recordingAviStream_),
-		frameIndex,
-		1,
-		bottomUpPixels.data(),
-		static_cast<LONG>(bottomUpPixels.size()),
-		AVIIF_KEYFRAME,
-		nullptr,
-		nullptr);
-	return SUCCEEDED(result);
+	return aviOutput_->Append(*framePixels, width, height, frameIndex);
 }
 
+// 通常録画のAVIハンドルを一括解放し、次の録画で使う寸法も戻します。
 void CaptureManager::EndRecordingAvi()
 {
-	if (recordingAviStream_) {
-		AVIStreamRelease(static_cast<PAVISTREAM>(recordingAviStream_));
-		recordingAviStream_ = nullptr;
-	}
-	if (recordingAviFile_) {
-		AVIFileRelease(static_cast<PAVIFILE>(recordingAviFile_));
-		recordingAviFile_ = nullptr;
-	}
-	if (aviInitialized_) {
-		AVIFileExit();
-		aviInitialized_ = false;
-	}
+	aviOutput_.reset();
 	recordingVideoWidth_ = 0;
 	recordingVideoHeight_ = 0;
+}
+
+// Debug自動確認の一枚動画を独立した出力先へ保存し、通常録画を中断しません。
+bool CaptureManager::SaveSingleFrameAvi(
+	const std::filesystem::path& filePath,
+	const std::vector<unsigned char>& pixels,
+	int width,
+	int height)
+{
+	AviOutput output;
+	return output.Open(filePath, width, height, kAviRecordingFramesPerSecond_) &&
+		output.Append(pixels, width, height, 0);
 }
 
 bool CaptureManager::BeginRecordingMp4(

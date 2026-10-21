@@ -1,4 +1,5 @@
 #include "Audio.h"
+#include "StringUtility.h"
 #include <mfapi.h>
 #include <mfidl.h>
 #include <mfreadwrite.h>
@@ -34,20 +35,6 @@ private:
 	std::atomic_bool isFinished_ = false;
 };
 
-std::wstring ConvertString(const std::string& str) {
-	if (str.empty()) {
-		return std::wstring();
-	}
-
-	auto sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), NULL, 0);
-	if (sizeNeeded == 0) {
-		return std::wstring();
-	}
-	std::wstring result(sizeNeeded, 0);
-	MultiByteToWideChar(CP_UTF8, 0, reinterpret_cast<const char*>(&str[0]), static_cast<int>(str.size()), &result[0], sizeNeeded);
-	return result;
-}
-
 void Audio::Initialize()
 {
 	//初期化処理
@@ -82,7 +69,7 @@ bool Audio::LoadFile(const std::string& filename)
 	HRESULT result;
 
 	// ファイルパスをワイド文字列に変換
-	std::wstring filePathW = ConvertString(filename);
+	std::wstring filePathW = StringUtility::ConvertString(filename);
 
 	//SourceReader作成
 	ComPtr<IMFSourceReader> pReader;

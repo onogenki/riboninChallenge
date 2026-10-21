@@ -34,6 +34,12 @@ bool Player::Initialize(
 	return true;
 }
 
+// 調整値を一括して所有し、更新中に外部から内部設定を直接書き換えられないようにします。
+void Player::SetMovementSettings(const MovementSettings& settings)
+{
+	movementSettings_ = settings;
+}
+
 void Player::Update(
 	float deltaTime,
 	const std::vector<OBB>& solidObbs,

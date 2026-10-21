@@ -30,7 +30,26 @@ public:
 	void UpdateAfterDraw();
 
 	bool IsRecording() const { return isRecording_; }
+	// Inspectorへ共通録画の経過秒数を渡し、Debug専用の計時状態を増やしません。
+	float GetRecordingTime() const { return recordingTime_; }
 	const std::string& GetLastMessage() const { return lastMessage_; }
+	// Debug画面の自動確認も通常撮影と同じ保存先・画素処理を使います。
+	std::filesystem::path GetCaptureDirectory(const char* folderName) const;
+	std::string MakeTimestampString() const;
+	// 現在の描画結果をRGBAピクセル配列としてCPUメモリへ読み戻します。
+	bool CapturePixels(std::vector<unsigned char>& pixels, int& width, int& height) const;
+	// Debug自動確認用のBMP保存も通常撮影の画素検証と保存処理へまとめます。
+	bool SavePixelsAsBmp(
+		const std::filesystem::path& filePath,
+		const std::vector<unsigned char>& pixels,
+		int width,
+		int height) const;
+	// 一枚のAVI保存は通常録画とは独立した出力先で実行します。
+	bool SaveSingleFrameAvi(
+		const std::filesystem::path& filePath,
+		const std::vector<unsigned char>& pixels,
+		int width,
+		int height);
 
 private:
 	// UIで選択できる動画コンテナ形式。
@@ -80,19 +99,10 @@ private:
 		int frameIndex = 0;
 	};
 
-	CaptureManager() = default;
-	~CaptureManager() = default;
+	CaptureManager();
+	~CaptureManager();
 
-	std::filesystem::path GetCaptureDirectory(const char* folderName) const;
 	bool CreateCaptureDirectories() const;
-	std::string MakeTimestampString() const;
-	// 現在の描画結果をRGBAピクセル配列としてCPUメモリへ読み戻す。
-	bool CapturePixels(std::vector<unsigned char>& pixels, int& width, int& height) const;
-	bool SavePixelsAsBmp(
-		const std::filesystem::path& filePath,
-		const std::vector<unsigned char>& pixels,
-		int width,
-		int height) const;
 	bool SavePixelsAsPng(
 		const std::filesystem::path& filePath,
 		const std::vector<unsigned char>& pixels,
@@ -149,7 +159,29 @@ private:
 	bool EncodeReplayFrame(const ReplayEncodeJob& job, ReplayFrame& frame) const;
 	bool DecodeReplayFrame(const ReplayFrame& frame, std::vector<unsigned char>& pixels) const;
 	void ClearReplayBuffer();
+	// SmokeのScene別進行と保存結果の判定を分け、撮影本体の更新順を変えずに確認します。
 	void UpdateSmokeBeforeCapture();
+	void UpdateTitleSmoke();
+	void UpdateStageSmoke();
+	void UpdateDebugSmoke();
+	void VerifyStageSmoke();
+	void VerifyDebugSmoke();
+	struct SmokeFrameErrors {
+		bool valid = true;
+		double direct = 0.0;
+		double flipped = 0.0;
+		double swapped = 0.0;
+		int decodedFrameCount = 0;
+	};
+	SmokeFrameErrors CompareSmokeFrames(
+		const std::vector<unsigned char>& referenceFirst,
+		const std::vector<unsigned char>& referenceLast,
+		const std::vector<unsigned char>& decodedFirst,
+		const std::vector<unsigned char>& decodedLast,
+		int width,
+		int height) const;
+	SmokeFrameErrors VerifySmokeVideo(bool videoExists);
+	SmokeFrameErrors VerifySmokeReplay(bool replayExists);
 	void UpdateSmokeAfterCapture(bool captured, bool visiblyNonBlack);
 	void FinishSmoke(bool success, const std::string& message);
 	bool IsVisiblyNonBlack(const std::vector<unsigned char>& pixels, int width, int height) const;
@@ -190,9 +222,8 @@ private:
 	int recordingVideoWidth_ = 0;
 	int recordingVideoHeight_ = 0;
 	int recordingFramesPerSecond_ = 10;
-	void* recordingAviFile_ = nullptr;
-	void* recordingAviStream_ = nullptr;
-	bool aviInitialized_ = false;
+	struct AviOutput;
+	std::unique_ptr<AviOutput> aviOutput_;
 	void* recordingMp4SinkWriter_ = nullptr;
 	unsigned long recordingMp4StreamIndex_ = 0;
 	long long recordingMp4SampleDuration_ = 0;

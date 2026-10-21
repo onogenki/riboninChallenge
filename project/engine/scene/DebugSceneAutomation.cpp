@@ -1,4 +1,5 @@
 #include "DebugScene.h"
+#include "CaptureManager.h"
 #include "DirectXCommon.h"
 #include <algorithm>
 #include <cstdlib>
@@ -43,7 +44,7 @@ void DebugScene::InitializeTimePlaybackSmokeFromEnvironment()
 		timePlaybackSmoke_,
 		DebugUiSmoke::IsEnabled(uiSmoke_),
 		modelFile,
-		gameViewCapture_.MakeTimestampString(),
+		CaptureManager::GetInstance()->MakeTimestampString(),
 		MakeTimePlaybackSmokeContext());
 }
 
@@ -60,7 +61,7 @@ void DebugScene::InitializeUiSmokeFromEnvironment()
 	const bool isAnimationSceneTest = smokeMode == "walk-scene" || isHotReloadTest;
 	DebugUiSmoke::Start(
 		uiSmoke_,
-		gameViewCapture_.MakeTimestampString(),
+		CaptureManager::GetInstance()->MakeTimestampString(),
 		isAnimationPreviewTest,
 		isAnimationSceneTest,
 		isHotReloadTest);

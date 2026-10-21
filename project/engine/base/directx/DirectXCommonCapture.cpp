@@ -3,14 +3,13 @@
 #include <cstring>
 #include <tmmintrin.h>
 
-// Game ViewのRenderTextureをCPUメモリへ読み戻す処理をまとめる。
-// 描画開始・終了の流れと分けることで、通常のScene描画を追いやすくする。
+// Game Viewの描画先を同期的に読み戻します。通常描画の状態へ戻してから、CPUへRGBA画素を渡します。
 bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight, bool usePostEffectTexture)
 {
 	ID3D12Resource* sourceResource = usePostEffectTexture
 		? postEffectTextureResource_.Get()
 		: renderTextureResource_.Get();
-	if (!sourceResource || !device_ || !commandList_ || !commandQueue) {
+	if (!sourceResource || !device_ || !commandList_ || !commandQueue_) {
 		return false;
 	}
 
@@ -26,6 +25,7 @@ bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels,
 	UINT64 rowSizeInBytes = 0;
 	UINT64 totalBytes = 0;
 	device_->GetCopyableFootprints(&sourceDesc, 0, 1, 0, &footprint, &numRows, &rowSizeInBytes, &totalBytes);
+	// GPUコピーの行ピッチにはアライメント分の余白が入るため、width*4をそのままコピー長にしません。
 	if (totalBytes == 0 || numRows == 0 || rowSizeInBytes == 0) {
 		return false;
 	}
@@ -82,6 +82,7 @@ bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels,
 
 	commandList_->CopyTextureRegion(&copyDestination, 0, 0, 0, &copySource, nullptr);
 
+	// 撮影後もSceneやポストエフェクトが同じ描画先を使うため、元のリソース状態へ戻します。
 	D3D12_RESOURCE_BARRIER restoreState = toCopySource;
 	restoreState.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
 	restoreState.Transition.StateAfter = sourceStateBefore;
@@ -93,7 +94,7 @@ bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels,
 	}
 
 	ID3D12CommandList* commandLists[] = { commandList_.Get() };
-	commandQueue->ExecuteCommandLists(1, commandLists);
+	commandQueue_->ExecuteCommandLists(1, commandLists);
 	WaitForGPU();
 
 	outWidth = static_cast<int>(sourceDesc.Width);
@@ -111,6 +112,7 @@ bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels,
 
 	const size_t sourceRowPitch = static_cast<size_t>(footprint.Footprint.RowPitch);
 	const size_t tightRowPitch = static_cast<size_t>(outWidth) * 4;
+	// 保存処理が期待するRGBAへ並べ替え、GPU側の行末余白を除いて詰め直します。
 	for (int y = 0; y < outHeight; ++y) {
 		const unsigned char* sourceRow = mappedData + footprint.Offset + static_cast<size_t>(y) * sourceRowPitch;
 		unsigned char* destinationRow = pixels.data() + static_cast<size_t>(y) * tightRowPitch;
@@ -134,12 +136,13 @@ bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels,
 	return SUCCEEDED(result);
 }
 
+// フレームを止めずに読むため、空きスロットの専用Command Listへコピーを記録します。
 bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 {
 	ID3D12Resource* sourceResource = usePostEffectTexture
 		? postEffectTextureResource_.Get()
 		: renderTextureResource_.Get();
-	if (!sourceResource || !device_ || !commandQueue || !fence) {
+	if (!sourceResource || !device_ || !commandQueue_ || !fence_) {
 		return false;
 	}
 
@@ -259,9 +262,10 @@ bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 		return false;
 	}
 	ID3D12CommandList* commandLists[] = { slot->commandList.Get() };
-	commandQueue->ExecuteCommandLists(1, commandLists);
-	const UINT64 signalValue = ++fenceVal;
-	result = commandQueue->Signal(fence.Get(), signalValue);
+	commandQueue_->ExecuteCommandLists(1, commandLists);
+	// Fence値と投入順を残し、完了していないGPUコピーや前後の入れ替わりを取り出し側で防ぎます。
+	const UINT64 signalValue = ++signaledFenceValue_;
+	result = commandQueue_->Signal(fence_.Get(), signalValue);
 	if (FAILED(result)) {
 		return false;
 	}
@@ -276,6 +280,7 @@ bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 	return true;
 }
 
+// 最古の予約だけを確認し、GPU完了済みの画素を順序どおりCPUへ移します。
 bool DirectXCommon::TryGetGameTextureCapturePixels(
 	std::vector<unsigned char>& pixels,
 	int& outWidth,
@@ -287,7 +292,7 @@ bool DirectXCommon::TryGetGameTextureCapturePixels(
 			oldestSlot = &candidate;
 		}
 	}
-	if (!oldestSlot || !fence || fence->GetCompletedValue() < oldestSlot->fenceValue) {
+	if (!oldestSlot || !fence_ || fence_->GetCompletedValue() < oldestSlot->fenceValue) {
 		return false;
 	}
 

@@ -1,4 +1,5 @@
 #include "DebugScene.h"
+#include "CaptureManager.h"
 #include "Camera.h"
 #include "CameraManager.h"
 #include "DirectXCommon.h"
@@ -12,10 +13,10 @@
 DebugSceneContent::Context DebugScene::MakeContentContext()
 {
 	DebugSceneContent::Context context{};
-	context.object3dCommon = object3dCommon;
-	context.spriteCommon = spriteCommon;
+	context.object3dCommon = object3dCommon_;
+	context.spriteCommon = spriteCommon_;
 	context.directXCommon = DirectXCommon::GetInstance();
-	context.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	context.camera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	context.modelLibrary = &debugSceneEditor_.GetEntries();
 	context.normalObjects = &normalObjects_;
 	context.animationObjects = &animationObjects_;
@@ -52,8 +53,8 @@ DebugSceneEditor::Context DebugScene::MakeEditorContext()
 {
 	DebugSceneEditor::Context context{};
 	context.directXCommon = DirectXCommon::GetInstance();
-	context.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
-	context.cameraManager = cameraManager.get();
+	context.camera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
+	context.cameraManager = cameraManager_.get();
 	context.normalObjects = &normalObjects_;
 	context.animationObjects = &animationObjects_;
 	context.sprites = &sprites_;
@@ -66,7 +67,7 @@ DebugSceneEditor::Context DebugScene::MakeEditorContext()
 	context.selection = &selection_;
 	context.entityRegistry = &entityRegistry_;
 	context.assetPreview = &assetPreview_;
-	context.gameViewCapture = &gameViewCapture_;
+	context.captureManager = CaptureManager::GetInstance();
 	context.emitterTransform = &emitterTransform_;
 	context.emitterCircle = emitterCircle_.get();
 	context.emitterPlane = emitterPlane_.get();
@@ -82,7 +83,7 @@ DebugSceneEditor::Context DebugScene::MakeEditorContext()
 	context.addModelAtDropPosition = [this](const std::string& fileName, float screenX, float screenY) {
 		Vector3 spawnPosition{};
 		return DebugViewportPlacement::TryGetWorldPosition(
-			cameraManager ? cameraManager->GetActiveCamera() : nullptr,
+			cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr,
 			screenX,
 			screenY,
 			spawnPosition)
@@ -109,7 +110,7 @@ DebugSceneEditor::Context DebugScene::MakeEditorContext()
 		ExitModelPreview();
 	};
 	context.resetPreview = [this]() {
-		assetPreview_.Reset(cameraManager ? cameraManager->GetActiveCamera() : nullptr);
+		assetPreview_.Reset(cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr);
 	};
 	return context;
 }
@@ -118,7 +119,7 @@ DebugSceneEditor::Context DebugScene::MakeEditorContext()
 DebugLevelRuntime::Context DebugScene::MakeLevelRuntimeContext()
 {
 	DebugLevelRuntime::Context context{};
-	context.object3dCommon = object3dCommon;
+	context.object3dCommon = object3dCommon_;
 	context.normalObjects = &normalObjects_;
 	context.animationObjects = &animationObjects_;
 	context.sprites = &sprites_;
@@ -196,7 +197,7 @@ DebugUiSmoke::Context DebugScene::MakeUiSmokeContext()
 	};
 	context.resetModelPreviewCamera = [this]()
 	{
-		assetPreview_.Reset(cameraManager ? cameraManager->GetActiveCamera() : nullptr);
+		assetPreview_.Reset(cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr);
 	};
 	context.exitModelPreview = [this]()
 	{
@@ -218,6 +219,6 @@ DebugUiSmoke::Context DebugScene::MakeUiSmokeContext()
 	{
 		return DebugCollisionOverlay::BuildWorldAabb(object, outAabb);
 	};
-	context.gameViewCapture = &gameViewCapture_;
+	context.captureManager = CaptureManager::GetInstance();
 	return context;
 }

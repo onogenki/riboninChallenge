@@ -3,12 +3,15 @@
 #include "MapChipRegistry.h"
 #include "StageMapObjectIndex.h"
 #include "StageMapChipFactory.h"
+#include "StageMapFileMonitor.h"
+#include "StageMapSelection.h"
 
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
 #include <Windows.h>
 
 namespace
@@ -43,7 +46,96 @@ namespace
 			spot.decay == 0.5f && spot.cosAngle == 0.75f && spot.cosFalloffStart == 0.875f;
 	}
 
-	// 一時フォルダだけを使い、JSONの型検査・照明読込・Engine座標での保存を確認します。
+	// Stage番号と外部ファイルの対応、および失敗時に選択・予約を壊さない契約を確認します。
+	bool CheckStageMapSelection()
+	{
+		StageMapSelection selection(1);
+		if (selection.GetStageId() != 1 || selection.GetDefinition() ||
+			selection.TakeRequestedStageId() != 0) {
+			return false;
+		}
+
+		constexpr const char* kExpectedNames[] = {
+			"stage1", "stage2", "stage3", "stage4", "stage5"
+		};
+		for (int stageId = 1; stageId <= 5; ++stageId) {
+			if (!selection.Select(stageId)) {
+				return false;
+			}
+			const StageMapSelection::Definition* definition = selection.GetDefinition();
+			const std::string name = kExpectedNames[stageId - 1];
+			if (!definition || selection.GetStageId() != stageId || definition->id != stageId ||
+				definition->levelFileName != name ||
+				definition->levelFilePath != "resources/levels/" + name + ".json" ||
+				definition->mapChipFilePath != "resources/maps/" + name + ".csv") {
+				return false;
+			}
+		}
+
+		const StageMapSelection::Definition* activeDefinition = selection.GetDefinition();
+		if (selection.Select(0) || selection.Select(6) ||
+			selection.GetStageId() != 5 || selection.GetDefinition() != activeDefinition) {
+			return false;
+		}
+		if (!selection.Request(2) || selection.Request(6) ||
+			selection.TakeRequestedStageId() != 2 || selection.TakeRequestedStageId() != 0) {
+			return false;
+		}
+		return selection.GetStageId() == 5 && selection.GetDefinition() == activeDefinition;
+	}
+
+	// 専用の一時JSON/CSVだけを使い、変更検知とゲーム内保存後の時刻同期を確認します。
+	bool CheckStageMapFileMonitor()
+	{
+		namespace fs = std::filesystem;
+		std::error_code error;
+		const fs::path temporaryDirectory = fs::current_path(error) /
+			("ribonin_map_monitor_smoke_" +
+				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+		if (error || !fs::create_directory(temporaryDirectory, error)) {
+			return false;
+		}
+		const fs::path jsonPath = temporaryDirectory / "map.json";
+		const fs::path csvPath = temporaryDirectory / "map.csv";
+		bool passed = false;
+		try {
+			{
+				std::ofstream jsonFile(jsonPath);
+				std::ofstream csvFile(csvPath);
+				jsonFile << "{}";
+				csvFile << "B0";
+			}
+			StageMapFileMonitor monitor;
+			monitor.Start(jsonPath.string(), csvPath.string());
+			passed = monitor.GetJsonFilePath() == jsonPath.string() && !monitor.ConsumeChange();
+			const fs::file_time_type jsonTime = fs::last_write_time(jsonPath);
+			fs::last_write_time(jsonPath, jsonTime + std::chrono::seconds(10));
+			passed = monitor.ConsumeChange() && !monitor.ConsumeChange() && passed;
+			const fs::file_time_type csvTime = fs::last_write_time(csvPath);
+			fs::last_write_time(csvPath, csvTime + std::chrono::seconds(10));
+			passed = monitor.ConsumeChange() && !monitor.ConsumeChange() && passed;
+			fs::last_write_time(jsonPath, jsonTime + std::chrono::seconds(20));
+			monitor.SynchronizeJson();
+			passed = !monitor.ConsumeChange() && passed;
+			// 両方の保存を同じフレームで見つけても、次フレームにCSVだけを持ち越さないことを確認します。
+			fs::last_write_time(jsonPath, jsonTime + std::chrono::seconds(30));
+			fs::last_write_time(csvPath, csvTime + std::chrono::seconds(20));
+			passed = monitor.ConsumeChange() && !monitor.ConsumeChange() && passed;
+		} catch (...) {
+			std::cerr << "DETAIL FAIL: map monitor test threw an exception\n";
+			passed = false;
+		}
+		// 作成した既知の一時ファイルとフォルダだけを消します。
+		bool cleanedUp = true;
+		for (const fs::path& path : { jsonPath, csvPath, temporaryDirectory }) {
+			error.clear();
+			fs::remove(path, error);
+			cleanedUp = !error && cleanedUp;
+		}
+		return passed && cleanedUp;
+	}
+
+	// 作業領域内の固有フォルダだけを使い、JSONの型検査・照明読込・保存を確認します。
 	bool CheckLevelJsonValidationAndLighting()
 	{
 		namespace fs = std::filesystem;
@@ -52,7 +144,8 @@ namespace
 		if (error) {
 			return false;
 		}
-		const fs::path temporaryDirectory = fs::temp_directory_path(error) /
+		// Windowsの一時フォルダでは置換が拒否される環境もあるため、実際のStageと同じ作業領域で確認します。
+		const fs::path temporaryDirectory = originalDirectory /
 			("ribonin_level_smoke_" +
 				std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
 		if (error || !fs::create_directory(temporaryDirectory, error)) {
@@ -83,6 +176,9 @@ namespace
 			passed = loadMatches(R"({"name":17,"objects":[]})", false) &&
 				loadMatches(R"({"name":"scene","coordinate_system":17,"objects":[]})", false) &&
 				loadMatches(R"({"name":"scene","coordinate_system":"engine","objects":[]})", true);
+			if (!passed) {
+				std::cerr << "DETAIL FAIL: JSON type validation\n";
+			}
 			// 照明を独立して読み、Blender座標系のY/Z変換と数値の保持を確認します。
 			std::ofstream lightingFile(jsonPath, std::ios::trunc);
 			lightingFile << R"({
@@ -106,6 +202,7 @@ namespace
 			lightingFile.close();
 			const std::unique_ptr<LevelLoader::LevelData> loaded = LevelLoader::Load("Smoke");
 			if (!lightingFile || !loaded || !loaded->hasLighting || !MatchesExpectedLighting(loaded->lighting)) {
+				std::cerr << "DETAIL FAIL: Blender lighting load\n";
 				passed = false;
 			} else {
 				// Stage1と同じEngine座標で保存し、全Lightの値を再読込でも保持します。
@@ -114,26 +211,45 @@ namespace
 				engineLevel.hasLighting = true;
 				engineLevel.lighting = loaded->lighting;
 				const bool saved = LevelLoader::Save("Smoke", engineLevel);
+				const DWORD engineSaveError = saved ? ERROR_SUCCESS : GetLastError();
 				const std::unique_ptr<LevelLoader::LevelData> reloaded = saved ? LevelLoader::Load("Smoke") : nullptr;
-				passed = passed && saved && reloaded && reloaded->hasLighting &&
+				const bool engineRoundTrip = saved && reloaded && reloaded->hasLighting &&
 					MatchesExpectedLighting(reloaded->lighting);
+				if (!engineRoundTrip) {
+					std::cerr << "DETAIL FAIL: Engine lighting save/reload saved=" << saved
+						<< " error=" << engineSaveError << " loaded=" << static_cast<bool>(reloaded) << '\n';
+				}
+				passed = passed && engineRoundTrip;
 				// Blender座標で読み込んだ照明も、保存・再読込後に同じ値へ戻る必要があります。
 				const bool blenderSaved = LevelLoader::Save("Smoke", *loaded);
+				const DWORD blenderSaveError = blenderSaved ? ERROR_SUCCESS : GetLastError();
 				const std::unique_ptr<LevelLoader::LevelData> blenderReloaded =
 					blenderSaved ? LevelLoader::Load("Smoke") : nullptr;
-				passed = passed && blenderSaved && blenderReloaded && blenderReloaded->hasLighting &&
+				const bool blenderRoundTrip = blenderSaved && blenderReloaded && blenderReloaded->hasLighting &&
 					MatchesExpectedLighting(blenderReloaded->lighting);
+				if (!blenderRoundTrip) {
+					std::cerr << "DETAIL FAIL: Blender lighting save/reload saved=" << blenderSaved
+						<< " error=" << blenderSaveError << " loaded=" << static_cast<bool>(blenderReloaded) << '\n';
+				}
+				passed = passed && blenderRoundTrip;
 				// 既存ファイルがない時も、完成した一時ファイルを新しい名前へ移せます。
 				const bool newFileSaved = LevelLoader::Save("SmokeNew", engineLevel);
+				const DWORD newFileSaveError = newFileSaved ? ERROR_SUCCESS : GetLastError();
 				const std::unique_ptr<LevelLoader::LevelData> newFileLoaded =
 					newFileSaved ? LevelLoader::Load("SmokeNew") : nullptr;
-				passed = passed && newFileSaved && newFileLoaded && newFileLoaded->hasLighting &&
+				const bool newFileRoundTrip = newFileSaved && newFileLoaded && newFileLoaded->hasLighting &&
 					MatchesExpectedLighting(newFileLoaded->lighting) && !fs::exists(newTemporaryJsonPath);
+				if (!newFileRoundTrip) {
+					std::cerr << "DETAIL FAIL: new JSON save/reload saved=" << newFileSaved
+						<< " error=" << newFileSaveError << " loaded=" << static_cast<bool>(newFileLoaded) << '\n';
+				}
+				passed = passed && newFileRoundTrip;
 				// 削除共有を許さず既存JSONを開き、置換失敗でも元ファイルを読めるか調べます。
 				const HANDLE lockedFile = CreateFileW(
 					jsonPath.c_str(), GENERIC_READ, FILE_SHARE_READ,
 					nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 				if (lockedFile == INVALID_HANDLE_VALUE) {
+					std::cerr << "DETAIL FAIL: open locked JSON\n";
 					passed = false;
 				} else {
 					LevelLoader::LevelData changedLevel{};
@@ -141,11 +257,16 @@ namespace
 					const bool replacedWhileLocked = LevelLoader::Save("Smoke", changedLevel);
 					CloseHandle(lockedFile);
 					const std::unique_ptr<LevelLoader::LevelData> keptFile = LevelLoader::Load("Smoke");
-					passed = passed && !replacedWhileLocked && keptFile && keptFile->hasLighting &&
+					const bool lockedFilePreserved = !replacedWhileLocked && keptFile && keptFile->hasLighting &&
 						MatchesExpectedLighting(keptFile->lighting) && fs::exists(temporaryJsonPath);
+					if (!lockedFilePreserved) {
+						std::cerr << "DETAIL FAIL: locked JSON replacement preserves original\n";
+					}
+					passed = passed && lockedFilePreserved;
 				}
 			}
 		} catch (...) {
+			std::cerr << "DETAIL FAIL: JSON test threw an exception\n";
 			passed = false;
 		}
 
@@ -218,6 +339,17 @@ int main()
 	check(block0 == 2 && block1 == 1 && ignored == 2,
 		"B0/B1 are separate; unknown X0 and unregistered B2 are ignored");
 
+	// Stage本編と同じFactory経路で、最初のP0と二つのB0だけが採用されることを確認します。
+	const StageMapChipFactory::StageChipData stageChipData = StageMapChipFactory::BuildStageData(
+		field, { 22.0f, 0.0f, 33.0f }, 1.0f, -2.5f);
+	check(!field.GetChips().empty() &&
+		stageChipData.playerStartChip == &field.GetChips().front() &&
+		stageChipData.blockData.size() == 2 &&
+		MatchesVector3(stageChipData.blockData[0].translation, { 24.0f, -2.5f, 33.0f }) &&
+		MatchesVector3(stageChipData.blockData[1].translation, { 24.0f, -2.5f, 34.0f }) &&
+		stageChipData.blockData[0].hasCollider && stageChipData.blockData[1].hasCollider,
+		"Stage factory keeps first P0 and ordered B0 blocks only");
+
 	// 編集UIが触るPlayerStartと、Sceneが読み取るPlayerStartが同じ元データか確認します。
 	LevelLoader::LevelData levelData;
 	LevelLoader::ObjectData firstStart;
@@ -242,6 +374,10 @@ int main()
 		"editing PlayerStart updates the LevelData read by the stage");
 	check(CheckLevelJsonValidationAndLighting(),
 		"JSON validation, new/replacement saves, and failed replacement preserve the old file");
+	check(CheckStageMapSelection(),
+		"Stage IDs 1-5 map to files; invalid IDs preserve selection and requests run once");
+	check(CheckStageMapFileMonitor(),
+		"JSON and CSV changes reload once, including simultaneous saves; saving JSON synchronizes its timestamp");
 	std::cout << (failures == 0 ? "SUCCESS" : "FAILURE") << ": failures=" << failures << '\n';
 	return failures == 0 ? 0 : 1;
 }

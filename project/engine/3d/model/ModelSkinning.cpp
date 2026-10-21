@@ -13,11 +13,12 @@ using namespace MyMath;
 // SkinClusterのGPU Resource作成、Palette更新、Compute Skinning、Skinned描画をまとめる。
 // 通常モデルの読込・描画と分け、骨ありモデルの処理だけを追えるようにする。
 // 生成途中の失敗はDescriptorを返し、完成した時だけObject3dへ渡す。
+// 骨付きModelの頂点・WeightとPaletteをGPUへ渡し、生成失敗時は未完成の状態を採用しません。
 bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device, const Skeleton& skeleton, const ModelData& modelData, const Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>& descriptorHeap, uint32_t descriptorSize, SkinCluster& result)
 {
 	// 空の頂点や未初期化Deviceでは、Descriptorを取得する前に生成を止めます。
 	if (!device || !descriptorHeap || descriptorSize == 0 || !modelCommon_ ||
-		!modelCommon_->GetDxCommon() || !vertexResource ||
+		!modelCommon_->GetDxCommon() || !vertexResource_ ||
 		skeleton.joints.empty() || modelData.vertices.empty()) {
 		Logger::Log("Model: SkinCluster dependencies are unavailable.");
 		return false;
@@ -51,7 +52,7 @@ bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device
 	}
 	skinCluster.paletteSrvIndex = srvIndex;
 
-	//paletter用のResourceを確保
+	// palette用のResourceを確保
 	skinCluster.paletteResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(WellForGPU) * skeleton.joints.size());
 	if (!skinCluster.paletteResource) {
 		return fail("Model: SkinCluster palette buffer creation failed.");
@@ -66,15 +67,15 @@ bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device
 	skinCluster.paletteSrvHandle.second = srvManager->GetGPUDescriptorHandle(srvIndex);
 
 	//palette用のsrvを作成する。StructuredBufferでアクセスできるようにする。
-	D3D12_SHADER_RESOURCE_VIEW_DESC paletterSrvDesc{};
-	paletterSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
-	paletterSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	paletterSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-	paletterSrvDesc.Buffer.FirstElement = 0;
-	paletterSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
-	paletterSrvDesc.Buffer.NumElements = UINT(skeleton.joints.size());
-	paletterSrvDesc.Buffer.StructureByteStride = sizeof(WellForGPU);
-	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletterSrvDesc, skinCluster.paletteSrvHandle.first);
+	D3D12_SHADER_RESOURCE_VIEW_DESC paletteSrvDesc{};
+	paletteSrvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	paletteSrvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	paletteSrvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	paletteSrvDesc.Buffer.FirstElement = 0;
+	paletteSrvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+	paletteSrvDesc.Buffer.NumElements = UINT(skeleton.joints.size());
+	paletteSrvDesc.Buffer.StructureByteStride = sizeof(WellForGPU);
+	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletteSrvDesc, skinCluster.paletteSrvHandle.first);
 
 	uint32_t inputVertexSrvIndex = srvManager->Allocate();
 	if (inputVertexSrvIndex == SrvManager::kInvalidSrvIndex) {
@@ -84,7 +85,7 @@ bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device
 	skinCluster.inputVertexSrvHandle.first = srvManager->GetCPUDescriptorHandle(inputVertexSrvIndex);
 	skinCluster.inputVertexSrvHandle.second = srvManager->GetGPUDescriptorHandle(inputVertexSrvIndex);
 	srvManager->CreateSRVforStructuredBuffer(
-		inputVertexSrvIndex, vertexResource.Get(), UINT(modelData.vertices.size()), sizeof(VertexData));
+		inputVertexSrvIndex, vertexResource_.Get(), UINT(modelData.vertices.size()), sizeof(VertexData));
 
 	//influence用のResourceを確保。頂点ごとにinfluence情報を追加できるようにする
 	skinCluster.influenceResource = modelCommon_->GetDxCommon()->CreateBufferResource(sizeof(VertexInfluence) * modelData.vertices.size());
@@ -228,33 +229,34 @@ void Model::Update(SkinCluster& skinCluster, const Skeleton& skeleton)
 	}
 }
 
+// Graphics Skinningの頂点とWeightを二つの入力へ渡し、材質ごとにMeshを描きます。
 void Model::Draw(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride)
 {
 	ID3D12GraphicsCommandList* commandList = modelCommon_->GetDxCommon()->GetCommandList();
 
 	// 1. 頂点バッファビューを設定 
 	D3D12_VERTEX_BUFFER_VIEW vbvs[2] = {
-		vertexBufferView,                // スロット0: 位置・UV・法線
+		vertexBufferView_,                // スロット0: 位置・UV・法線
 		skinCluster.influenceBufferView  // スロット1: Weight・Index
 	};
 	commandList->IASetVertexBuffers(0, 2, vbvs);
 
 	// インデックスバッファをセット
-	commandList->IASetIndexBuffer(&indexBufferView);
+	commandList->IASetIndexBuffer(&indexBufferView_);
 
 	// 2. 形状を設定 (三角形リスト)
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 	// 3. マテリアルCBufferの設定 (RootParameter 0)
-	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 
 	// マトリックスパレットSRVの設定 (RootParameter 7)
 	// （※Object3dCommonで追加した [7] 番のパラメータに、パレットのSRVを渡します）
 	commandList->SetGraphicsRootDescriptorTable(7, skinCluster.paletteSrvHandle.second);
 
-	for (const MeshData& mesh : modelData.meshes)
+	for (const MeshData& mesh : modelData_.meshes)
 	{
-		const MaterialData& material = modelData.materials[mesh.materialIndex];
+		const MaterialData& material = modelData_.materials[mesh.materialIndex];
 		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
 			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
 			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
@@ -301,18 +303,19 @@ void Model::DispatchSkinning(SkinCluster& skinCluster)
 	skinCluster.outputVertexResourceState = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
 }
 
+// Compute Skinning済みの頂点Bufferを読み、通常の材質と同じMesh順で描画します。
 void Model::DrawSkinned(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverride)
 {
 	ID3D12GraphicsCommandList* commandList = modelCommon_->GetDxCommon()->GetCommandList();
 
 	commandList->IASetVertexBuffers(0, 1, &skinCluster.outputVertexBufferView);
-	commandList->IASetIndexBuffer(&indexBufferView);
+	commandList->IASetIndexBuffer(&indexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 
-	for (const MeshData& mesh : modelData.meshes)
+	for (const MeshData& mesh : modelData_.meshes)
 	{
-		const MaterialData& material = modelData.materials[mesh.materialIndex];
+		const MaterialData& material = modelData_.materials[mesh.materialIndex];
 		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
 			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
 			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);

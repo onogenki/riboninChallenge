@@ -29,8 +29,10 @@ public:
 
 	void SetWindowMode(WindowMode mode);
 
-	HINSTANCE GetHInstance() const { return wc.hInstance; }
-	HWND GetHwnd() const { return hwnd; }
+	// 登録済みWindow ClassのInstanceを返し、InputのDirectInput生成に使います。
+	HINSTANCE GetHInstance() const { return wc_.hInstance; }
+	// Windowの所有権を渡さずHandleだけを返し、入力と描画先の初期化に使います。
+	HWND GetHwnd() const { return hwnd_; }
 	WindowMode GetWindowMode() const { return windowMode_; }
 	// WM_QUITに指定された終了コードを、ウィンドウ解放前にFrameworkへ返します。
 	int GetQuitCode() const { return quitCode_; }
@@ -38,8 +40,8 @@ public:
 	uint32_t GetClientHeight() const;
 
 private:
-	HWND hwnd = nullptr;
-	WNDCLASS wc{};
+	HWND hwnd_ = nullptr;
+	WNDCLASS wc_{};
 	WindowMode windowMode_ = WindowMode::Maximized;
 	RECT windowedRect_{};
 	bool isComInitialized_ = false;

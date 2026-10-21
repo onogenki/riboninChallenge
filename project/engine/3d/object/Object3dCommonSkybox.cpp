@@ -1,10 +1,10 @@
 #include "Object3dCommon.h"
 
-#include <cassert>
+#include <stdexcept>
 #include <vector>
 
 
-// Skybox専用のRootSignatureとGraphics Pipelineをまとめる。
+// Skybox専用のShader結合位置を作り、失敗時は描画Pipelineへ進みません。
 void Object3dCommon::CreateSkyboxRootSignature()
 {
 	HRESULT hr = S_FALSE;
@@ -60,13 +60,17 @@ void Object3dCommon::CreateSkyboxRootSignature()
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob = nullptr;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 	hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !signatureBlob) {
+		throw std::runtime_error("Object3dCommon: skybox root signature serialization failed");
+	}
 
 	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&skyboxRootSignature_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !skyboxRootSignature_) {
+		throw std::runtime_error("Object3dCommon: skybox root signature creation failed");
+	}
 }
 
-
+// 夜空のShaderとPipelineを作り、失敗時は未完成のSkyboxを使わせません。
 void Object3dCommon::CreateSkyboxPipeline()
 {
 	HRESULT hr = S_FALSE;
@@ -111,11 +115,15 @@ void Object3dCommon::CreateSkyboxPipeline()
 	// shaderをコンパイルする (Skybox用のシェーダーパスを指定)
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Skybox.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexShaderBlob != nullptr);
+	if (!vertexShaderBlob) {
+		throw std::runtime_error("Object3dCommon: skybox vertex shader is unavailable");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Skybox.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!pixelShaderBlob) {
+		throw std::runtime_error("Object3dCommon: skybox pixel shader is unavailable");
+	}
 
 	// DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -153,6 +161,8 @@ void Object3dCommon::CreateSkyboxPipeline()
 
 	// 実際に生成
 	hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&skyboxGraphicsPipelineState_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !skyboxGraphicsPipelineState_) {
+		throw std::runtime_error("Object3dCommon: skybox graphics pipeline creation failed");
+	}
 }
 

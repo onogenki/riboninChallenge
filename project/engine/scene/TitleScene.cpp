@@ -41,7 +41,7 @@ TitleScene::~TitleScene() = default;
 TitleEditor::Context TitleScene::MakeTitleEditorContext()
 {
 	TitleEditor::Context context{};
-	context.camera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	context.camera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	context.normalObjects = &titleObjects_.GetNormalObjects();
 	context.animationObjects = &titleObjects_.GetAnimationObjects();
 	context.sprites = &titleObjects_.GetSprites();
@@ -53,11 +53,11 @@ TitleEditor::Context TitleScene::MakeTitleEditorContext()
 	context.baseSpriteCount = titleObjects_.GetBaseSpriteCount();
 	context.addModel = [this](const std::string& fileName)
 	{
-		return titleObjects_.AddModel(object3dCommon, fileName);
+		return titleObjects_.AddModel(object3dCommon_, fileName);
 	};
 	context.addTexture = [this](const std::string& textureFilePath)
 	{
-		return titleObjects_.AddTexture(spriteCommon, textureFilePath);
+		return titleObjects_.AddTexture(spriteCommon_, textureFilePath);
 	};
 	context.clearAdded = [this]()
 	{
@@ -95,10 +95,10 @@ void TitleScene::InitializeRenderSystems()
 	PostEffect::GetInstance()->SetSepia(false);
 
 	// Title専用のCameraManagerを作り、ほかのSceneのCamera状態を持ち込まないようにします。
-	InitializeMainCamera(cameraManager, mainCamera, kCameraStart);
-	object3dCommon = Object3dCommon::GetInstance();
-	object3dCommon->Initialize(dxCommon);
-	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
+	InitializeMainCamera(cameraManager_, mainCamera_, kCameraStart);
+	object3dCommon_ = Object3dCommon::GetInstance();
+	object3dCommon_->Initialize(dxCommon);
+	object3dCommon_->SetDefaultCamera(cameraManager_->GetActiveCamera());
 }
 
 // Title画面の背景モデルを照らす三種類のLightを、初期値へ設定します。
@@ -131,8 +131,8 @@ void TitleScene::InitializeDefaultLighting()
 // TitleのSprite生成はManagerへ任せ、編集対象には上側の仮画像を選びます。
 bool TitleScene::InitializeTitleSprites()
 {
-	spriteCommon = SpriteCommon::GetInstance();
-	if (!titleObjects_.InitializeSprites(spriteCommon, DirectXCommon::GetInstance())) {
+	spriteCommon_ = SpriteCommon::GetInstance();
+	if (!titleObjects_.InitializeSprites(spriteCommon_, DirectXCommon::GetInstance())) {
 		return false;
 	}
 	titleEditor_.SelectSprite(1);
@@ -149,7 +149,7 @@ void TitleScene::PrepareNextTitleStep()
 		preparationStep_ = PreparationStep::kModel;
 		break;
 	case PreparationStep::kModel:
-		if (!titleObjects_.InitializeModel(object3dCommon)) {
+		if (!titleObjects_.InitializeModel(object3dCommon_)) {
 			Logger::Log("Title preparation failed: the monitor or floor plane could not be loaded.");
 			preparationStep_ = PreparationStep::kFailed;
 			presentationStep_ = PresentationStep::kFailed;
@@ -179,8 +179,8 @@ void TitleScene::StartTitleNoise()
 	Logger::Log("Title presentation: 12 frames and 3D preparation complete; noise cover started.");
 	presentationStep_ = PresentationStep::kNoiseCover;
 	presentationTimer_ = 0.0f;
-	mainCamera->SetTranslate(kCameraStart);
-	mainCamera->SetRotate({ 0.0f, 0.0f, 0.0f });
+	mainCamera_->SetTranslate(kCameraStart);
+	mainCamera_->SetRotate({ 0.0f, 0.0f, 0.0f });
 	// 他の画面効果が残るとRandomNoiseが選ばれないため、切替中はノイズを単独で使います。
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->SetGrayscale(false);
@@ -201,7 +201,7 @@ bool TitleScene::InitializeSkyBoxAndEditorResources()
 {
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 	skyBox_ = Object3dFactory::CreateSkyBox(
-		dxCommon, cameraManager->GetActiveCamera(), "Resources/backGround/skybox-night-cube.dds");
+		dxCommon, cameraManager_->GetActiveCamera(), "Resources/backGround/skybox-night-cube.dds");
 	if (!skyBox_) {
 		return false;
 	}
@@ -238,10 +238,10 @@ void TitleScene::UpdateSceneContent()
 	UpdateTitlePresentation(deltaTime);
 	if (isInitialized_) {
 		// Cameraを先に更新し、RenderContextが完成済みの3D対象だけを準備します。
-		cameraManager->Update();
+		cameraManager_->Update();
 		Object3dRenderContext::NormalizeDirectionalLight(directionalLight_);
 		Object3dRenderContext renderContext(
-			cameraManager->GetActiveCamera(),
+			cameraManager_->GetActiveCamera(),
 			directionalLight_,
 			pointLight_,
 			spotLight_);
@@ -338,7 +338,7 @@ void TitleScene::UpdatePullBack(float deltaTime)
 	presentationTimer_ += deltaTime;
 	const float t = std::clamp(presentationTimer_ / kPullBackSeconds, 0.0f, 1.0f);
 	const float eased = 1.0f - (1.0f - t) * (1.0f - t);
-	mainCamera->SetTranslate(Lerp(kCameraStart, kCameraPulledBack, eased));
+	mainCamera_->SetTranslate(Lerp(kCameraStart, kCameraPulledBack, eased));
 	const float noiseFade = std::clamp(
 		(kNoiseFadeSeconds - presentationTimer_) / kNoiseFadeSeconds, 0.0f, 1.0f);
 	PostEffect::GetInstance()->SetRandomNoiseIntensity(noiseFade);
@@ -358,8 +358,8 @@ void TitleScene::UpdateTiltDown(float deltaTime)
 	presentationTimer_ += deltaTime;
 	const float t = std::clamp(presentationTimer_ / kTiltDownSeconds, 0.0f, 1.0f);
 	const float eased = t * t * (3.0f - 2.0f * t);
-	mainCamera->SetTranslate(kCameraPulledBack);
-	mainCamera->SetRotate(Lerp({ 0.0f, 0.0f, 0.0f }, kCameraLookDown, eased));
+	mainCamera_->SetTranslate(kCameraPulledBack);
+	mainCamera_->SetRotate(Lerp({ 0.0f, 0.0f, 0.0f }, kCameraLookDown, eased));
 	if (t >= 1.0f) {
 		presentationStep_ = PresentationStep::kReady;
 		Logger::Log("Title presentation: camera stopped; Enter is enabled.");
@@ -374,7 +374,7 @@ void TitleScene::UpdateEditorUi(bool isGameViewActive)
 	ImGuiManager::GetInstance()->Begin("Title");
 	titleEditor_.Draw(MakeTitleEditorContext());
 	if (isGameViewActive && presentationStep_ == PresentationStep::kReady) {
-		SceneEditor::UpdateViewportCamera(cameraManager ? cameraManager->GetActiveCamera() : nullptr);
+		SceneEditor::UpdateViewportCamera(cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr);
 	}
 	ImGuiManager::GetInstance()->End();
 }
@@ -418,8 +418,8 @@ void TitleScene::Draw()
 
 	if (isInitialized_) {
 		// 仮画像の下で完成済みの3Dを一度描き、初回描画の準備も済ませます。
-		SceneRenderPipeline::DrawObjects(object3dCommon, titleObjects_.GetNormalObjects());
-		SceneRenderPipeline::DrawObjects(object3dCommon, titleObjects_.GetAnimationObjects());
+		SceneRenderPipeline::DrawObjects(object3dCommon_, titleObjects_.GetNormalObjects());
+		SceneRenderPipeline::DrawObjects(object3dCommon_, titleObjects_.GetAnimationObjects());
 		skyBox_->Draw();
 	}
 
@@ -427,14 +427,14 @@ void TitleScene::Draw()
 	const bool showLoadingSprites =
 		presentationStep_ == PresentationStep::kFrames || presentationStep_ == PresentationStep::kFailed;
 	SceneRenderPipeline::DrawSprites(
-		spriteCommon,
+		spriteCommon_,
 		titleObjects_.GetSprites(),
 		showLoadingSprites ? 0 : titleObjects_.GetBaseSpriteCount());
 
 	// ImGuiのBegin/Endが未実行の準備中はDrawも省き、未生成DrawDataを渡しません。
 	SceneRenderPipeline::End(
 		DirectXCommon::GetInstance(),
-		cameraManager ? cameraManager->GetActiveCamera() : nullptr,
+		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr,
 		isInitialized_);
 	hasDrawnTitleSprite_ = true;
 	if (isInitialized_) {
@@ -452,8 +452,8 @@ void TitleScene::Finalize()
 	titleObjects_.Finalize();
 	skyBox_.reset();
 	titleEditor_.Finalize();
-	mainCamera.reset();
-	cameraManager.reset();
+	mainCamera_.reset();
+	cameraManager_.reset();
 	isInitialized_ = false;
 	isSpriteReady_ = false;
 	hasDrawnTitleSprite_ = false;

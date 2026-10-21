@@ -3,6 +3,7 @@
   <ItemGroup>
     <Filter Include="Tests"><UniqueIdentifier>{3317CF68-900D-42BB-B64A-30A8EDAF1DC8}</UniqueIdentifier></Filter>
     <Filter Include="EngineAudio"><UniqueIdentifier>{F51FB945-9974-41AB-A486-30B9E4BF3A93}</UniqueIdentifier></Filter>
+    <Filter Include="EngineUtility"><UniqueIdentifier>{69DA20B6-7799-48D6-B58F-C36E0A9DC38E}</UniqueIdentifier></Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AudioApiSmoke.cpp"><Filter>Tests</Filter></ClCompile>
@@ -10,9 +11,11 @@
     <ClCompile Include="..\engine\audio\AudioMixer.cpp"><Filter>EngineAudio</Filter></ClCompile>
     <ClCompile Include="..\engine\audio\BgmPlayer.cpp"><Filter>EngineAudio</Filter></ClCompile>
     <ClCompile Include="..\engine\audio\SoundEffectPlayer.cpp"><Filter>EngineAudio</Filter></ClCompile>
+    <ClCompile Include="..\engine\base\utility\StringUtility.cpp"><Filter>EngineUtility</Filter></ClCompile>
     <ClInclude Include="..\engine\audio\Audio.h"><Filter>EngineAudio</Filter></ClInclude>
     <ClInclude Include="..\engine\audio\AudioMixer.h"><Filter>EngineAudio</Filter></ClInclude>
     <ClInclude Include="..\engine\audio\BgmPlayer.h"><Filter>EngineAudio</Filter></ClInclude>
     <ClInclude Include="..\engine\audio\SoundEffectPlayer.h"><Filter>EngineAudio</Filter></ClInclude>
+    <ClInclude Include="..\engine\base\utility\StringUtility.h"><Filter>EngineUtility</Filter></ClInclude>
   </ItemGroup>
 </Project>

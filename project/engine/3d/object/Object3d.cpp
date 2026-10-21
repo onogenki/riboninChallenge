@@ -27,21 +27,21 @@ bool Object3d::Initialize(Object3dCommon* object3dCommon)
 	}
 
 	// 共通描画設定とCameraは所有せず、Objectの生存中だけ参照します。
-	this->object3dCommon = object3dCommon;
+	object3dCommon_ = object3dCommon;
 
 	//デフォルトカメラを自分にセット
-	this->camera = object3dCommon->GetDefaultCamera();
+	camera_ = object3dCommon->GetDefaultCamera();
 
 	// 描画用の行列・Light・Camera Constant Bufferは、専用のGPUデータ部品へまとめます。
 	gpuData_ = std::make_unique<Object3dGpuData>();
 	if (!gpuData_->Initialize(object3dCommon->GetDxCommon())) {
 		gpuData_.reset();
-		this->object3dCommon = nullptr;
-		camera = nullptr;
+		object3dCommon_ = nullptr;
+		camera_ = nullptr;
 		return false;
 	}
 	//Transform変数を作る
-	transform = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
+	transform_ = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	transformPlayback_.Reset();
 	animationReturnState_.Reset();
 	return true;
@@ -51,7 +51,7 @@ bool Object3d::Initialize(Object3dCommon* object3dCommon)
 void Object3d::Update()
 {
 	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
-	transformPlayback_.Update(transform, deltaTime);
+	transformPlayback_.Update(transform_, deltaTime);
 
 	if (model_ && isAnimating_ && currentAnimation_.duration > 0.0f)
 	{
@@ -94,14 +94,14 @@ void Object3d::Update()
 		model_->Update(skinCluster_, skeleton_);
 	}
 	//TransformからWorldMatrixを作る
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	Matrix4x4 worldMatrix = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
 	if (hasParentWorldMatrix_)
 	{
 		worldMatrix = Multiply(worldMatrix, parentWorldMatrix_);
 	}
 
 	if (gpuData_) {
-		gpuData_->UpdateTransform(worldMatrix, camera);
+		gpuData_->UpdateTransform(worldMatrix, camera_);
 	}
 }
 
@@ -119,7 +119,7 @@ bool Object3d::GetJointWorldMatrix(const std::string& jointName, Matrix4x4& worl
 		return false;
 	}
 
-	const Matrix4x4 modelWorldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	const Matrix4x4 modelWorldMatrix = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
 	worldMatrix = Multiply(skeleton_.joints[jointIterator->second].skeletonSpaceMatrix, modelWorldMatrix);
 	return true;
 }
@@ -147,7 +147,7 @@ void Object3d::RecordTransformEdit(const Transform& before)
 // 指定秒数を使い、Transform編集の履歴を記録します。
 void Object3d::RecordTransformEdit(const Transform& before, float elapsedSeconds)
 {
-	transformPlayback_.RecordEdit(before, transform, elapsedSeconds);
+	transformPlayback_.RecordEdit(before, transform_, elapsedSeconds);
 }
 
 // Animation時間を進めず、反射Cameraなど指定Camera用のWVPだけを更新します。
@@ -156,13 +156,13 @@ void Object3d::UpdateCameraForDraw(Camera* drawCamera)
 	if (!drawCamera) {
 		return;
 	}
-	camera = drawCamera;
-	Matrix4x4 worldMatrix = MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
+	camera_ = drawCamera;
+	Matrix4x4 worldMatrix = MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
 	if (hasParentWorldMatrix_) {
 		worldMatrix = Multiply(worldMatrix, parentWorldMatrix_);
 	}
 	if (gpuData_) {
-		gpuData_->UpdateTransform(worldMatrix, camera);
+		gpuData_->UpdateTransform(worldMatrix, camera_);
 	}
 }
 
@@ -173,16 +173,16 @@ void Object3d::Draw()
 		return;
 	}
 
-	ID3D12GraphicsCommandList* commandList = object3dCommon->GetDxCommon()->GetCommandList();
+	ID3D12GraphicsCommandList* commandList = object3dCommon_->GetDxCommon()->GetCommandList();
 	if (isSkeletal_) {
 		// 骨ありModelは、元から使っていたVertex Shader方式で骨行列と頂点影響度を渡して描きます。
 		// これによりwalk.gltfなどのAnimation Modelを、通常Modelと別の正しい頂点形式で描画します。
-		object3dCommon->SetSkinningCommonDrawSetting();
+		object3dCommon_->SetSkinningCommonDrawSetting();
 		if (!gpuData_ || !gpuData_->BindForObjectDraw(commandList)) {
 			return;
 		}
 
-		const std::string& environmentTexturePath = object3dCommon->GetEnvironmentTexturePath();
+		const std::string& environmentTexturePath = object3dCommon_->GetEnvironmentTexturePath();
 		if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f) {
 			commandList->SetGraphicsRootDescriptorTable(
 				8,
@@ -194,11 +194,11 @@ void Object3d::Draw()
 
 	// Animation・SkyBox・鏡の直後でも、通常モデル用の頂点形式とRoot Signatureへ戻します。
 	// Root Signatureを切り替えた後で、このObjectの行列・Light・Textureを設定します。
-	object3dCommon->SetCommonDrawSetting();
+	object3dCommon_->SetCommonDrawSetting();
 	if (!gpuData_ || !gpuData_->BindForObjectDraw(commandList)) {
 		return;
 	}
-	const std::string& environmentTexturePath = object3dCommon->GetEnvironmentTexturePath();
+	const std::string& environmentTexturePath = object3dCommon_->GetEnvironmentTexturePath();
 	if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f) {
 		commandList->SetGraphicsRootDescriptorTable(
 			7,
@@ -210,18 +210,18 @@ void Object3d::Draw()
 // 通常の深度値より奥にある面だけを描き、壁に隠れたObjectの形だけを見せます。
 void Object3d::DrawOccludedSilhouette(const Vector4& color)
 {
-	if (!model_ || !object3dCommon || !gpuData_) {
+	if (!model_ || !object3dCommon_ || !gpuData_) {
 		return;
 	}
 
-	ID3D12GraphicsCommandList* commandList = object3dCommon->GetDxCommon()->GetCommandList();
+	ID3D12GraphicsCommandList* commandList = object3dCommon_->GetDxCommon()->GetCommandList();
 	if (isSkeletal_) {
 		// 骨ありModelも通常描画と同じ変形済み頂点を使うため、Animationの形がそのまま残ります。
-		object3dCommon->SetSkinningComputeSetting();
+		object3dCommon_->SetSkinningComputeSetting();
 		model_->DispatchSkinning(skinCluster_);
 	}
 
-	object3dCommon->SetOccludedSilhouetteDrawSetting();
+	object3dCommon_->SetOccludedSilhouetteDrawSetting();
 	gpuData_->BindForOccludedSilhouetteDraw(commandList, color);
 	if (isSkeletal_) {
 		model_->DrawSkinned(skinCluster_, textureSrvIndexOverride_);
@@ -238,8 +238,8 @@ void Object3d::DrawMirror(
 		return;
 	}
 
-	ID3D12GraphicsCommandList* commandList = object3dCommon->GetDxCommon()->GetCommandList();
-	object3dCommon->SetMirrorDrawSetting();
+	ID3D12GraphicsCommandList* commandList = object3dCommon_->GetDxCommon()->GetCommandList();
+	object3dCommon_->SetMirrorDrawSetting();
 	if (!gpuData_->BindForMirrorDraw(
 		commandList,
 		reflectionViewProjection,
@@ -353,7 +353,7 @@ bool Object3d::InitializeAnimation()
 		}
 		//スケルトンがあるならSkinClusterも作成する
 		// （引数の descriptorHeap や device は DxCommon 等から引っ張ってくる）
-		auto device = object3dCommon->GetDxCommon()->GetDevice();
+		auto device = object3dCommon_->GetDxCommon()->GetDevice();
 		if (!device) {
 			Logger::Log("Object3d: DirectX device is unavailable for SkinCluster.");
 			skeleton_ = {};

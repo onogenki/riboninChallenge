@@ -78,27 +78,27 @@ bool DebugScene::InitializeRenderSystems()
 	ParticleManager::GetInstance()->ClearAllGroups();
 
 	// 3Dと2Dの共通描画部は、Sceneへ入る時に同じDirectX環境で初期化します。
-	object3dCommon = Object3dCommon::GetInstance();
-	object3dCommon->Initialize(dxCommon);
-	spriteCommon = SpriteCommon::GetInstance();
-	return spriteCommon->Initialize(dxCommon);
+	object3dCommon_ = Object3dCommon::GetInstance();
+	object3dCommon_->Initialize(dxCommon);
+	spriteCommon_ = SpriteCommon::GetInstance();
+	return spriteCommon_->Initialize(dxCommon);
 }
 
 // DebugScene専用のCameraを作り、ほかのSceneで使ったCamera状態を持ち込みません。
 void DebugScene::InitializeCameras()
 {
 	// MainCameraは通常のGame Viewへ使います。
-	InitializeMainCamera(cameraManager, mainCamera, { 0.0f, 0.0f, -10.0f });
-	ParticleManager::GetInstance()->SetCameraManager(cameraManager.get());
+	InitializeMainCamera(cameraManager_, mainCamera_, { 0.0f, 0.0f, -10.0f });
+	ParticleManager::GetInstance()->SetCameraManager(cameraManager_.get());
 
 	// 上から確認する補助Cameraも同じManagerへ登録します。
 	upCamera_ = std::make_unique<Camera>();
 	upCamera_->SetRotate({ 0.785f,0.0f,0.0f });
 	upCamera_->SetTranslate({ 0.0f,5.0f,-5.0f });
-	cameraManager->AddCamera("UpCamera", upCamera_.get());
+	cameraManager_->AddCamera("UpCamera", upCamera_.get());
 
 	// Object3dの初期Cameraには、現在選んだMainCameraを渡します。
-	object3dCommon->SetDefaultCamera(cameraManager->GetActiveCamera());
+	object3dCommon_->SetDefaultCamera(cameraManager_->GetActiveCamera());
 }
 
 
@@ -137,10 +137,10 @@ bool DebugScene::InitializeSceneResources()
 		Logger::Log(std::string("DebugScene initialization failed: environment texture could not be loaded: ") + environmentTexturePath);
 		return false;
 	}
-	object3dCommon->SetEnvironmentTexturePath(environmentTexturePath);
+	object3dCommon_->SetEnvironmentTexturePath(environmentTexturePath);
 
 	// 読み込めたDDSだけをFactoryから受け取り、未登録SRVを描画しません。
-	skyBox_ = Object3dFactory::CreateSkyBox(dxCommon, cameraManager->GetActiveCamera(), skyBoxTexturePath);
+	skyBox_ = Object3dFactory::CreateSkyBox(dxCommon, cameraManager_->GetActiveCamera(), skyBoxTexturePath);
 	if (!skyBox_) {
 		Logger::Log("DebugScene initialization failed: SkyBox could not be created.");
 		return false;
@@ -155,16 +155,16 @@ bool DebugScene::InitializeSceneResources()
 bool DebugScene::InitializeInitialContent()
 {
 	// Factoryでモデル読込とObject3d初期化を済ませ、Debug固有の配置だけをここで決めます。
-	auto objPlane = Object3dFactory::Create(object3dCommon, "debug/terrain.obj");
+	auto objPlane = Object3dFactory::Create(object3dCommon_, "debug/terrain.obj");
 	if (!objPlane) {
 		return false;
 	}
-	objPlane->GetTransform().translate = { 1.0f, -2.0f, 10.0f };
+	objPlane->SetTranslate({ 1.0f, -2.0f, 10.0f });
 	objectPlane_ = objPlane.get();
 	normalObjects_.push_back(std::move(objPlane));
 
 	// 人型・歩行Animation・手持ちWeaponは、Animation確認専用部品がまとめて準備します。
-	if (!debugAnimationPreview_.Initialize(object3dCommon, animationObjects_)) {
+	if (!debugAnimationPreview_.Initialize(object3dCommon_, animationObjects_)) {
 		return false;
 	}
 
@@ -179,7 +179,7 @@ bool DebugScene::InitializeInitialContent()
 	for (uint32_t i = 0; i < 1; ++i)
 	{
 		auto sprite = std::make_unique<Sprite>();
-		if (!sprite->Initialize(spriteCommon, "Resources/debug/monsterBall.png")) {
+		if (!sprite->Initialize(spriteCommon_, "Resources/debug/monsterBall.png")) {
 			return false;
 		}
 
@@ -238,7 +238,7 @@ void DebugScene::InitializeLightsAndEmitters()
 }
 
 
-// 初期ObjectをECSへ登録し、Shelf・Capture・自動確認を開始します。
+// 初期ObjectをECSへ登録し、Shelfと自動確認を開始します。撮影本体は共通Managerが所有します。
 void DebugScene::InitializeDebugTools()
 {
 	baseAnimationObjectCount_ = animationObjects_.size();
@@ -260,7 +260,6 @@ void DebugScene::InitializeDebugTools()
 	}
 	levelRuntime_.SetEcsSyncReady(true);
 	debugSceneEditor_.ScanResources();
-	gameViewCapture_.Initialize();
 	InitializeUiSmokeFromEnvironment();
 	InitializeTimePlaybackSmokeFromEnvironment();
 }
@@ -273,7 +272,7 @@ bool DebugScene::EnterModelPreview(const std::string& fileName)
 		return false;
 	}
 
-	Camera* activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	Camera* activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	// モデルごとの中心と半径はShelfのスキャン結果から受け取り、プレビュー部品へ渡します。
 	Vector3 previewCenter{};
 	float previewRadius = 1.0f;
@@ -298,15 +297,15 @@ bool DebugScene::EnterModelPreview(const std::string& fileName)
 bool DebugScene::EnterTexturePreview(const std::string& textureFilePath)
 {
 	return assetPreview_.EnterTexture(
-		spriteCommon,
+		spriteCommon_,
 		textureFilePath,
-		cameraManager ? cameraManager->GetActiveCamera() : nullptr);
+		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr);
 }
 
 // モデルまたはTextureのPreviewを終了し、通常のDebug Scene表示へ戻します。
 void DebugScene::ExitModelPreview()
 {
-	assetPreview_.Exit(cameraManager ? cameraManager->GetActiveCamera() : nullptr);
+	assetPreview_.Exit(cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr);
 }
 
 // Debug用Particleを発生させる、人型Animationモデル付近の座標を返します。
@@ -315,20 +314,16 @@ Vector3 DebugScene::GetParticleEffectPosition() const
 	return debugAnimationPreview_.GetParticleEffectPosition();
 }
 
-// 初期化失敗後は未生成のSkyBoxやObjectを参照しません。
+// 初期化失敗後は未生成のSkyBoxやObjectを参照せず、撮影は共通Managerへ任せます。
 void DebugScene::Update()
 {
 	if (!isSceneReady_) {
 		return;
 	}
-	// DebugSceneの一フレームは、読込→Capture→内容→UI→自動確認の順です。
+	// DebugSceneの一フレームは、読込→内容→UI→自動確認の順です。
 	// Blenderからscene.jsonが保存された時だけ、配置済みモデルを再読込します。
 	levelRuntime_.UpdateHotReload(MakeLevelRuntimeContext());
-	// UI自動確認中は、確認用の一枚保存だけを行います。
-	// 通常のリプレイ蓄積を同時に走らせると、同じRenderTextureを二重に読み取ってしまいます。
-	if (!DebugUiSmoke::IsEnabled(uiSmoke_)) {
-		gameViewCapture_.Update();
-	}
+	// 通常撮影はSceneManagerの描画後にCaptureManagerが処理します。
 	UpdateSceneContent();
 	UpdateEditorUi();
 	UpdateAutomation();
@@ -343,11 +338,11 @@ void DebugScene::Update()
 void DebugScene::UpdateSceneContent()
 {
 	gameViewCameraController_.Update(
-		cameraManager ? cameraManager->GetActiveCamera() : nullptr,
+		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr,
 		assetPreview_);
 
 	// Cameraを先に更新してから、その行列を全モデルの描画準備へ使います。
-	cameraManager->Update();
+	cameraManager_->Update();
 
 	// 選択中のEmitterだけを動かし、ParticleManagerは全Groupを更新します。
 	if (activeEmitter_) {
@@ -358,7 +353,7 @@ void DebugScene::UpdateSceneContent()
 	// DirectionalLightは全Object3dで共有するため、一度だけ安全な単位方向へそろえます。
 	Object3dRenderContext::NormalizeDirectionalLight(directionalLight_);
 	Object3dRenderContext renderContext(
-		cameraManager->GetActiveCamera(),
+		cameraManager_->GetActiveCamera(),
 		directionalLight_,
 		pointLight_,
 		spotLight_);
@@ -410,7 +405,7 @@ void DebugScene::UpdateEditorUi()
 #endif
 	// Animation確認部品が所有する人型モデルのSkeletonを、必要な時だけ重ねて表示します。
 	debugAnimationPreview_.DrawSkeletonDebug(
-		cameraManager ? cameraManager->GetActiveCamera() : nullptr,
+		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr,
 		ImGuiManager::GetInstance()->IsSkeletonDebugDrawEnabled());
 
 	ImGuiManager::GetInstance()->End();
@@ -425,9 +420,9 @@ void DebugScene::Draw()
 	// 通常SceneとPreviewの描画経路をDebug専用Rendererへ渡します。
 	DebugSceneRenderer::Draw({
 		DirectXCommon::GetInstance(),
-		object3dCommon,
-		spriteCommon,
-		cameraManager ? cameraManager->GetActiveCamera() : nullptr,
+		object3dCommon_,
+		spriteCommon_,
+		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr,
 		assetPreview_.IsActive() ? assetPreview_.GetObject() : nullptr,
 		assetPreview_.IsActive() ? assetPreview_.GetSprite() : nullptr,
 		&normalObjects_,
@@ -452,7 +447,6 @@ void DebugScene::Finalize()
 
 	activeEmitter_ = nullptr;
 	objectPlane_ = nullptr;
-	gameViewCapture_.Finalize();
 	debugSceneEditor_.Finalize();
 	levelRuntime_.Reset();
 	baseAnimationObjectCount_ = 0;
@@ -469,7 +463,7 @@ void DebugScene::Finalize()
 	animationObjects_.clear();
 	entityRegistry_.Clear();
 	upCamera_.reset();
-	mainCamera.reset();
-	cameraManager.reset();
+	mainCamera_.reset();
+	cameraManager_.reset();
 }
 

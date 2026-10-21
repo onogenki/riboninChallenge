@@ -138,6 +138,8 @@
       <GuardEHContMetadata>true</GuardEHContMetadata>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <!-- Releaseの並列コンパイルでも共有PDB管理に依存しないよう、Debug情報を各objへ保持します。 -->
+      <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <DisableSpecificWarnings>4865;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>

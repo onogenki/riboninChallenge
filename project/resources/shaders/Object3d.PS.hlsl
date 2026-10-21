@@ -191,9 +191,9 @@ PixelShaderOutput main(
     {
         float32_t3 cameraToPosition = normalize(input.worldPosition - gCamera.worldPosition);
         float32_t3 reflectedVector = reflect(cameraToPosition, N);
-        float32_t4 enviromentColor = gEnvironmentTexture.Sample(gSampler, reflectedVector);
+        float32_t4 environmentColor = gEnvironmentTexture.Sample(gSampler, reflectedVector);
     
-        output.color.rgb += enviromentColor.rgb * gMaterial.environmentCoefficient;
+        output.color.rgb += environmentColor.rgb * gMaterial.environmentCoefficient;
     } 
     // アルファ
     output.color.a =

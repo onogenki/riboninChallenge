@@ -8,7 +8,7 @@
 #pragma comment(lib,"dinput8.lib")
 #pragma comment(lib,"dxguid.lib")
 
-std::unique_ptr <Input> Input::instance = nullptr;
+std::unique_ptr <Input> Input::instance_ = nullptr;
 
 namespace {
 constexpr float kStickMax = 32768.0f;
@@ -33,36 +33,36 @@ void Input::Initialize(WinApp* winApp)
 	HRESULT result;
 
 	//DirectInputのインスタンス生成
-	result = DirectInput8Create(winApp->GetHInstance(), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput, nullptr);
+	result = DirectInput8Create(winApp->GetHInstance(), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput_, nullptr);
 	if (FAILED(result)) {
 		Logger::Log("Input: DirectInput initialization failed; mouse uses Windows fallback.\n");
 		return;
 	}
 	//キーボードデバイス生成
-	result = directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL);
+	result = directInput_->CreateDevice(GUID_SysKeyboard, &keyboard_, NULL);
 	if (SUCCEEDED(result)) {
 		// Windowsキーを妨げない協調レベルで、キーボードを使える状態にします。
-		result = keyboard->SetDataFormat(&c_dfDIKeyboard);
+		result = keyboard_->SetDataFormat(&c_dfDIKeyboard);
 		if (SUCCEEDED(result)) {
-			result = keyboard->SetCooperativeLevel(winApp->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+			result = keyboard_->SetCooperativeLevel(winApp->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
 		}
 	}
 	if (FAILED(result)) {
 		Logger::Log("Input: DirectInput keyboard initialization failed.\n");
-		keyboard.Reset();
+		keyboard_.Reset();
 	}
 
 	// マウスデバイス生成
-	result = directInput->CreateDevice(GUID_SysMouse, &mouse, nullptr);
+	result = directInput_->CreateDevice(GUID_SysMouse, &mouse_, nullptr);
 	if (SUCCEEDED(result)) {
 		// マウスの初期化に失敗しても、更新時のWindows入力で操作を続けられるようにする。
-		result = mouse->SetDataFormat(&c_dfDIMouse);
+		result = mouse_->SetDataFormat(&c_dfDIMouse);
 		if (SUCCEEDED(result)) {
-			result = mouse->SetCooperativeLevel(
+			result = mouse_->SetCooperativeLevel(
 				winApp->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
 		}
 		if (SUCCEEDED(result)) {
-			result = mouse->Acquire();
+			result = mouse_->Acquire();
 		}
 	}
 	if (FAILED(result) && result != DIERR_OTHERAPPHASPRIO) {
@@ -72,7 +72,7 @@ void Input::Initialize(WinApp* winApp)
 	SearchGamepads();
 
 	//gamepadsの中に要素があればコントローラー接続と判断
-	if (!gamepads.empty())
+	if (!gamepads_.empty())
 	{
 		currentDevice_ = InputDevice::Gamepad;
 	} else
@@ -85,8 +85,8 @@ void Input::Initialize(WinApp* winApp)
 void Input::Update()
 {
 	//前回のキー入力を保存
-	memcpy(keyPre, key, sizeof(key));
-	mouseStatePre = mouseState;
+	memcpy(keyPre_, key_, sizeof(key_));
+	mouseStatePre_ = mouseState_;
 	UpdateKeyboard();
 	UpdateMouse();
 	UpdateGamepads();
@@ -97,11 +97,11 @@ void Input::Update()
 void Input::UpdateKeyboard()
 {
 	//キーボード情報の取得開始
-	if (keyboard) {
-		keyboard->Acquire();
+	if (keyboard_) {
+		keyboard_->Acquire();
 		// フォーカスを失った時は古い押下状態を残さない。
-		if (FAILED(keyboard->GetDeviceState(sizeof(key), key))) {
-			ZeroMemory(key, sizeof(key));
+		if (FAILED(keyboard_->GetDeviceState(sizeof(key_), key_))) {
+			ZeroMemory(key_, sizeof(key_));
 			// Releaseで操作不能になった時、前面表示中の取得失敗だけを診断できます。
 			if (GetForegroundWindow() == winApp_->GetHwnd() && !keyboardUnavailableLogged_) {
 				Logger::Log("Input: DirectInput keyboard state unavailable; keyboard input cleared.");
@@ -117,23 +117,23 @@ void Input::UpdateKeyboard()
 void Input::UpdateMouse()
 {
 	// マウススクリーン座標取得
-	POINT pos{ mouseScreenX, mouseScreenY };
+	POINT pos{ mouseScreenX_, mouseScreenY_ };
 	if (GetCursorPos(&pos)) {
 		ScreenToClient(winApp_->GetHwnd(), &pos);
 	}
 
-	mouseScreenX = pos.x;
-	mouseScreenY = pos.y;
+	mouseScreenX_ = pos.x;
+	mouseScreenY_ = pos.y;
 
 	// マウスボタン
    // 現在の状態をクリアしてから取得
-	ZeroMemory(&mouseState, sizeof(mouseState));
+	ZeroMemory(&mouseState_, sizeof(mouseState_));
 
-	HRESULT hr = mouse ? mouse->GetDeviceState(sizeof(DIMOUSESTATE), &mouseState) : E_FAIL;
-	if (FAILED(hr) && mouse) {
+	HRESULT hr = mouse_ ? mouse_->GetDeviceState(sizeof(DIMOUSESTATE), &mouseState_) : E_FAIL;
+	if (FAILED(hr) && mouse_) {
 		// フォーカス復帰後の再取得結果も確認する。
-		mouse->Acquire();
-		hr = mouse->GetDeviceState(sizeof(DIMOUSESTATE), &mouseState);
+		mouse_->Acquire();
+		hr = mouse_->GetDeviceState(sizeof(DIMOUSESTATE), &mouseState_);
 	}
 	if (FAILED(hr)) {
 		// DirectInputが使えない間だけWindows入力に切り替え、Releaseの操作を失わない。
@@ -143,12 +143,12 @@ void Input::UpdateMouse()
 		}
 		if (GetForegroundWindow() == winApp_->GetHwnd()) {
 			if (hasPreviousMousePosition_) {
-				mouseState.lX = pos.x - previousMousePosition_.x;
-				mouseState.lY = pos.y - previousMousePosition_.y;
+				mouseState_.lX = pos.x - previousMousePosition_.x;
+				mouseState_.lY = pos.y - previousMousePosition_.y;
 			}
 			const int buttons[] = { VK_LBUTTON, VK_RBUTTON, VK_MBUTTON };
 			for (int button = 0; button < 3; ++button) {
-				mouseState.rgbButtons[button] = (GetAsyncKeyState(buttons[button]) & 0x8000) ? 0x80 : 0;
+				mouseState_.rgbButtons[button] = (GetAsyncKeyState(buttons[button]) & 0x8000) ? 0x80 : 0;
 			}
 		}
 	} else {
@@ -161,32 +161,32 @@ void Input::UpdateMouse()
 // 未接続なら再検索し、取得失敗時は古い押下状態を残さず再取得します。
 void Input::UpdateGamepads()
 {
-	if (gamepads.empty()) {
+	if (gamepads_.empty()) {
 		reSearchTimer_++;
 		if (reSearchTimer_ >= 60) { // 60フレーム（約1秒）に1回実行
 			reSearchTimer_ = 0;
 			SearchGamepads(); // 再検索！
 
 			// もしこのタイミングで見つかったら、デバイス状態をゲームパッドにする
-			if (!gamepads.empty()) {
+			if (!gamepads_.empty()) {
 				currentDevice_ = InputDevice::Gamepad;
 			}
 		}
 	}
-	padStatesPre = padStates;
+	padStatesPre_ = padStates_;
 	// 各パッドの現在値を読み、Trigger判定用に前フレームの値を残します。
-	for (size_t i = 0; i < gamepads.size(); i++) {
-		gamepads[i]->Poll();
+	for (size_t i = 0; i < gamepads_.size(); i++) {
+		gamepads_[i]->Poll();
 
 		// 読めないフレームでは前回の押下を使わないよう、結果は新しい状態へ受け取ります。
 		DIJOYSTATE currentState{};
-		HRESULT hr = gamepads[i]->GetDeviceState(sizeof(DIJOYSTATE), &currentState);
+		HRESULT hr = gamepads_[i]->GetDeviceState(sizeof(DIJOYSTATE), &currentState);
 		if (FAILED(hr)) {
-			gamepads[i]->Acquire();
+			gamepads_[i]->Acquire();
 			currentState = {};
-			hr = gamepads[i]->GetDeviceState(sizeof(DIJOYSTATE), &currentState);
+			hr = gamepads_[i]->GetDeviceState(sizeof(DIJOYSTATE), &currentState);
 		}
-		padStates[i] = SUCCEEDED(hr) ? currentState : DIJOYSTATE{};
+		padStates_[i] = SUCCEEDED(hr) ? currentState : DIJOYSTATE{};
 	}
 }
 
@@ -196,7 +196,7 @@ void Input::UpdateCurrentDevice()
 	//キーボードの何かしら押されたかチェック
 	for (int i = 0; i < 256; i++)
 	{
-		if (key[i])//どこかのキーが押されていたら
+		if (key_[i])//どこかのキーが押されていたら
 		{
 			currentDevice_ = InputDevice::Keyboard;
 			break;//キーボードに確定したのでループを抜ける
@@ -204,19 +204,19 @@ void Input::UpdateCurrentDevice()
 	}
 
 	//マウスの何かしら押されたかチェック
-	if (mouseState.lX != 0 || mouseState.lY != 0 || mouseState.lZ != 0 ||
-		mouseState.rgbButtons[0] || mouseState.rgbButtons[1] ||
-		mouseState.rgbButtons[2] || mouseState.rgbButtons[3])
+	if (mouseState_.lX != 0 || mouseState_.lY != 0 || mouseState_.lZ != 0 ||
+		mouseState_.rgbButtons[0] || mouseState_.rgbButtons[1] ||
+		mouseState_.rgbButtons[2] || mouseState_.rgbButtons[3])
 	{
 		currentDevice_ = InputDevice::Keyboard; // マウスを触った場合もキーボードUIにする
 	}
 
 	//コントローラーの何かしらのボタンまたはスティックが反応したらチェック
-	for (size_t i = 0; i < gamepads.size(); i++)
+	for (size_t i = 0; i < gamepads_.size(); i++)
 	{//ボタンチェック
 		for (int b = 0; b < 32; b++)
 		{
-			if (padStates[i].rgbButtons[b])
+			if (padStates_[i].rgbButtons[b])
 			{
 				currentDevice_ = InputDevice::Gamepad;
 				break;
@@ -236,21 +236,21 @@ void Input::UpdateCurrentDevice()
 // ゲームパッドを列挙し、現在接続されている装置とボタン状態だけを保持します。
 void Input::SearchGamepads() {
 	// 念のためリストを一度クリアする
-	gamepads.clear();
-	padStates.clear();
-	padStatesPre.clear();
-	if (!directInput) {
+	gamepads_.clear();
+	padStates_.clear();
+	padStatesPre_.clear();
+	if (!directInput_) {
 		return;
 	}
 
 	// 接続されているパッドを探す（Initialize内にあった処理の引っ越し）
-	HRESULT result = directInput->EnumDevices(
+	HRESULT result = directInput_->EnumDevices(
 		DI8DEVCLASS_GAMECTRL,
 		[](const DIDEVICEINSTANCE* pdidInstance, VOID* pContext) -> BOOL {
 			auto self = static_cast<Input*>(pContext);
 			ComPtr<IDirectInputDevice8> newPad;
 
-			if (FAILED(self->directInput->CreateDevice(pdidInstance->guidInstance, &newPad, nullptr))) {
+			if (FAILED(self->directInput_->CreateDevice(pdidInstance->guidInstance, &newPad, nullptr))) {
 				return DIENUM_CONTINUE;
 			}
 
@@ -266,9 +266,9 @@ void Input::SearchGamepads() {
 			diprg.lMax = 32768;  // 最大値
 			newPad->SetProperty(DIPROP_RANGE, &diprg.diph);
 
-			self->gamepads.push_back(newPad);
-			self->padStates.emplace_back();
-			self->padStatesPre.emplace_back();
+			self->gamepads_.push_back(newPad);
+			self->padStates_.emplace_back();
+			self->padStatesPre_.emplace_back();
 
 			return DIENUM_CONTINUE;
 		},
@@ -276,25 +276,26 @@ void Input::SearchGamepads() {
 }
 
 
+// 入力状態をフレーム間で共有するため、同じInput本体を返します。
 Input* Input::GetInstance() {
-	if (instance == nullptr) {
-		instance = std::make_unique <Input>();
+	if (instance_ == nullptr) {
+		instance_ = std::make_unique <Input>();
 	}
-	return instance.get();
+	return instance_.get();
 }
 
-//プッシュ入力
+// 現在フレームの指定キーを読み、押し続け中の操作にも使えるようにします。
 bool Input::PushKey(BYTE keyNumber){
 	//指定キーを押していればtrueを返す
-	if (key[keyNumber]) {
+	if (key_[keyNumber]) {
 		return true;
 	}
 	//そうでなければfalseを返す
 	return false;
 }
-//トリガー入力
+// 前フレームとの差を調べ、一回だけ反応させたい操作に使います。
 bool Input::TriggerKey(BYTE keyNumber){
-	if (key[keyNumber] && !keyPre[keyNumber]){
+	if (key_[keyNumber] && !keyPre_[keyNumber]){
 		return true;
 	}
 	return false;
@@ -303,44 +304,45 @@ bool Input::TriggerKey(BYTE keyNumber){
 bool Input::TriggerAnyKeyExcept(BYTE excludedKey) const
 {
 	for (int index = 0; index < 256; ++index) {
-		if (index != excludedKey && key[index] && !keyPre[index]) {
+		if (index != excludedKey && key_[index] && !keyPre_[index]) {
 			return true;
 		}
 	}
 	return false;
 }
-// ゲームパッドのボタンが押された瞬間かどうか
+// 前フレームとの差を調べ、パッドのボタンを一回だけ反応させます。
 bool Input::TriggerPadButton(int padIndex, int button) {
 	// 指定されたインデックスが範囲外なら拒否
-	if (padIndex < 0 || padIndex >= static_cast<int>(padStates.size()) || button < 0 || button >= 32) return false;
+	if (padIndex < 0 || padIndex >= static_cast<int>(padStates_.size()) || button < 0 || button >= 32) return false;
 
 	// 「現在のフレームで押されていて」かつ「前のフレームでは押されていなかった」なら true
-	if (padStates[padIndex].rgbButtons[button] && !padStatesPre[padIndex].rgbButtons[button]) {
+	if (padStates_[padIndex].rgbButtons[button] && !padStatesPre_[padIndex].rgbButtons[button]) {
 		return true;
 	}
 
 	return false;
 }
 
-// マウスボタンが押されたかどうか
+// 今フレームのマウスボタンを読み、ドラッグなど押し続ける操作に使います。
 bool Input::IsMouseButtonPressed(int button) {
 	if (button < 0 || button >= 4) return false;
-	if (mouseState.rgbButtons[button] & 0x80) {
+	if (mouseState_.rgbButtons[button] & 0x80) {
 		return true;
 	}
 	return false;
 }
 
+// 前フレームとの差を調べ、クリックを押した瞬間だけ成立させます。
 bool Input::TriggerMouseButton(int button) {
 	if (button < 0 || button >= 4) return false;
-	return (mouseState.rgbButtons[button] & 0x80) && !(mouseStatePre.rgbButtons[button] & 0x80);
+	return (mouseState_.rgbButtons[button] & 0x80) && !(mouseStatePre_.rgbButtons[button] & 0x80);
 }
 
-// ゲームパッドのボタンが押されたかどうか
+// 今フレームのパッドボタンを読み、押し続ける操作に使います。
 bool Input::IsPadButtonPressed(int padIndex, int button) {
-	if (padIndex < 0 || padIndex >= static_cast<int>(padStates.size()) || button < 0 || button >= 32) return false;
+	if (padIndex < 0 || padIndex >= static_cast<int>(padStates_.size()) || button < 0 || button >= 32) return false;
 
-	if (padStates[padIndex].rgbButtons[button]) {
+	if (padStates_[padIndex].rgbButtons[button]) {
 		return true;
 	}
 
@@ -349,32 +351,32 @@ bool Input::IsPadButtonPressed(int padIndex, int button) {
 
 // 左スティックの横方向を読み、共通の範囲と遊び幅で判定します。
 float Input::GetPadLeftAxisX(int padIndex) {
-	if (padIndex >= 0 && padIndex < static_cast<int>(padStates.size())) {
-		return NormalizePadAxis(padStates[padIndex].lX);
+	if (padIndex >= 0 && padIndex < static_cast<int>(padStates_.size())) {
+		return NormalizePadAxis(padStates_[padIndex].lX);
 	}
 	return 0.0f;
 }
 // 左スティックの縦方向を読み、横方向と同じ遊び幅で判定します。
 float Input::GetPadLeftAxisY(int padIndex) {
-	if (padIndex >= 0 && padIndex < static_cast<int>(padStates.size())) {
+	if (padIndex >= 0 && padIndex < static_cast<int>(padStates_.size())) {
 		// 符号はここで反転せず、DirectInputから取得した向きをそのまま返します。
-		return NormalizePadAxis(padStates[padIndex].lY);
+		return NormalizePadAxis(padStates_[padIndex].lY);
 	}
 	return 0.0f;
 }
 
 // 右スティックの横方向を読み、左スティックと同じ基準で判定します。
 float Input::GetPadRightAxisX(int padIndex) {
-	if (padIndex >= 0 && padIndex < static_cast<int>(padStates.size())) {
-		return NormalizePadAxis(padStates[padIndex].lRx);
+	if (padIndex >= 0 && padIndex < static_cast<int>(padStates_.size())) {
+		return NormalizePadAxis(padStates_[padIndex].lRx);
 	}
 	return 0.0f;
 }
 
 // 右スティックの縦方向を読み、他の軸と同じ基準で判定します。
 float Input::GetPadRightAxisY(int padIndex) {
-	if (padIndex >= 0 && padIndex < static_cast<int>(padStates.size())) {
-		return NormalizePadAxis(padStates[padIndex].lRy);
+	if (padIndex >= 0 && padIndex < static_cast<int>(padStates_.size())) {
+		return NormalizePadAxis(padStates_[padIndex].lRy);
 	}
 	return 0.0f;
 }

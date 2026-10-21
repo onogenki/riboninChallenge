@@ -20,17 +20,17 @@ MSBuild project/tests/AudioApiSmoke.vcxproj /m /p:Configuration=Debug /p:Platfor
 
 ## 通常起動のScene順
 
-`RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE=1`は撮影・録画をせず、最初の`Loading → TITLE`に続き、テスト自身が`Loading → STAGE1`へのScene切替を予約して各SceneのDrawを確認します。予約前には未登録名と`LOADING`自身を行き先に指定して拒否され、白画面への切替も予約されないことを確認します。`RIBONIN_CHALLENGE_START_SCENE`は指定しません。現在の通常操作は`TITLE`の`Stage1(true)`内でEnter後に`BeginStageStart()`へ進むため、このSmokeはそのEnter経路を通りません。
+`RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE=1`は撮影・録画をせず、最初の`Loading → TITLE`に続き、テスト自身がフェード付きで`STAGE_SELECT → STAGE1`へのScene切替を予約して各SceneのDrawを確認します。予約前には未登録名と`LOADING`自身を行き先に指定して拒否され、白画面への切替も予約されないことを確認します。`RIBONIN_CHALLENGE_START_SCENE`は指定しません。このSmokeはEnterキーやポーズ中のBackspaceキーを実際に押す経路は通りません。
 
 ```powershell
-# projectフォルダを作業ディレクトリとして、Release版の通常起動順を確認します。
+# projectフォルダを作業ディレクトリとして、Release版のScene描画順を確認します。
 $env:RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE = '1'
-../generated/outputs/Release/riboninCharenge.exe
+../generated/outputs/Release/riboninChallenge.exe
 Remove-Item Env:RIBONIN_CHALLENGE_STARTUP_ROUTE_SMOKE
 Get-Content logs/startup_route_smoke.log
 ```
 
-ログの`SUCCESS`と、両方のLoading・Title・Stage1のDraw回数が1以上であることを確認します。これはSceneManagerの切替順のテストで、白背景の見た目、Enter入力、同じScene内の登場演出、マウス操作は保証しません。
+ログの`SUCCESS`と、3回のLoading・Title・StageSelect・Stage1のDraw回数が1以上であることを確認します。これはSceneManagerの切替順のテストで、白フェードの見た目、Enter入力、同じScene内の登場演出、マウス操作は保証しません。
 
 ## 撮影Smokeの対応構成
 
@@ -51,7 +51,7 @@ Get-Content logs/startup_route_smoke.log
 # projectフォルダから、DebugまたはDevelopmentの検証用実行ファイルを起動します。
 $env:RIBONIN_CHALLENGE_START_SCENE = 'DEBUG'
 $env:RIBONIN_CHALLENGE_DEBUG_UI_SMOKE = 'walk-scene-reload'
-$process = Start-Process -FilePath '../generated/outputs/Debug/riboninCharenge.exe' -WorkingDirectory . -WindowStyle Hidden -PassThru -Wait
+$process = Start-Process -FilePath '../generated/outputs/Debug/riboninChallenge.exe' -WorkingDirectory . -WindowStyle Hidden -PassThru -Wait
 $process.ExitCode
 Remove-Item Env:RIBONIN_CHALLENGE_START_SCENE,Env:RIBONIN_CHALLENGE_DEBUG_UI_SMOKE
 ```
@@ -68,4 +68,4 @@ MSBuild project/tests/LevelApiSmoke.vcxproj /m /p:Configuration=Debug /p:Platfor
 ./generated/tests/Debug/LevelApiSmoke.exe
 ```
 
-空欄の列番号、P/E/B/G/C/Lの登録別実行、B0とB1の区別、未登録番号の無視、B0の1×1×1 Colliderと座標を確認します。さらに、Editorが変更する入れ子のPlayerStartとStageが読むPlayerStartが同じ元データであることも確認します。これは対応表と配置データのテストです。Stage1でE0などの敵・ギミックが表示される証拠ではありません。
+空欄の列番号、P/E/B/G/C/Lの登録別実行、B0とB1の区別、未登録番号の無視、B0の1×1×1 Colliderと座標を確認します。さらに、Editorが変更する入れ子のPlayerStartとStageが読むPlayerStartが同じ元データであること、Stage ID 1〜5のJSON/CSV対応、無効IDでの選択保持と切替予約の一度だけの消費を確認します。これは対応表と配置データのテストです。Stage1でE0などの敵・ギミックが表示される証拠ではありません。

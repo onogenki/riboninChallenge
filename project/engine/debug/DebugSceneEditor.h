@@ -15,7 +15,7 @@ class DebugEntityRegistry;
 class DebugParticleEffects;
 class DebugSceneSelection;
 class DirectXCommon;
-class GameViewCapture;
+class CaptureManager;
 class Object3d;
 class ParticleEmitter;
 class Sprite;
@@ -44,7 +44,7 @@ public:
 		DebugSceneSelection* selection = nullptr;
 		DebugEntityRegistry* entityRegistry = nullptr;
 		DebugAssetPreview* assetPreview = nullptr;
-		GameViewCapture* gameViewCapture = nullptr;
+		CaptureManager* captureManager = nullptr;
 		// Inspector内のParticle・Effect・Camera・ECSタブが使う値です。
 		Transform* emitterTransform = nullptr;
 		ParticleEmitter* emitterCircle = nullptr;

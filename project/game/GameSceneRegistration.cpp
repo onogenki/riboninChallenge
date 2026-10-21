@@ -14,9 +14,10 @@ void RegisterGameScenes(SceneFactory& sceneFactory)
 	// 起動時も本編開始時も、一つのLoadingSceneを共通して使います。
 	sceneFactory.RegisterScene("LOADING", []() { return std::make_unique<LoadingScene>(); });
 	// 提出用Titleは従来のStage1固定Cameraを使い、Enterで選択画面へ進みます。
-	sceneFactory.RegisterScene("TITLE", []() { return std::make_unique<Stage1>(true); });
+	sceneFactory.RegisterScene("TITLE", []() { return std::make_unique<Stage>(1, true); });
 	sceneFactory.RegisterScene("STAGE_SELECT", []() { return std::make_unique<StageSelectScene>(); });
-	sceneFactory.RegisterScene("STAGE1", []() { return std::make_unique<Stage1>(); });
+	// 本編は一つのStage Sceneを使い、Stage IDごとにstage1.jsonからstage5.jsonを読み分けます。
+	sceneFactory.RegisterScene("STAGE1", []() { return std::make_unique<Stage>(1); });
 }
 
 // gameがリンクされた時だけ、起動前にStage1の登録処理をengineへ渡します。
