@@ -11,7 +11,7 @@
 #include "DebugParticleEffects.h"
 #include "DebugSceneSelection.h"
 #include "DirectXCommon.h"
-#include "GameViewCapture.h"
+#include "CaptureManager.h"
 #include "ImGuiManager.h"
 #include "Object3d.h"
 #include "ParticleEmitter.h"
@@ -42,7 +42,7 @@ void DebugSceneEditor::DrawInspector(Context& context)
 #ifdef USE_IMGUI
 	if (!context.normalObjects || !context.animationObjects || !context.sprites ||
 		!context.directionalLight || !context.pointLight || !context.spotLight ||
-		!context.selection || !context.entityRegistry || !context.gameViewCapture) {
+		!context.selection || !context.entityRegistry || !context.captureManager) {
 		return;
 	}
 
@@ -85,11 +85,11 @@ void DebugSceneEditor::DrawInspector(Context& context)
 		context.selection->ClearObjectSelection();
 	};
 	options.drawHeader = [&context]() {
-		if (context.gameViewCapture->IsRecording()) {
+		if (context.captureManager->IsRecording()) {
 			ImGui::TextColored(
 				ImVec4(1.0f, 0.25f, 0.2f, 1.0f),
 				"Recording Game View: %.2f sec",
-				context.gameViewCapture->GetRecordingTime());
+				context.captureManager->GetRecordingTime());
 			ImGui::Separator();
 		}
 	};

@@ -1,10 +1,10 @@
 #include "Object3dCommon.h"
 
-#include <cassert>
+#include <stdexcept>
 #include <vector>
 
 
-// 骨ありモデルのGraphics SkinningとCompute SkinningのPipelineをまとめる。
+// 骨ありモデルのShader結合位置を作り、失敗時は未完成のPipelineへ進みません。
 void Object3dCommon::CreateSkinningRootSignature()
 {
 	// RootSignature作成
@@ -103,18 +103,20 @@ void Object3dCommon::CreateSkinningRootSignature()
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature,
 		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr))
-	{
-		assert(false);
+	if (FAILED(hr) || !signatureBlob) {
+		throw std::runtime_error("Object3dCommon: skinning root signature serialization failed");
 	}
 
 	// バイナリを元に生成
 	hr = dxCommon_->GetDevice()->CreateRootSignature(0,
 		signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
 		IID_PPV_ARGS(&skinningRootSignature_)); // メンバ変数 rootSignature_ に保存
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !skinningRootSignature_) {
+		throw std::runtime_error("Object3dCommon: skinning root signature creation failed");
+	}
 }
 
+// 骨ありモデル用のShaderとPipelineを作り、失敗時はDrawへ進ませません。
 void Object3dCommon::CreateSkinningGraphicsPipeline()
 {
 	HRESULT hr = S_FALSE;
@@ -161,7 +163,7 @@ void Object3dCommon::CreateSkinningGraphicsPipeline()
 	blendDesc.RenderTarget[0].RenderTargetWriteMask =
 		D3D12_COLOR_WRITE_ENABLE_ALL;
 
-	// RasiterZerStateの設定
+	// RasterizerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	// カリングしない(裏面表示しない)
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
@@ -171,11 +173,15 @@ void Object3dCommon::CreateSkinningGraphicsPipeline()
 	// shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon_->CompileShader(L"resources/shaders/SkinningObject3d.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexShaderBlob != nullptr);
+	if (!vertexShaderBlob) {
+		throw std::runtime_error("Object3dCommon: skinning vertex shader is unavailable");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Object3d.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!pixelShaderBlob) {
+		throw std::runtime_error("Object3dCommon: skinning pixel shader is unavailable");
+	}
 
 	// DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -214,9 +220,12 @@ void Object3dCommon::CreateSkinningGraphicsPipeline()
 	// 実際に生成
 	hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
 		IID_PPV_ARGS(&skinningGraphicsPipelineState_)); // メンバ変数 graphicsPipelineState_ に保存
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !skinningGraphicsPipelineState_) {
+		throw std::runtime_error("Object3dCommon: skinning graphics pipeline creation failed");
+	}
 }
 
+// 変形済み頂点を使う壁越し描画の結合位置を作り、失敗時はComputeへ進みません。
 void Object3dCommon::CreateSkinningComputeRootSignature()
 {
 	D3D12_DESCRIPTOR_RANGE descriptorRanges[4] = {};
@@ -253,19 +262,26 @@ void Object3dCommon::CreateSkinningComputeRootSignature()
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature,
 		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !signatureBlob) {
+		throw std::runtime_error("Object3dCommon: compute skinning root signature serialization failed");
+	}
 
 	hr = dxCommon_->GetDevice()->CreateRootSignature(0,
 		signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
 		IID_PPV_ARGS(&skinningComputeRootSignature_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !skinningComputeRootSignature_) {
+		throw std::runtime_error("Object3dCommon: compute skinning root signature creation failed");
+	}
 }
 
+// 骨ありモデルの壁越し描画用Compute Shaderを作り、失敗時は使用を止めます。
 void Object3dCommon::CreateSkinningComputePipeline()
 {
 	Microsoft::WRL::ComPtr<IDxcBlob> computeShaderBlob = dxCommon_->CompileShader(
 		L"resources/shaders/Skinning.CS.hlsl", L"cs_6_0");
-	assert(computeShaderBlob != nullptr);
+	if (!computeShaderBlob) {
+		throw std::runtime_error("Object3dCommon: compute skinning shader is unavailable");
+	}
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC computePipelineStateDesc{};
 	computePipelineStateDesc.CS = {
@@ -276,6 +292,8 @@ void Object3dCommon::CreateSkinningComputePipeline()
 
 	HRESULT hr = dxCommon_->GetDevice()->CreateComputePipelineState(
 		&computePipelineStateDesc, IID_PPV_ARGS(&skinningComputePipelineState_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !skinningComputePipelineState_) {
+		throw std::runtime_error("Object3dCommon: compute skinning pipeline creation failed");
+	}
 }
 

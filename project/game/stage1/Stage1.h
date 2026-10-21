@@ -2,7 +2,6 @@
 
 #include "BaseScene.h"
 #include "BgmPlayer.h"
-#include "FileHotReload.h"
 #include "LevelLoader.h"
 #include "Laser.h"
 #include "MapChipField.h"
@@ -11,12 +10,14 @@
 #include "StageCameraEvents.h"
 #include "StageCollisionWorld.h"
 #include "StageLightPuzzle.h"
+#include "StageLighting.h"
+#include "StageMapFileMonitor.h"
 #include "StageMapRuntime.h"
+#include "StageMapSelection.h"
 #include "StageStart.h"
 #include "editor/StageEditor.h"
 #include "StageHazardLights.h"
 #include "debug/Stage1GameplaySmoke.h"
-#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -31,14 +32,14 @@ class StagePauseOverlay;
 class CameraManager;
 class Object3dCommon;
 
-// 鏡パズルと開始演出を進め、提出用Titleでは同じStageを固定視点で見せるSceneです。
-class Stage1 : public BaseScene
+// Stage IDに対応したLevelを読み込み、共通のPlayer・Camera・描画を維持したまま進行するSceneです。
+class Stage : public BaseScene
 {
 public:
 	// 前方宣言した所有型を安全に生成するため、実装はStage1.cppに置きます。
-	explicit Stage1(bool startsWithTemporaryTitle = false);
+	explicit Stage(int initialStageId = 1, bool startsWithTemporaryTitle = false);
 	// 前方宣言した所有型を安全に破棄するため、実装はStage1.cppに置きます。
-	~Stage1() override;
+	~Stage() override;
 
 	// シーンの開始時に、Camera・照明・Stage固有のObjectを作成します。
 	void Initialize() override;
@@ -49,24 +50,28 @@ public:
 	// 毎フレーム、SkyBox・部屋・球・鏡の板を画面に描画します。
 	void Draw() override;
 	bool IsReadyForTransition() const override { return isStageReady_; }
+	// 次の更新で指定IDのJSONへ切り替える要求を予約し、IDが1〜5以外なら受け付けません。
+	bool RequestStage(int stageId);
+	// 現在読み込んでいるStage IDを返します。
+	int GetStageId() const { return stageMapSelection_.GetStageId(); }
 
 private:
+	// 新しいStageの読込を成功時だけ確定し、必要ならPlayerを開始位置へ移動します。
+	bool LoadStage(int stageId, bool resetPlayerPosition);
+	// Updateの先頭で予約されたStage切替を一度だけ実行します。
+	void ApplyRequestedStageChange();
+
 	// Stage1専用のCameraを所有し、描画共通設定はManagerから借ります。
-	std::unique_ptr<CameraManager> cameraManager;
-	std::unique_ptr<Camera> mainCamera;
-	Object3dCommon* object3dCommon = nullptr;
+	std::unique_ptr<CameraManager> cameraManager_;
+	std::unique_ptr<Camera> mainCamera_;
+	Object3dCommon* object3dCommon_ = nullptr;
 
 	// ---------- JSONを実行中のオブジェクトへ変換する補助構造体 ----------
-
-	// 三灯照明は最大3本に固定し、残りのSpotLight枠をLaser演出へ残します。
-	static constexpr size_t kStageLightingSpotLightCount = 3;
 
 	// ---------- 初期化の補助関数 ----------
 
 	// 描画用Light・Camera・Object3d共通設定を準備し、Lightを描けない時は失敗を返します。
 	bool InitializeRenderSystems();
-	// JSONを読む前に使う、Stage1の標準照明値を設定します。
-	void InitializeDefaultLighting();
 	// JSONへ依存しない床・鏡・Laser・Switch・Doorを作成します。
 	bool InitializeStageGimmicks();
 	// JSONとCSVを最初に読み込み、Colliderを生成してHot Reload監視を開始します。
@@ -99,8 +104,6 @@ private:
 	std::vector<LaserSegment> ReflectHazardLightSegments(const std::vector<LaserSegment>& sourceSegments) const;
 	// 鏡の更新後に、Laser・Switch・DoorのPuzzle状態を更新します。
 	void UpdateLightPuzzle(float deltaTime);
-	// 反射後を含むLaser線分から、床や壁を実際に照らすSpotLight配列を作ります。
-	void UpdateLaserSpotLights();
 	// ---------- Camera制御 ----------
 
 	// Playerを自動追尾する通常Cameraを更新します。
@@ -124,11 +127,9 @@ private:
 	// Stage1の外部マップファイルが保存されたかを確認します。
 	void UpdateStageMapHotReload();
 	// Stage1の外部マップファイルを読み、成功した場合だけ床と鏡へ反映します。
-	bool ReloadStageMap();
+	bool ReloadStageMap(bool resetPlayerPosition = false);
 	// ゲーム内で編集したLevelDataをJSONへ保存します。
 	bool SaveStageMap();
-	// 読込済みLevelDataの照明設定を、Stage1全体で共有するLightへ反映します。
-	void ApplyStageLighting();
 	// Player開始位置、持てるMirror位置、StageStart演出設定を読込済みLevelDataから反映します。
 	void ApplyStageStartSettings(
 		const LevelLoader::ObjectData* playerStartData,
@@ -228,10 +229,11 @@ private:
 	StageCollisionWorld collisionWorld_{};
 	// ---------- stage1.jsonの実行中データ ----------
 
-	// Stage1の外部マップファイルが保存された瞬間を検出します。
-	FileHotReload stageMapHotReload_;
-	// Stage1のCSVマップチップが保存された瞬間を検出します。
-	FileHotReload stageMapChipHotReload_;
+	// Stage IDと外部ファイルの対応・切替予約は、Sceneの進行処理から分けて所有します。
+	StageMapSelection stageMapSelection_{};
+
+	// 選択中StageのJSONとCSVの変更監視を所有し、Updateへ通知します。
+	StageMapFileMonitor stageMapFileMonitor_{};
 	// Stage1のJSONをゲーム内で編集できる形で保持します。
 	std::unique_ptr<LevelLoader::LevelData> stageMapData_;
 	// stage1.csvから読んだ、B0やP0のマップチップデータです。
@@ -240,24 +242,15 @@ private:
 	StageMapRuntime stageMapRuntime_;
 	// JSONから生成するEvent Trigger・Event Camera・Camera Areaをまとめて管理します。
 	StageCameraEvents stageCameraEvents_;
-	// Hot Reloadウィンドウで選択しているオブジェクト番号です。
-	int selectedStageMapObjectIndex_ = 0;
 	// Collider確認、Level編集、Viewport操作をまとめるEdit View専用の窓口です。
 	StageEditor stageEditor_{};
-	// ファイル保存時に自動で再読込するかを切り替えます。
-	bool autoStageMapReload_ = true;
-	// ImGuiへ表示する、直近の再読込結果です。
-	std::string stageMapReloadStatus_ = "Not loaded yet.";
 	// ---------- Stage1全体のライト ----------
 
-	// Stage1 内の全モデルで共有する平行光源です。
-	Object3d::DirectionalLight directionalLight_{};
-	// Stage1 内の全モデルで共有する点光源です。
-	Object3d::PointLight pointLight_{};
-	// JSONで配置するキー・フィル・バックライトです。先頭から優先して描画へ渡します。
-	std::vector<Object3d::SpotLight> stageSpotLights_;
-	// Laserの各線分へ対応する、暗い場所を照らす実際のSpotLightです。
-	std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount> spotLights_{};
+	// JSONの三灯とLaser・危険Lightの線分から作る照明値を所有します。
+	StageLighting stageLighting_{};
 	// Stage1の本編データを使って動く、自動確認専用のDebug部品です。
 	Stage1GameplaySmoke gameplaySmoke_{};
 };
+
+// 既存の分割実装ファイル名を維持しながら、外部コードがStageへ移行するまでの互換名を残します。
+using Stage1 = Stage;

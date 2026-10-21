@@ -16,14 +16,21 @@ public:
 	// 現在Sceneがあれば描画し、描画後のCaptureも更新します。
 	void Draw();
 
-	// Sceneを生成するFactoryを借ります。呼び出し元がFactoryの寿命を管理します。
+	// @brief Sceneを生成するFactoryを借ります。Managerは所有しません。
+	// @param sceneFactory Scene切替とManagerの利用中に生存するFactoryです。
 	void SetSceneFactory(AbstractSceneFactory* sceneFactory) { sceneFactory_ = sceneFactory; }
 
-	// sceneNameのSceneを次フレームへ予約し、予約できた時だけtrueを返します。
+	// @brief 指定名のSceneをFactoryで生成し、次のUpdateで切り替える予約をします。
+	// @param sceneName Factoryに登録済みのScene名です。
+	// @return 予約できた時だけtrueです。Sceneの初期化完了や描画成功は示しません。
 	bool ChangeScene(const std::string& sceneName);
-	// Loading自身以外の登録済みsceneNameだけを予約し、失敗時は白画面へ切り替えません。
+	// @brief Loading自身以外の登録済みSceneだけを、白いLoading経由で予約します。
+	// @param sceneName Loading後に開く、Factory登録済みのScene名です。
+	// @return Loadingの予約に成功した時だけtrueです。行き先の初期化完了は示しません。
 	bool ChangeSceneWithLoading(const std::string& sceneName);
-	// 白く覆ってからLoadingを経由し、準備済みの行き先を徐々に表示します。
+	// @brief 現在画面を白く覆い、Loadingと準備待ちを経て行き先を徐々に表示します。
+	// @param sceneName Loading以外のFactory登録済みのScene名です。
+	// @return フェード開始を受け付けた時だけtrueです。遷移完了は示しません。
 	bool ChangeSceneWithFade(const std::string& sceneName);
 	// SceneRenderPipelineが最後に白Spriteを重ねるための描画口です。
 	void DrawFadeOverlay();
@@ -46,8 +53,8 @@ private:
 	// 連続したScene切替を避け、Loadingを描画できる期間を確保する待機フレーム数です。
 	static constexpr int kSceneChangeCooldownFrames = 6;
 
-	// 予約済みSceneを安全に終了・初期化して、現在Sceneとして確定します。
-	void ApplyPendingSceneChange();
+	// 予約済みSceneを初期化し、失敗時は未完成Sceneを更新・描画へ渡さずfalseを返します。
+	bool ApplyPendingSceneChange();
 	// Scene切替の状態と白Spriteの透明度を、更新順に沿って進めます。
 	void UpdateFade();
 	// 画面全体を覆うSpriteを一度だけ生成します。

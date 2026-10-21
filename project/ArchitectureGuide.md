@@ -1,4 +1,10 @@
-# riboninCharenge クラス構成メモ
+# riboninChallenge クラス構成メモ
+
+## 命名規則
+
+クラス・構造体は`TitleScene`のようなPascalCase、関数は`InitializeRenderSystems()`のようなPascalCaseを使います。
+クラスが所有・保持する`private`メンバは`cameraManager_`のようなcamelCaseと末尾`_`で表し、関数内の一時変数`dxCommon`と区別します。
+固定の設定値には`kCameraStart`のような`k`接頭辞を使います。JSON・CSVの公開データ構造や外部APIの名前は、保存形式と利用側への影響を確認せず機械的に変更しません。
 
 ## Scene
 
@@ -32,12 +38,12 @@ Object3dの完全な型を知る場所で生成・破棄します。
 
 `SceneFactory`
 
-`"TITLE"`、`"TITLE_ORIGINAL"`、`"DEBUG"`、`"STAGE1"`という名前から、対応するSceneを一体生成します。
+`"TITLE"`、`"TITLE_ORIGINAL"`、`"DEBUG"`、`"STAGE_SELECT"`、`"STAGE1"`という名前から、対応するSceneを一体生成します。
 ゲームのScene追加は`game/GameSceneRegistration.cpp`の`RegisterGameScenes()`へ、名前と生成関数を登録します。
 その登録を`GameSceneRegistry`経由で`SceneFactory`へ渡すため、Stage追加だけでengine側へStageのヘッダを増やす必要はありません。
-現在の`"TITLE"`は提出用に`Stage1(true)`を生成し、固定CameraのStage背景へTitle画像とENTER画像を重ねます。
+現在の`"TITLE"`は提出用に`Stage(1, true)`を生成し、固定CameraのStage背景へTitle画像とENTER画像を重ねます。
 従来の12枚の画像から始まる`TitleScene`は`"TITLE_ORIGINAL"`で残し、通常起動では使用しません。
-`"STAGE1"`はタイトル表示なしの`Stage1()`を生成します。
+`"STAGE_SELECT"`は共通の夜空と案内を表示する`StageSelectScene`、`"STAGE1"`はタイトル表示なしの`Stage(1)`を生成します。
 
 `SceneManager`
 
@@ -48,14 +54,15 @@ Object3dの完全な型を知る場所で生成・破棄します。
 
 通常起動は`Game::Initialize()`が`LOADING`を予約し、白い`LoadingScene`が`TITLE`を予約します。未登録の開始Scene名が指定された場合、`SceneManager::ChangeScene()`の失敗を`Game`が受けて終了コード1で止めます。Sceneのない更新・描画ループには進みません。
 その前に`Framework::Initialize()`がPostEffect・Model・Particleなどの共通資源を依存順に準備します。`DirectXCommon::CompileShader()`はShader読込・コンパイル・結果取得の失敗を例外で伝えます。必須画像やShaderが欠けた場合、`Framework`は後続の初期化を止め、終了コード1を記録します。`Game`はSceneを予約せず、`Framework::Run()`はUpdate/Drawへ入らず、生成済みの共通資源を解放します。AudioとImGuiは初期化済みの場合だけ終了処理を呼びます。
-現在の`TITLE`では、`Stage1::Update()`がGame View内のEnterを検出すると、Sceneを作り直さず同じ`Stage1`で本編の登場演出を始めます。
-`StartupRouteSmoke`はテスト時だけ`TITLE`から`ChangeSceneWithLoading("STAGE1")`を直接予約し、Loading→Title→Loading→Stage1の描画順と回数を確認します。
-そのため、このSmokeの成功は通常操作のEnter判定や、同じScene内で本編へ進む経路の確認にはなりません。
+現在の`TITLE`では、`Stage::Update()`がGame View内のEnterを検出すると、白フェード付きで`STAGE_SELECT`を予約します。セレクト画面のEnterは`STAGE1`へ、Stage1でTabのポーズ中にBackspaceを押すと`STAGE_SELECT`へ戻ります。
+`SceneManager::ChangeSceneWithFade()`は現在の画面を徐々に白く覆い、共通Loadingで次のSceneの準備を待ち、行き先の最初の描画後に白を薄くします。白くなる時間は固定ですが、読込完了を時間で決めません。
+`StartupRouteSmoke`はテスト時だけ`TITLE`→`STAGE_SELECT`→`STAGE1`のフェードを直接予約し、最初のLoadingと二回の遷移中Loading、各Sceneの描画回数を確認します。
+そのため、このSmokeの成功は通常操作のEnter／Backspace判定や、白フェードの見た目の確認にはなりません。
 
 ### 入力を読む順番
 
 `Framework::Update()`はScene更新より先に`Input::Update()`を呼びます。`Input`は前フレームの状態を保存した後、`UpdateKeyboard()`→`UpdateMouse()`→`UpdateGamepads()`→`UpdateCurrentDevice()`の順に更新します。`TriggerKey()`や`TriggerMouseButton()`は、保存した前フレームと現在値の差から「押した瞬間」を返します。
-現在の`Stage1::Update()`のTitle用Enter判定、従来の`TitleScene`のEnter判定、`Stage1::UpdateMirrorGameplay()`のEキー・マウス判定は、同じ`Input`から読みます。ReleaseでマウスのDirectInput取得に失敗した時だけWindows入力へ切り替えます。キーボードの取得失敗はログに残しますが、現在はWindows入力への切替処理を持ちません。
+現在の`Stage::Update()`のTitle用Enter判定、`StageSelectScene::Update()`のEnter／Backspace判定、`Stage::UpdatePauseState()`のTab／Backspace判定、`Stage::UpdateMirrorGameplay()`のEキー・マウス判定は、同じ`Input`から読みます。ReleaseでマウスのDirectInput取得に失敗した時だけWindows入力へ切り替えます。キーボードの取得失敗はログに残しますが、現在はWindows入力への切替処理を持ちません。
 
 `Stage1`
 
@@ -68,7 +75,7 @@ Object3dの完全な型を知る場所で生成・破棄します。
 `Stage1`へ追加してよい処理は、「このStageだけの遊び」に関係するものです。
 `Stage1.h`は値として持つ部品だけを直接`#include`し、`unique_ptr`で所有するPlayerやMirrorなどは前方宣言します。
 実体を使う`Stage1.cpp`だけがそれらのヘッダを読み込むため、ほかのSceneへ不要な依存が広がりません。
-`Stage1(true)`のTitle中は`game/stage1/StageTitleOverlay.cpp`の`StageTitleOverlay`が二枚のSpriteを生成・所有・更新し、Sceneは背景のStageと危険Lightの進行と描画順だけを決めます。Spriteの描画は`SceneRenderPipeline::DrawSprites()`へ渡します。Title専用Cameraを増やさず、同じ`mainCamera`を固定位置へ動かします。Enter後に`BeginStageStart()`を呼ぶまで、Player登場演出・Camera追従・BGMを進めません。
+`Stage(1, true)`のTitle中は`game/stage1/StageTitleOverlay.cpp`の`StageTitleOverlay`が二枚のSpriteを生成・所有・更新し、Sceneは背景のStageと危険Lightの進行と描画順だけを決めます。Spriteの描画は`SceneRenderPipeline::DrawSprites()`へ渡します。Title専用Cameraを増やさず、同じ`mainCamera`を固定位置へ動かします。Title中はPlayer登場演出・Camera追従・BGMを進めず、セレクト後に生成する本編の`Stage(1)`で開始します。
 
 ### Stage1を読む順番
 
@@ -117,9 +124,9 @@ Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別
 | 新しい通常3Dモデルを作る | `Object3dFactory::Create()` または `Object3dCollection::Create()` | SceneまたはCollection |
 | Playerのモデルを準備する | `Player::Initialize()` | Player |
 | Playerと壁・Triggerを判定する | `player.CheckCollision(collider)` | Player |
-| 一体のEnemyを出現させる | `enemyManager.Spawn(spawnData)` | EnemyManager |
-| 設定不要のEnemyを一体出現させる | `enemyManager.Spawn("ghost.obj", position)` | EnemyManager |
-| 複数Enemyをまとめて出現させる | `enemyManager.SpawnAll(spawnDataList)` | EnemyManager |
+| Enemyを一体生成する（現在はSmokeだけで使用） | `enemyManager.Spawn(spawnData)` | EnemyManager |
+| モデル名と位置でEnemyを一体生成する（現在はSmokeだけで使用） | `enemyManager.Spawn("ghost.obj", position)` | EnemyManager |
+| Enemyをまとめて生成する（現在はSmokeだけで使用） | `enemyManager.SpawnAll(spawnDataList)` | EnemyManager |
 | 全3DモデルへCamera・Lightを反映する | `Object3dRenderContext::UpdateObjects()` | SceneのUpdate |
 | 3D一覧を描画する | `SceneRenderPipeline::DrawObjects()` | SceneのDraw |
 
@@ -159,19 +166,19 @@ Stage1は`B0`を`debug/block.obj`の1x1x1ブロック、`P0`をPlayer開始位�
 CSVの1マスは`MapChipField::GetPosition()`で3D座標へ変換されるため、
 MapChipFieldへモデル名や当たり判定の処理を混ぜません。
 
-`MapChipRegistry`は「種類＋番号」と実行する処理を結びます。`Stage1::ApplyStageMapData()`で`P0`と`B0`を登録し、CSVで読んだ各マスを渡します。
+`MapChipRegistry`は「種類＋番号」と実行する処理を結びます。`StageMapChipFactory::BuildStageData()`が`P0`と`B0`を登録し、CSVで読んだ各マスを渡します。
 未登録の番号は何も作りません。`StageMapChipFactory::CreateBlockData()`が`B0`を`debug/block.obj`と1×1×1のBOX Colliderへ変換します。
 
 | CSVに書くもの | 現在の結果 | 処理を追加する場所 |
 | --- | --- | --- |
-| `P0` | Playerの開始位置。JSONのPlayerStartより優先 | `Stage1::ApplyStageMapData()`のP0登録 |
-| `B0` | `debug/block.obj`とBOX Collider | 同関数のB0登録、外観・判定値は`StageMapChipFactory` |
-| `E0/G0/C0/L0` | 種類として認識するが、まだ生成しない | 各ゲーム機能を作った後、同関数へ番号と処理を登録 |
-| `B1`などの未登録番号 | 生成しない | 同関数へ別番号で登録 |
+| `P0` | Playerの開始位置。JSONのPlayerStartより優先 | `StageMapChipFactory::BuildStageData()`のP0登録 |
+| `B0` | `debug/block.obj`とBOX Collider | 同関数のB0登録、外観・判定値は`CreateBlockData()` |
+| `E0/G0/C0/L0` | 種類として認識するが、まだ生成しない | 各ゲーム機能を作った後、Factoryへ番号と処理を登録 |
+| `B1`などの未登録番号 | 生成しない | Factoryへ別番号で登録 |
 | `,`で区切った空欄 | 何も生成しない。列位置だけ一マス進む | 登録不要 |
 
 CSVファイル自体は任意です。`resources/maps/stage1.csv`がなければJSONだけでStage1を開始できます。
-番号別処理を追加する時は、`Stage1::ApplyStageMapData()`のP0/B0登録を見て、同じ場所に種類・番号・処理を一組登録します。
+番号別処理を追加する時は、`StageMapChipFactory::BuildStageData()`のP0/B0登録を見て、同じ場所に種類・番号・処理を一組登録します。
 今はEnemyやGoalの実体がないため、対応表だけでそれらがゲームに出るわけではありません。
 
 `StageMapRuntime`
@@ -194,7 +201,8 @@ Stage1は`Object3dRenderContext`を一度作り、`StageMapRuntime::UpdateRender
 
 `Stage1MapLoading.cpp`
 
-`Stage1`が所有する`stage1.json`と`stage1.csv`の、保存時刻監視・再読込・JSON保存だけを置く実装ファイルです。
+`StageMapSelection`がStage ID 1〜5とJSON/CSVの対応、切替予約を持ちます。`StageMapFileMonitor`が選択中JSON/CSVの保存時刻を監視します。`Stage1MapLoading.cpp`には、再読込・JSON保存と、読込成功時だけ監視先とStage切替を確定する進行処理を置きます。
+JSONとCSVが同じフレームで保存された場合も、両方の更新時刻を確認してから再読込を一回だけ要求します。片方の変更を次フレームへ持ち越すと、同じStageを二回作り直すためです。
 読込後に実行中のObjectへ反映する判断は引き続き`Stage1::ApplyStageMapData()`が行います。
 つまり、ファイルを読む責任と、読んだデータを本編の床・鏡・Cameraへ使う責任を、読み手が別々に追えます。
 CSVの読込と座標変換は`MapChipField`、番号ごとの処理選択は`MapChipRegistry`、Stage1専用ブロックの見た目とCollider値は`StageMapChipFactory`が担当します。
@@ -256,9 +264,9 @@ if (!carryableMirror_) {
 鏡床の水平化・Collider同期・両面反射設定は`CreateMirrorFloor()`にそろえ、Stage側で個別に設定し忘れない形にしています。
 Stage1では従来通り、携帯鏡の生成失敗は初期化中断、鏡床の失敗はその部品なしで続行します。
 
-`Stage1Lighting.cpp`
+`StageLighting.cpp`
 
-Puzzle Laserと危険Lightの線分を、壁や床を照らすSpotLight配列へ変換する実装ファイルです。
+JSONの照明値とPuzzle Laser・危険Lightの線分を、壁や床を照らすSpotLight配列へ変換する実装ファイルです。
 JSONで置いたキー・フィル・バックライトを先に残し、空いているSpotLight枠だけをLaser用に使います。
 
 `CameraController::Update()`
@@ -294,7 +302,10 @@ JSONで置いたキー・フィル・バックライトを先に残し、空い�
 - `ObbCollider`：床・壁・鏡・置物向けの回転できる箱形判定
 
 例えば`Player`は`SphereCollider`を、`FixedMirror`と`StageMapRuntime`は`ObbCollider`を持ちます。
-そのため新しいEnemyを作る時も、「EnemyがSphereColliderまたはObbColliderを持つ」と書くだけで、判定形状を統一できます。
+現在の`Enemy`は`SphereCollider`を所有する具象クラスです。別の判定形状が必要なゲーム物体は、その物体自身が適切なColliderを所有します。
+
+現行の判定呼び出しは球・箱の組み合わせをコンパイル時に知っているため、`SphereCollider::Check()`と`ObbCollider::Check()`のオーバーロードで選びます。`Collider*`へ異なる形を混ぜて一括処理する経路はなく、ここに仮想`Check()`を足すと形の組み合わせを実行時に再判定する仕組みだけが増えます。
+`EnemyManager`も`Enemy`を直接生成・所有するため、現時点で`Enemy::Update()`と`Draw()`の仮想呼び出しは必要ありません。派生した敵の振る舞いが必要になった時に、生成方法と共通インターフェースを一緒に設計します。
 
 PlayerやEnemyを扱うSceneのコードでは、形状を取り出さずに`player.CheckCollision(wallCollider)`のように書きます。
 球と箱はどちら側から呼んでも判定でき、返る法線は「呼び出した側を相手から離す向き」です。
@@ -441,7 +452,7 @@ JSONの`EVENT_TRIGGER`、`EVENT_CAMERA`、`CAMERA_AREA`を実行するクラス�
 
 時間で動く4種類の危険Lightの軌道、反射後のLaser線分、Playerとの接触判定、専用Rendererによる描画を担当します。
 Stage1は固定鏡・持てる鏡・床・壁の反射ルールをコールバックで渡し、
-受け取った線分をSpotLightへ使います。通常CameraとMirror反射Cameraへの描画は、`StageHazardLights::Draw()`へ任せます。
+受け取った線分は`StageLighting`がSpotLightへ変換します。通常CameraとMirror反射Cameraへの描画は、`StageHazardLights::Draw()`へ任せます。
 
 `StageLightPuzzle`
 
@@ -449,6 +460,11 @@ Charge Laser、Door Laser、二つのSwitch、大型Mirrorの回転、Doorの開
 `Stage1`は鏡・Door・発射装置のモデルを所有し、毎フレーム必要な非所有ポインタと床・壁OBBを渡すだけです。
 通常CameraとMirror反射Cameraへの描画も`StageLightPuzzle::Draw()`へ任せるため、
 別Stageで同じPuzzleを使う時は、`StageLightPuzzle`へモデルと設定値を渡して更新できます。
+
+`StageLighting`
+
+Stage全体の平行光・点光源・SpotLight配列を所有します。JSONのLighting設定と、更新済みのPuzzle・危険Lightの線分を受け取り、`Object3dRenderContext`へ渡す値だけを作ります。
+Sceneは初期化・マップ反映・ギミック更新後の合成を呼ぶ順番だけを決め、ライトの色や枠の優先順位を持ちません。
 
 `StageReflectionRenderer`
 
@@ -584,18 +600,18 @@ Scene側でCamera・Light設定のループを書き直しません。
 
 ### Stage1のライトが画面に届くまで
 
-`Stage1::InitializeDefaultLighting()`でJSON未設定時の初期値を作ります。
+`StageLighting::InitializeDefaults()`でJSON未設定時の初期値を作ります。
 `LevelLoader::Load()`は`resources/levels/stage1.json`の開始演出・Lighting・配置物を順に読み、
 Lightingの平行光・点光源・SpotLightの項目は`LevelLoader.cpp`内の`LoadLighting()`が変換します。
-その結果を`Stage1::ApplyStageLighting()`がSceneの照明へ反映します。
+その結果を`StageLighting::ApplyLevel()`がStageの照明へ反映します。
 編集結果を保存する時は`LevelLoader::Save()`が`SaveLighting()`へ照明のJSON組立を任せます。
 Engine座標はそのまま、Blender座標は読込時と逆にY/Zを入れ替え、再読込後も同じ照明値にします。
 保存では、完成した`stage1.json.tmp`を同じフォルダ内で`stage1.json`へ置き換えます。失敗したら`.tmp`を消さず、Editorに二つのファイルを確認するよう表示します。読込は常に`.json`だけで、`.tmp`を勝手に本編へ反映しません。
-平行光と点光源は`Stage1`が保持し、JSONのキー・フィル・バックライトは`stageSpotLights_`へ最大3灯だけ保持します。
+平行光と点光源は`StageLighting`が保持し、JSONのキー・フィル・バックライトは同じクラスの`stageSpotLights_`へ最大3灯だけ保持します。
 
 毎フレームの`Stage1::Update()`では、Mirror・Puzzle・危険Lightを更新した**後**に
-`Stage1::UpdateLaserSpotLights()`を呼びます。これにより、そのフレームの反射後の線分を照明に使えます。
-`spotLights_`を一度空にしてからJSONのSpotLightを先に入れ、残った枠へPuzzleと危険Lightの線分を順番に変換します。
+`StageLighting::UpdateLaserSpotLights()`を呼びます。これにより、そのフレームの反射後の線分を照明に使えます。
+`StageLighting`の`spotLights_`を一度空にしてからJSONのSpotLightを先に入れ、残った枠へPuzzleと危険Lightの線分を順番に変換します。
 配列は最大16灯なので、線分が多い時は後から来た線分の照明を追加しません。Laser自体の線分描画とは別の処理です。
 
 その後、`Object3dRenderContext::UpdateObject()`が平行光・点光源・SpotLight配列を
@@ -605,14 +621,14 @@ Engine座標はそのまま、Blender座標は読込時と逆にY/Zを入れ替�
 SpotLightの未使用枠は`intensity == 0`としてShader側で飛ばします。
 
 ```text
-stage1.json → LevelLoader::Load / LoadLighting → ApplyStageLighting → directionalLight_ / pointLight_
-                                                            → stageSpotLights_
-stageSpotLights_ + Puzzle・危険Lightの反射後線分 → UpdateLaserSpotLights → spotLights_
+stage1.json → LevelLoader::Load / LoadLighting → StageLighting::ApplyLevel → directionalLight_ / pointLight_
+                                                                     → stageSpotLights_
+stageSpotLights_ + Puzzle・危険Lightの反射後線分 → StageLighting::UpdateLaserSpotLights → spotLights_
 三種類のLight → Object3dRenderContext → Object3dGpuData → Object3d.PS.hlsl
 ```
 
 調整場所は、部屋の基本照明が`stage1.json`の`lighting`、
-Laser線分から作る色・強さ・距離・円錐角が`Stage1Lighting.cpp`、
+Laser線分から作る色・強さ・距離・円錐角が`StageLighting.cpp`、
 モデル表面での光の計算が`Object3d.PS.hlsl`です。
 平行光の`direction`は「面から光源を見る方向」ですが、SpotLightの`direction`は「光源から照射先へ向かう方向」です。
 二つを同じ意味として設定すると明暗が逆になるため、編集時に注意します。
@@ -731,10 +747,10 @@ DebugSceneが所有するCamera・Object・Spriteの責任は変えず、開始�
 自動確認だけは`DebugSceneAutomation.cpp`へ分けています。環境変数の判定、UI Smoke、時間再生 Smoke、Debug Particleの確認更新を調べる時だけ、そのファイルを開きます。
 Scene所有データを各Debug部品へ渡すContextの組み立ては`DebugSceneContexts.cpp`です。
 
-`GameViewCapture`
+`CaptureManager`
 
-Debug画面で使うスクリーンショット、AVI録画、30秒リプレイ保存を担当します。
-`DebugScene`は保存形式やAVIハンドルを持たず、更新とUI表示を依頼するだけです。
+通常画面とDebug画面で使うスクリーンショット、動画録画、リプレイ保存を担当します。
+`DebugScene`は保存形式やAVIハンドルを持たず、自動確認の一枚保存だけを共通Managerへ依頼します。
 
 `DebugParticleEffects`
 
@@ -916,8 +932,9 @@ Editorから追加した物は次フレームの描画準備でCamera・Lightを
 `StageEditor`
 
 Stage1のEdit View全体の窓口です。Collider確認、JSONの追加・削除・保存、Lighting編集、Viewport操作を順番に表示します。
+自動再読込のON/OFF、選択中オブジェクト番号、結果メッセージも`StageEditor`が所有します。Sceneは更新時に`IsAutoMapReloadEnabled()`を読み、再読込後に`ClampSelectedObjectIndex()`、読込やCameraの通知時に`SetReloadStatus()`を呼びます。編集UI専用の状態をSceneへ戻さないためです。
 発射装置モデルは`Stage1`の`sceneObjects_`が所有し、`StageSceneRenderer`ではほかの通常Objectと同じ一覧から描きます。Rendererへ発射装置を個別に渡す必要はありません。
-`Stage Lighting`で照明を変えた時は`Stage1::ApplyStageLighting()`だけを呼びます。床・鏡・PlayerStartなどの配置は再反映しないため、遊びながら明るさを調整しても、置いた携帯鏡の位置は戻しません。設定を次回も使うには`Stage Map Editor`の`Save Map`でJSONを保存します。
+`Stage Lighting`で照明を変えた時は`StageLighting::ApplyLevel()`だけを呼びます。床・鏡・PlayerStartなどの配置は再反映しないため、遊びながら明るさを調整しても、置いた携帯鏡の位置は戻しません。設定を次回も使うには`Stage Map Editor`の`Save Map`でJSONを保存します。
 `Stage Lighting`と`Stage Player`はInspector内の別タブです。片方を開いても、もう片方の操作欄を覆いません。
 Stage1はJSON・Player・鏡・実行中Objectを所有し続け、`StageEditor`には再構築・保存・再読込の操作だけを渡します。
 このクラスは画面全体ではないため、`BaseScene`を継承しません。
@@ -972,7 +989,7 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | Stage1の外部ファイル監視・再読込・保存処理 | Stage1MapLoading |
 | Stage1のEdit View・Puzzle Debug UI | Stage1EditorUi |
 | Stage1の携帯Mirror操作・反射対象一覧・危険Light反射 | Stage1MirrorGameplay |
-| Stage1のLaser・危険LightをSpotLightへ変換 | Stage1Lighting |
+| Stage全体の照明を所有し、Laser・危険LightをSpotLightへ変換 | StageLighting |
 | JSON/CSVから通常モデルを作る | StageMapRuntime |
 | 携帯鏡・鏡床を生成し、Levelの固定鏡データを生成・編集反映する | StageMirrorFactory |
 | Playerを追従する通常Camera | CameraController |
@@ -1005,7 +1022,7 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | 鏡用・Skinning用・Skybox用の専用Pipeline | Object3dCommonMirror / Object3dCommonSkinning / Object3dCommonSkybox |
 | 一つのSkyBoxの頂点・Index・行列・Material Buffer | SkyBox |
 | 球・箱の当たり判定を持つ | SphereCollider / ObbCollider |
-| Debug画面の画像・動画保存 | GameViewCapture |
+| Debug画面の自動確認用BMP・一枚AVI保存 | CaptureManager |
 | スクリーンショット・動画・リプレイの保存 | CaptureManager |
 | AVI・MP4の保存と動画エンコーダー | CaptureManagerVideo |
 | 直近30秒のリプレイ圧縮・保存 | CaptureManagerReplay |

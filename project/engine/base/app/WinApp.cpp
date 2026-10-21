@@ -40,15 +40,16 @@ LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 	}
 }
 
+// 登録するウィンドウ名を実行ファイルと揃え、起動時の表示と識別名を一致させます。
 void WinApp::Initialize()
 {
 	isComInitialized_ = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
 
-	wc.lpfnWndProc = WindowProc;
-	wc.lpszClassName = L"riboninCharengeWindowClass";
-	wc.hInstance = GetModuleHandle(nullptr);
-	wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	RegisterClass(&wc);
+	wc_.lpfnWndProc = WindowProc;
+	wc_.lpszClassName = L"riboninChallengeWindowClass";
+	wc_.hInstance = GetModuleHandle(nullptr);
+	wc_.hCursor = LoadCursor(nullptr, IDC_ARROW);
+	RegisterClass(&wc_);
 
 	RECT windowRect{ 0, 0, kClientWidth, kClientHeight };
 	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, false);
@@ -62,9 +63,9 @@ void WinApp::Initialize()
 	windowedRect_.bottom = windowedRect_.top + windowHeight;
 
 	// 起動時は閉じるボタンを使える最大化ウィンドウにする。
-	hwnd = CreateWindow(
-		wc.lpszClassName,
-		L"riboninCharenge",
+	hwnd_ = CreateWindow(
+		wc_.lpszClassName,
+		L"riboninChallenge",
 		WS_OVERLAPPEDWINDOW,
 		windowedRect_.left,
 		windowedRect_.top,
@@ -72,10 +73,10 @@ void WinApp::Initialize()
 		windowedRect_.bottom - windowedRect_.top,
 		nullptr,
 		nullptr,
-		wc.hInstance,
+		wc_.hInstance,
 		this);
 
-	ShowWindow(hwnd, SW_MAXIMIZE);
+	ShowWindow(hwnd_, SW_MAXIMIZE);
 	timeBeginPeriod(1);
 }
 
@@ -83,10 +84,11 @@ void WinApp::Update()
 {
 }
 
+// Windowを閉じてCOMを解放し、次回起動へ今回の資源を持ち越さないようにします。
 void WinApp::Finalize()
 {
 	timeEndPeriod(1);
-	CloseWindow(hwnd);
+	CloseWindow(hwnd_);
 	if (isComInitialized_) {
 		CoUninitialize();
 		isComInitialized_ = false;
@@ -108,43 +110,45 @@ bool WinApp::ProcessMessage()
 	return false;
 }
 
+// 終了要求をWindowへ送り、通常のMessage経路でゲームループを止めます。
 void WinApp::RequestClose()
 {
-	if (hwnd) {
-		PostMessage(hwnd, WM_CLOSE, 0, 0);
+	if (hwnd_) {
+		PostMessage(hwnd_, WM_CLOSE, 0, 0);
 	}
 }
 
+// 現在のWindow Handleを使って表示モードを切り替え、直前の通常サイズを保ちます。
 void WinApp::SetWindowMode(WindowMode mode)
 {
-	if (!hwnd || mode == GetWindowMode()) {
+	if (!hwnd_ || mode == GetWindowMode()) {
 		return;
 	}
 
 	if (GetWindowMode() == WindowMode::Windowed) {
-		GetWindowRect(hwnd, &windowedRect_);
+		GetWindowRect(hwnd_, &windowedRect_);
 	}
 
 	if (mode == WindowMode::BorderlessFullscreen) {
-		ShowWindow(hwnd, SW_RESTORE);
-		SetWindowLongPtr(hwnd, GWL_STYLE, WS_POPUP);
+		ShowWindow(hwnd_, SW_RESTORE);
+		SetWindowLongPtr(hwnd_, GWL_STYLE, WS_POPUP);
 		MONITORINFO monitorInfo{ sizeof(MONITORINFO) };
-		GetMonitorInfo(MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), &monitorInfo);
+		GetMonitorInfo(MonitorFromWindow(hwnd_, MONITOR_DEFAULTTONEAREST), &monitorInfo);
 		SetWindowPos(
-			hwnd, HWND_TOP,
+			hwnd_, HWND_TOP,
 			monitorInfo.rcMonitor.left, monitorInfo.rcMonitor.top,
 			monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
 			monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top,
 			SWP_FRAMECHANGED | SWP_SHOWWINDOW);
 	} else {
-		SetWindowLongPtr(hwnd, GWL_STYLE, WS_OVERLAPPEDWINDOW);
+		SetWindowLongPtr(hwnd_, GWL_STYLE, WS_OVERLAPPEDWINDOW);
 		SetWindowPos(
-			hwnd, nullptr,
+			hwnd_, nullptr,
 			windowedRect_.left, windowedRect_.top,
 			windowedRect_.right - windowedRect_.left,
 			windowedRect_.bottom - windowedRect_.top,
 			SWP_FRAMECHANGED | SWP_NOZORDER | SWP_SHOWWINDOW);
-		ShowWindow(hwnd, mode == WindowMode::Maximized ? SW_MAXIMIZE : SW_RESTORE);
+		ShowWindow(hwnd_, mode == WindowMode::Maximized ? SW_MAXIMIZE : SW_RESTORE);
 	}
 
 	windowMode_ = mode;
@@ -158,16 +162,18 @@ void WinApp::ToggleFullscreen()
 		: WindowMode::BorderlessFullscreen);
 }
 
+// 現在のクライアント領域を読み、描画解像度をWindowの実寸に合わせます。
 uint32_t WinApp::GetClientWidth() const
 {
 	RECT rect{};
-	GetClientRect(hwnd, &rect);
+	GetClientRect(hwnd_, &rect);
 	return static_cast<uint32_t>(rect.right - rect.left);
 }
 
+// 現在のクライアント領域を読み、縦方向もWindowの実寸に合わせます。
 uint32_t WinApp::GetClientHeight() const
 {
 	RECT rect{};
-	GetClientRect(hwnd, &rect);
+	GetClientRect(hwnd_, &rect);
 	return static_cast<uint32_t>(rect.bottom - rect.top);
 }

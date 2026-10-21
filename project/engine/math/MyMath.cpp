@@ -363,6 +363,7 @@ namespace MyMath {
 		return result;
 	}
 
+	// 行列式で逆変換の可否を判定し、余因子を行列式で割って逆行列を作ります。
 	Matrix4x4 Inverse(const Matrix4x4& m) {
 		Matrix4x4 result = {};
 		float det =
@@ -375,6 +376,7 @@ namespace MyMath {
 			m.m[0][1] * m.m[1][2] * m.m[2][3] * m.m[3][0] - m.m[0][2] * m.m[1][3] * m.m[2][1] * m.m[3][0] - m.m[0][3] * m.m[1][1] * m.m[2][2] * m.m[3][0] +
 			m.m[0][3] * m.m[1][2] * m.m[2][1] * m.m[3][0] + m.m[0][2] * m.m[1][1] * m.m[2][3] * m.m[3][0] + m.m[0][1] * m.m[1][3] * m.m[2][2] * m.m[3][0];
 
+		// 逆行列を作れない時は、従来のAPI契約どおり零行列を返します。
 		if (det == 0) return result;
 		det = 1.0f / det;
 

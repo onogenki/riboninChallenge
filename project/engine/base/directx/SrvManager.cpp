@@ -1,13 +1,14 @@
 #include "SrvManager.h"
 
+// DirectXから共通Heapを作り、使用済み番号を残さず全枠を割当可能にします。
 void SrvManager::Initialize(DirectXCommon* dxCommon){
 	//引数で受け取ってメンバ変数に記録する
-	this->directXCommon = dxCommon;
+	directXCommon_ = dxCommon;
 
 	//デスクリプタヒープの作成
-	descriptorHeap = directXCommon->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
+	descriptorHeap_ = directXCommon_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
 	//デスクリプタ1個分のサイズを取得して記録
-	descriptorSize = directXCommon->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	descriptorSize_ = directXCommon_->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	freeList_ = {};
 	allocated_.fill(false);
 
@@ -54,38 +55,42 @@ void SrvManager::Free(uint32_t index)
 	freeList_.push(index);
 }
 
+// Heap先頭からの距離を番号へ戻し、このHeapに属する枠だけを再利用します。
 void SrvManager::Free(D3D12_CPU_DESCRIPTOR_HANDLE handle)
 {
-	if (!descriptorHeap || descriptorSize == 0) {
+	if (!descriptorHeap_ || descriptorSize_ == 0) {
 		return;
 	}
-	const SIZE_T start = descriptorHeap->GetCPUDescriptorHandleForHeapStart().ptr;
+	const SIZE_T start = descriptorHeap_->GetCPUDescriptorHandleForHeapStart().ptr;
 	if (handle.ptr < start) {
 		return;
 	}
 	const SIZE_T offset = handle.ptr - start;
-	if (offset % descriptorSize != 0) {
+	if (offset % descriptorSize_ != 0) {
 		return;
 	}
-	Free(static_cast<uint32_t>(offset / descriptorSize));
+	Free(static_cast<uint32_t>(offset / descriptorSize_));
 }
 
+// 登録先の枠を指定するため、先頭Handleへ一枠の幅と番号を加えます。
 D3D12_CPU_DESCRIPTOR_HANDLE SrvManager::GetCPUDescriptorHandle(uint32_t index)
 {
-	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	handleCPU.ptr += (descriptorSize * index);
+	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap_->GetCPUDescriptorHandleForHeapStart();
+	handleCPU.ptr += (descriptorSize_ * index);
 
 	return handleCPU;
 }
 
+// Shaderが同じ枠を参照できるよう、GPU側の先頭Handleから番号を計算します。
 D3D12_GPU_DESCRIPTOR_HANDLE SrvManager::GetGPUDescriptorHandle(uint32_t index)
 {
-	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	handleGPU.ptr += (descriptorSize * index);
+	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap_->GetGPUDescriptorHandleForHeapStart();
+	handleGPU.ptr += (descriptorSize_ * index);
 
 	return handleGPU;
 }
 
+// Textureの形式とMip数をDescriptorへ登録し、描画時の画像参照を可能にします。
 void SrvManager::CreateSRVforTexture2D(
 	uint32_t srvIndex,
 	ID3D12Resource* pResource,
@@ -107,10 +112,11 @@ void SrvManager::CreateSRVforTexture2D(
 	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
 	srvDesc.Texture2D.MipLevels = MipLevels;
 
-	directXCommon->GetDevice()->CreateShaderResourceView(pResource, &srvDesc, GetCPUDescriptorHandle(srvIndex));
+	directXCommon_->GetDevice()->CreateShaderResourceView(pResource, &srvDesc, GetCPUDescriptorHandle(srvIndex));
 
 }
 
+// 構造化Bufferの要素数と幅をSRVへ記録し、Shader側の配列参照を可能にします。
 void SrvManager::CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride)
 {
 
@@ -123,9 +129,10 @@ void SrvManager::CreateSRVforStructuredBuffer(uint32_t srvIndex, ID3D12Resource*
 	srvDesc.Buffer.StructureByteStride = structureByteStride;
 	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 
-	directXCommon->GetDevice()->CreateShaderResourceView(pResource, &srvDesc, GetCPUDescriptorHandle(srvIndex));
+	directXCommon_->GetDevice()->CreateShaderResourceView(pResource, &srvDesc, GetCPUDescriptorHandle(srvIndex));
 }
 
+// Shaderから書き込む構造化Bufferを、指定番号のUAVへ登録します。
 void SrvManager::CreateUAVforStructuredBuffer(uint32_t uavIndex, ID3D12Resource* pResource, UINT numElements, UINT structureByteStride)
 {
 	D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc{};
@@ -137,22 +144,25 @@ void SrvManager::CreateUAVforStructuredBuffer(uint32_t uavIndex, ID3D12Resource*
 	uavDesc.Buffer.CounterOffsetInBytes = 0;
 	uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 
-	directXCommon->GetDevice()->CreateUnorderedAccessView(pResource, nullptr, &uavDesc, GetCPUDescriptorHandle(uavIndex));
+	directXCommon_->GetDevice()->CreateUnorderedAccessView(pResource, nullptr, &uavDesc, GetCPUDescriptorHandle(uavIndex));
 }
 
+// Drawより先に共有HeapをCommand Listへ結合し、SRV/UAVの番号を有効にします。
 void SrvManager::PreDraw()
 {
 	//描画用のDescriptorHeapの設定
-	ID3D12DescriptorHeap* descriptorHeaps[] = { descriptorHeap.Get() };
-	directXCommon->GetCommandList()->SetDescriptorHeaps(1, descriptorHeaps);
+	ID3D12DescriptorHeap* descriptorHeaps[] = { descriptorHeap_.Get() };
+	directXCommon_->GetCommandList()->SetDescriptorHeaps(1, descriptorHeaps);
 }
 
+// Graphics Shaderの指定Root Parameterへ、登録済みGPU Handleを渡します。
 void SrvManager::SetGraphicsRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex)
 {
-	directXCommon->GetCommandList()->SetGraphicsRootDescriptorTable(RootParameterIndex, GetGPUDescriptorHandle(srvIndex));
+	directXCommon_->GetCommandList()->SetGraphicsRootDescriptorTable(RootParameterIndex, GetGPUDescriptorHandle(srvIndex));
 }
 
+// Compute Shaderの指定Root Parameterへ、同じHeapのGPU Handleを渡します。
 void SrvManager::SetComputeRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex)
 {
-	directXCommon->GetCommandList()->SetComputeRootDescriptorTable(RootParameterIndex, GetGPUDescriptorHandle(srvIndex));
+	directXCommon_->GetCommandList()->SetComputeRootDescriptorTable(RootParameterIndex, GetGPUDescriptorHandle(srvIndex));
 }

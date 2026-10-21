@@ -53,66 +53,67 @@ public:
 	void Draw();
 
 	//getter
-	const Vector2& GetPosition() const { return position; }//座標
-	float GetRotation() const { return rotation; }//回転
-	const Vector4& GetColor()const { return materialData->color; }//色
-	const Vector2& GetSize() const { return size; }//サイズ
-	const Vector2& GetAnchorPoint()const { return anchorPoint; }//アンカーポイント
+	const Vector2& GetPosition() const { return position_; }//座標
+	float GetRotation() const { return rotation_; }//回転
+	const Vector4& GetColor()const { return materialData_->color; }//色
+	const Vector2& GetSize() const { return size_; }//サイズ
+	const Vector2& GetAnchorPoint()const { return anchorPoint_; }//アンカーポイント
 	bool GetIsFlipX()const { return isFlipX_; }//フリップX
 	bool GetIsFlipY()const { return isFlipY_; }//フリップY
-	const Vector2& GetTextureLeftTop()const { return textureLeftTop; }
-	const Vector2& GetTextureSize()const { return textureSize; }
+	const Vector2& GetTextureLeftTop()const { return textureLeftTop_; }
+	const Vector2& GetTextureSize()const { return textureSize_; }
 
 	//setter
-	void SetPosition(const Vector2& position) { this->position = position; }//座標
-	void SetRotation(float rotation) { this->rotation = rotation; }//回転
-	void SetColor(const Vector4& color) { materialData->color = color; }//色
-	void SetSize(const Vector2& size) { this->size = size; }//サイズ
+	void SetPosition(const Vector2& position) { position_ = position; }//座標
+	void SetRotation(float rotation) { rotation_ = rotation; }//回転
+	void SetColor(const Vector4& color) { materialData_->color = color; }//色
+	void SetSize(const Vector2& size) { size_ = size; }//サイズ
 	// 読込失敗時は現在の画像を維持し、変更しなかったことを返します。
 	bool SetTexture(const std::string& textureFilePath);
-	void SetAnchorPoint(const Vector2& anchorPoint) { this->anchorPoint = anchorPoint; }//アンカーポイント
+	void SetAnchorPoint(const Vector2& anchorPoint) { anchorPoint_ = anchorPoint; }//アンカーポイント
 	void SetIsFlipX(bool isFlipX) { this->isFlipX_ = isFlipX; }
 	void SetIsFlipY(bool isFlipY) { this->isFlipY_ = isFlipY; }
-	void SetTextureLeftTop(const Vector2& textureLeftTop) { this->textureLeftTop = textureLeftTop; }
-	void SetTextureSize(const Vector2& textureSize) { this->textureSize = textureSize; }
+	void SetTextureLeftTop(const Vector2& textureLeftTop) { textureLeftTop_ = textureLeftTop; }
+	void SetTextureSize(const Vector2& textureSize) { textureSize_ = textureSize; }
 
 
-	Transform& GetTransform() { return transform; }
+	// 既存の編集APIを維持し、Spriteの変換値を呼び出し元へ渡します。
+	Transform& GetTransform() { return transform_; }
 private:
 
-	SpriteCommon* spriteCommon = nullptr;
+	SpriteCommon* spriteCommon_ = nullptr;
 
 	//バッファリソース
-	Microsoft::WRL::ComPtr<ID3D12Resource>vertexResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource>indexResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource>materialResource;
-	Microsoft::WRL::ComPtr<ID3D12Resource>transformationMatrixResource;
+	Microsoft::WRL::ComPtr<ID3D12Resource>vertexResource_;
+	Microsoft::WRL::ComPtr<ID3D12Resource>indexResource_;
+	Microsoft::WRL::ComPtr<ID3D12Resource>materialResource_;
+	Microsoft::WRL::ComPtr<ID3D12Resource>transformationMatrixResource_;
 
 	//頂点バッファビューを作成する
-	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
-	D3D12_INDEX_BUFFER_VIEW indexBufferView{};
+	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
+	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
 
 	//バッファリソース内のデータを指すポインタ
-	VertexData* vertexData = nullptr;
-	uint32_t* indexData = nullptr;
-	Material* materialData = nullptr;
-	TransformationMatrix* transformationMatrixData = nullptr;
+	VertexData* vertexData_ = nullptr;
+	uint32_t* indexData_ = nullptr;
+	Material* materialData_ = nullptr;
+	TransformationMatrix* transformationMatrixData_ = nullptr;
 
-	Vector2 position = { 0.0f,0.0f };
+	Vector2 position_ = { 0.0f,0.0f };
 
-	float rotation = 0.0f;
+	float rotation_ = 0.0f;
 
-	Vector2 size = { 640.0f,360.0f };
+	Vector2 size_ = { 640.0f,360.0f };
 
-	Transform transform{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+	Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
-	Transform uvTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+	Transform uvTransform_ = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	std::string textureFilePath_;
 
 	//基準点
-	Vector2 anchorPoint = { 0.0f,0.0f };
+	Vector2 anchorPoint_ = { 0.0f,0.0f };
 
 	//左右フリップ
 	bool isFlipX_ = false;
@@ -120,10 +121,10 @@ private:
 	bool isFlipY_ = false;
 
 	//テクスチャ左上座標
-	Vector2 textureLeftTop = { 0.0f,0.0f };
+	Vector2 textureLeftTop_ = { 0.0f,0.0f };
 
 	//テクスチャ切り出しサイズ
-	Vector2 textureSize = { 100.0f,100.0f };
+	Vector2 textureSize_ = { 100.0f,100.0f };
 
 	//テクスチャサイズをイメージに合わせる
 	void AdjustTextureSize();

@@ -1,6 +1,6 @@
 //{{NO_DEPENDENCIES}}
 // Microsoft Visual C++ generated include file.
-// Used by ribboninCharenge.rc
+// Used by riboninChallenge.rc
 
 // 新しいオブジェクトの次の既定値
 // 

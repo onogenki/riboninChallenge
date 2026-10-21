@@ -46,8 +46,8 @@ public:
 	void SetGraphicsRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex);
 	void SetComputeRootDescriptorTable(UINT RootParameterIndex, uint32_t srvIndex);
 
-	//デスクリプタヒープを取得
-	ID3D12DescriptorHeap* GetDescriptorHeap() { return descriptorHeap.Get(); }
+	// 描画と資源登録で同じHeapを使えるよう、所有権を渡さず本体を返します。
+	ID3D12DescriptorHeap* GetDescriptorHeap() { return descriptorHeap_.Get(); }
 
 private:
 
@@ -58,16 +58,16 @@ private:
 	SrvManager& operator=(const SrvManager&) = delete;
 
 
-	DirectXCommon* directXCommon = nullptr;
+	DirectXCommon* directXCommon_ = nullptr;
 
 	//最大SRV数(最大テクスチャ枚数)
 	static constexpr uint32_t kMaxSRVCount = 512;
 
 	//SRV用のデスクリプタサイズ
-	uint32_t descriptorSize = 0;
+	uint32_t descriptorSize_ = 0;
 
 	//SRV用デスクリプタヒープ
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> descriptorHeap_;
 
 	//空き番号を管理するキュー
 	std::queue<uint32_t> freeList_;

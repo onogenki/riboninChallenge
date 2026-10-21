@@ -10,6 +10,7 @@
 #include "StageMapRuntime.h"
 #include "StageMapObjectIndex.h"
 #include "../debug/StagePuzzleDebugUi.h"
+#include <algorithm>
 #include <cstdio>
 #include <numbers>
 
@@ -19,7 +20,7 @@ void StageEditor::Initialize()
 	levelEditor_.Initialize();
 }
 
-// Edit ViewだけでPlayer、Collider、Level、Viewportを順に表示し、保存対象を区別します。
+// Edit ViewだけでPlayer、Collider、Level、Viewportを順に表示し、ゲーム進行中に編集操作を混ぜません。
 void StageEditor::Draw(Context& context)
 {
 	if (!context.isEditViewActive) {
@@ -29,8 +30,7 @@ void StageEditor::Draw(Context& context)
 	DrawPlayerControls(context);
 
 	DrawCollision(context);
-	if (!context.autoMapReload || !context.mapReloadStatus || !context.levelData ||
-		!context.selectedObjectIndex) {
+	if (!context.levelData) {
 		return;
 	}
 
@@ -88,15 +88,11 @@ void StageEditor::DrawPlayerControls(Context& context)
 				Vector3 startPosition = playerStart->translation;
 				if (ImGui::DragFloat3("PlayerStart Position", &startPosition.x, 0.05f)) {
 					playerStart->translation = startPosition;
-					if (context.mapReloadStatus) {
-						*context.mapReloadStatus = "PlayerStart edited in memory. Press Save Map to keep it.";
-					}
+					mapReloadStatus_ = "PlayerStart edited in memory. Press Save Map to keep it.";
 				}
 				if (ImGui::Button("Copy Current Player to PlayerStart")) {
 					playerStart->translation = context.player->GetPosition();
-					if (context.mapReloadStatus) {
-						*context.mapReloadStatus = "PlayerStart copied in memory. Press Save Map to keep it.";
-					}
+					mapReloadStatus_ = "PlayerStart copied in memory. Press Save Map to keep it.";
 				}
 				ImGui::TextDisabled("Press Save Map, then restart Stage1 to use this start position.");
 			} else {
@@ -171,41 +167,39 @@ void StageEditor::DrawCollision(const Context& context) const
 	StagePuzzleDebugUi::DrawCollision(collisionContext);
 }
 
-// StageLevelEditorへ、Stage1が所有するJSONと保存・再構築操作だけを渡します。
-StageLevelEditor::Context StageEditor::MakeLevelEditorContext(Context& context) const
+// StageLevelEditorへ、Stage1が所有するJSONと保存・再構築操作を渡し、選択番号は編集UI内で保持します。
+StageLevelEditor::Context StageEditor::MakeLevelEditorContext(Context& context)
 {
 	StageLevelEditor::Context levelEditorContext{};
 	levelEditorContext.levelData = context.levelData;
 	levelEditorContext.playerPosition = context.playerPosition;
-	levelEditorContext.selectedObjectIndex = context.selectedObjectIndex;
+	levelEditorContext.selectedObjectIndex = &selectedObjectIndex_;
 	levelEditorContext.applyLevelData = context.applyLevelData;
 	levelEditorContext.saveLevelData = context.saveLevelData;
-	levelEditorContext.setStatus = [&context](const std::string& message)
+	levelEditorContext.setStatus = [this](const std::string& message)
 	{
-		if (context.mapReloadStatus) {
-			*context.mapReloadStatus = message;
-		}
+		mapReloadStatus_ = message;
 	};
 	return levelEditorContext;
 }
 
-// JSONの追加・削除・保存と、Lighting編集後の実行中Stageへの反映を行います。
+// JSONの追加・削除・保存とLighting反映を行い、操作結果と再読込設定を編集UI内で一元管理します。
 bool StageEditor::DrawLevelControls(
 	Context& context,
 	const StageLevelEditor::Context& levelEditorContext)
 {
-	auto setStatus = [&context](const std::string& message)
+	auto setStatus = [this](const std::string& message)
 	{
-		*context.mapReloadStatus = message;
+		mapReloadStatus_ = message;
 	};
 
 	const LevelEditorResult levelEditorResult =
 		ImGuiManager::GetInstance()->LevelHotReloadWindow(
-			*context.autoMapReload,
+			autoMapReload_,
 			context.mapFilePath,
-			*context.mapReloadStatus,
+			mapReloadStatus_,
 			context.levelData,
-			*context.selectedObjectIndex);
+			selectedObjectIndex_);
 	if (levelEditorResult.reloadRequested) {
 		if (context.reloadMap) {
 			context.reloadMap();
@@ -256,7 +250,7 @@ bool StageEditor::DrawLevelControls(
 // Viewport専用の選択状態を使い、JSON由来モデルのTransformを編集します。
 void StageEditor::DrawViewport(Context& context)
 {
-	if (!context.levelData || !context.mapRuntime || !context.selectedObjectIndex) {
+	if (!context.levelData || !context.mapRuntime) {
 		return;
 	}
 
@@ -267,18 +261,24 @@ void StageEditor::DrawViewport(Context& context)
 	viewportContext.carryableMirror = context.carryableMirror;
 	viewportContext.fixedMirrors = context.fixedMirrors;
 	viewportContext.mapRuntime = context.mapRuntime;
-	viewportContext.selectedObjectIndex = context.selectedObjectIndex;
+	viewportContext.selectedObjectIndex = &selectedObjectIndex_;
 	viewportContext.applyEdits = [applyLevelData = context.applyLevelData]()
 	{
 		return applyLevelData && applyLevelData(false);
 	};
-	viewportContext.setStatus = [&context](const std::string& message)
+	viewportContext.setStatus = [this](const std::string& message)
 	{
-		if (context.mapReloadStatus) {
-			*context.mapReloadStatus = message;
-		}
+		mapReloadStatus_ = message;
 	};
 	editViewport_.Draw(viewportContext);
+}
+
+// 再読込でJSONの個数が変わっても、Edit Viewが範囲外のオブジェクトを参照しないようにします。
+void StageEditor::ClampSelectedObjectIndex(std::size_t objectCount)
+{
+	selectedObjectIndex_ = objectCount == 0
+		? -1
+		: std::clamp(selectedObjectIndex_, 0, static_cast<int>(objectCount) - 1);
 }
 
 // Stage1終了時に、編集UIが保持するModel ShelfとViewportの選択状態を破棄します。

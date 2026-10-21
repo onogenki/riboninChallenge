@@ -53,8 +53,9 @@ public:
 	// 携帯Mirrorを構えている間は、移動中でもPlayerの向きを固定します。
 	void SetMirrorGuardMode(bool isMirrorGuardMode) { isMirrorGuardMode_ = isMirrorGuardMode; }
 	bool IsMirrorGuardMode() const { return isMirrorGuardMode_; }
-	// Stage固有のコードを増やさず、Playerの移動・重力・ジャンプだけを調整できます。
-	MovementSettings& GetMovementSettings() { return movementSettings_; }
+	// 設定をまとめて受け取り、Playerだけが移動値を保持・更新できるようにします。
+	void SetMovementSettings(const MovementSettings& settings);
+	// 現在の移動値は読み取り専用で返し、外部からの部分的な書き換えを防ぎます。
 	const MovementSettings& GetMovementSettings() const { return movementSettings_; }
 
 	//Stage1の共通描画処理で使用する3Dオブジェクトを取得する

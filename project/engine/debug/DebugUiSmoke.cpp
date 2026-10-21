@@ -1,6 +1,6 @@
 #include "DebugUiSmoke.h"
 
-#include "GameViewCapture.h"
+#include "CaptureManager.h"
 #include "ModelManager.h"
 #include "Object3d.h"
 #include "Sprite.h"
@@ -43,7 +43,7 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 		!context.getPreviewState || !context.getSelectionState ||
 		!context.enterModelPreview || !context.enterTexturePreview || !context.resetModelPreviewCamera ||
 		!context.exitModelPreview || !context.addModel || !context.addTexture ||
-		!context.clearAddedSceneModels || !context.buildWorldAabb || !context.gameViewCapture) {
+		!context.clearAddedSceneModels || !context.buildWorldAabb || !context.captureManager) {
 		Finish(state, false, "Required Debug UI test context was not initialized.");
 		return;
 	}
@@ -139,7 +139,7 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 		}
 		// 一枚目の描画後に再読込し、Modelの参照と実行中の材質指定を保って二枚目を描けるか確認します。
 		if (state.isHotReloadTest && state.stage == 2 && state.frame == 60) {
-			Model* modelBeforeReload = addedObject->GetModel();
+			const Model* modelBeforeReload = addedObject->GetModel();
 			Model* handModel = ModelManager::GetInstance()->FindModel("debug/sphere.obj");
 			if (!modelBeforeReload || !handModel || handModel->GetModelData().materials.empty()) {
 				Finish(state, false, "Models required for hot reload were not available.");
@@ -314,7 +314,7 @@ void DebugUiSmoke::UpdateAfterDraw(State& state, const Context& context)
 	if (!state.isEnabled || state.isFinished || !state.isPendingCapture) {
 		return;
 	}
-	if (!context.gameViewCapture) {
+	if (!context.captureManager) {
 		Finish(state, false, "Game View capture was not initialized.");
 		return;
 	}
@@ -322,7 +322,7 @@ void DebugUiSmoke::UpdateAfterDraw(State& state, const Context& context)
 	std::vector<unsigned char> pixels;
 	int width = 0;
 	int height = 0;
-	if (!context.gameViewCapture->CapturePixels(pixels, width, height)) {
+	if (!context.captureManager->CapturePixels(pixels, width, height)) {
 		Finish(state, false, "CapturePixels failed.");
 		return;
 	}
@@ -331,9 +331,9 @@ void DebugUiSmoke::UpdateAfterDraw(State& state, const Context& context)
 		? "ribonin_challenge_walk_scene_frame" + std::to_string(state.frame) + "_"
 		: "ribonin_challenge_ui_smoke_";
 	const std::filesystem::path screenshotPath =
-		context.gameViewCapture->GetCaptureDirectory("Screenshots") /
-		(capturePrefix + context.gameViewCapture->MakeTimestampString() + ".bmp");
-	if (!context.gameViewCapture->SavePixelsAsBmp(screenshotPath, pixels, width, height)) {
+		context.captureManager->GetCaptureDirectory("Screenshots") /
+		(capturePrefix + context.captureManager->MakeTimestampString() + ".bmp");
+	if (!context.captureManager->SavePixelsAsBmp(screenshotPath, pixels, width, height)) {
 		Finish(state, false, "SavePixelsAsBmp failed: " + screenshotPath.string());
 		return;
 	}
@@ -361,9 +361,9 @@ void DebugUiSmoke::UpdateAfterDraw(State& state, const Context& context)
 	}
 
 	const std::filesystem::path videoPath =
-		context.gameViewCapture->GetCaptureDirectory("Videos") /
-		("ribonin_challenge_ui_smoke_" + context.gameViewCapture->MakeTimestampString() + ".avi");
-	if (!context.gameViewCapture->SaveSingleFrameAvi(videoPath, pixels, width, height)) {
+		context.captureManager->GetCaptureDirectory("Videos") /
+		("ribonin_challenge_ui_smoke_" + context.captureManager->MakeTimestampString() + ".avi");
+	if (!context.captureManager->SaveSingleFrameAvi(videoPath, pixels, width, height)) {
 		Finish(state, false, "SaveSingleFrameAvi failed: " + videoPath.string());
 		return;
 	}

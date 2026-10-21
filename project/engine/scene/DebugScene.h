@@ -1,6 +1,5 @@
 #pragma once
 #include "Object3d.h"
-#include "../debug/GameViewCapture.h"
 #include "../debug/DebugParticleEffects.h"
 #include "../debug/DebugAnimationPreview.h"
 #include "../debug/DebugAssetPreview.h"
@@ -45,10 +44,10 @@ public:
 
 private:
 	// Cameraと描画共通設定はDebugSceneが所有・借用し、他Sceneの状態を書き換えません。
-	std::unique_ptr<CameraManager> cameraManager;
-	std::unique_ptr<Camera> mainCamera;
-	Object3dCommon* object3dCommon = nullptr;
-	SpriteCommon* spriteCommon = nullptr;
+	std::unique_ptr<CameraManager> cameraManager_;
+	std::unique_ptr<Camera> mainCamera_;
+	Object3dCommon* object3dCommon_ = nullptr;
+	SpriteCommon* spriteCommon_ = nullptr;
 
 	// ---------- DebugScene開始時の準備 ----------
 
@@ -141,9 +140,6 @@ private:
     size_t baseAnimationObjectCount_ = 0;
 	// 初期配置のSprite数です。
     size_t baseSpriteCount_ = 0;
-
-	// Game Viewの画像保存・動画記録・リプレイ保存を担当します。
-	GameViewCapture gameViewCapture_{};
 
 	// ---------- 3D・2D選択状態 ----------
 

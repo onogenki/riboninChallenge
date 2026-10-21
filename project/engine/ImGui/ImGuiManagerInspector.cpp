@@ -327,7 +327,8 @@ void ImGuiManager::ModelWindow(
 				targetObject->GetTransformPlaybackDuration());
 		}
 
-		Transform& transform = targetObject->GetTransform();
+		// ImGuiの編集中は一時値を使い、確定後にObject3dへ一括反映します。
+		Transform transform = targetObject->GetTransform();
 		const Transform transformBeforeEdit = transform;
 		bool transformEdited = false;
 		const bool transformPlaybackActive =
@@ -358,6 +359,7 @@ void ImGuiManager::ModelWindow(
 		}
 		ImGui::EndDisabled();
 		if (transformEdited) {
+			targetObject->SetTransform(transform);
 			targetObject->RecordTransformEdit(transformBeforeEdit);
 		}
 

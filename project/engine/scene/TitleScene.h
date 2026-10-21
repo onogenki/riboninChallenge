@@ -33,10 +33,10 @@ public:
 
 private:
 	// TitleScene専用のCameraを所有し、描画共通設定はManagerから借ります。
-	std::unique_ptr<CameraManager> cameraManager;
-	std::unique_ptr<Camera> mainCamera;
-	Object3dCommon* object3dCommon = nullptr;
-	SpriteCommon* spriteCommon = nullptr;
+	std::unique_ptr<CameraManager> cameraManager_;
+	std::unique_ptr<Camera> mainCamera_;
+	Object3dCommon* object3dCommon_ = nullptr;
+	SpriteCommon* spriteCommon_ = nullptr;
 
 	// ---------- 初期化の補助関数 ----------
 

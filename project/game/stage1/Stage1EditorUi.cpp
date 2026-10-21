@@ -13,9 +13,7 @@ void Stage1::DrawStageEditorUi()
 	// Stage1はゲームデータを所有し、Edit Viewの表示・操作順は編集専用部品へ任せます。
 	StageEditor::Context editorContext{};
 	editorContext.isEditViewActive = ImGuiManager::GetInstance()->IsEditViewActive();
-	editorContext.autoMapReload = &autoStageMapReload_;
-	editorContext.mapFilePath = stageMapHotReload_.GetFilePath();
-	editorContext.mapReloadStatus = &stageMapReloadStatus_;
+	editorContext.mapFilePath = stageMapFileMonitor_.GetJsonFilePath();
 	editorContext.levelData = stageMapData_.get();
 	editorContext.playerPosition = player_ ? player_->GetPosition() : Vector3{};
 	// P0がある時はJSONのPlayerStartを編集しても開始位置へ反映されないため、UIへ優先元を知らせます。
@@ -25,11 +23,10 @@ void Stage1::DrawStageEditorUi()
 		{
 			return MapChipField::GetType(chip) == MapChipType::PlayerStart && chip.subId == 0;
 		});
-	editorContext.selectedObjectIndex = &selectedStageMapObjectIndex_;
 	editorContext.player = player_.get();
 	editorContext.floorObb = floor_ ? &collisionWorld_.GetFloorObb() : nullptr;
 	editorContext.floor = floor_;
-	editorContext.activeCamera = cameraManager ? cameraManager->GetActiveCamera() : nullptr;
+	editorContext.activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	// 通常Cameraの所有者はStage1のまま、Edit Viewへ一時調整用の参照だけを渡します。
 	editorContext.cameraController = cameraController_.get();
 	editorContext.fixedMirrors = &fixedMirrors_;
@@ -44,7 +41,8 @@ void Stage1::DrawStageEditorUi()
 	// 照明だけを変更した時は、置いた鏡や床をJSONの位置へ戻さずLightのみ更新します。
 	editorContext.applyLighting = [this]()
 	{
-		ApplyStageLighting();
+		stageLighting_.ApplyLevel(
+			stageMapData_ && stageMapData_->hasLighting ? &stageMapData_->lighting : nullptr);
 	};
 	editorContext.saveLevelData = [this]()
 	{
@@ -53,7 +51,7 @@ void Stage1::DrawStageEditorUi()
 	editorContext.reloadMap = [this]()
 	{
 		ReloadStageMap();
-		stageMapHotReload_.Synchronize();
+		stageMapFileMonitor_.SynchronizeJson();
 	};
 	stageEditor_.Draw(editorContext);
 }
@@ -87,7 +85,7 @@ void Stage1::DrawStagePuzzleDebugUi()
 						objectData.rotation.y = settings.largeMirrorBaseYaw;
 						objectData.scaling.x = mirror.GetWidth() * 0.5f;
 						objectData.scaling.y = mirror.GetHeight() * 0.5f;
-						stageMapReloadStatus_ = "Mirror edited in memory. Press Save Map to keep it.";
+						stageEditor_.SetReloadStatus("Mirror edited in memory. Press Save Map to keep it.");
 						return true;
 					}
 					if (syncMirrorData(objectData.children)) {

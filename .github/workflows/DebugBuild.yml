@@ -1,28 +1,61 @@
 name: DebugBuild
+
 on:
-push:
-branches:
--master
+  push:
+    branches:
+      - master
 
 env:
-#リポジトリのルートディレクトリを基点としたソリューションファイルのパス
-SOLUTION_FILE_PATH: project/riboninCharenge.sln
-#Visual Studioの構成(Debug / Release)
-CONFIGURATION: Debug
+  # リポジトリのルートディレクトリを基点としたソリューションファイルのパス
+  SOLUTION_FILE_PATH: project/riboninChallenge.sln
+  # Visual Studioの構成(Debug / Release)
+  CONFIGURATION: Debug
 
 jobs:
-build:
-runs-on: windows-2022
+  build:
+    runs-on: windows-2022
 
-steps:
--name: Checkout
-uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
--name: Add MsBuild to PATH
-uses: microsoft/setup-msbuild@v2
-with:
-msbuild-architecture: x64
+      - name: Add MsBuild to PATH
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
 
--name: Build
-run: |
-msbuild ${{env.SOLUTION_FILE_PATH}} /p:Platform=x64,Configuration=${{env.CONFIGURATION}}
+      - name: Validate Visual Studio file registration
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content 'project/riboninChallenge.vcxproj'
+          [xml]$filters = Get-Content 'project/riboninChallenge.vcxproj.filters'
+          $types = @('ClCompile', 'ClInclude', 'FxCompile', 'None', 'ResourceCompile', 'Text')
+          $projectItems = @($project.SelectNodes('//*[@Include]') | Where-Object { $_.LocalName -in $types })
+          $filterItems = @($filters.SelectNodes('//*[@Include]') | Where-Object { $_.LocalName -in $types })
+          $projectKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+          $filterKeys = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+          foreach ($item in $projectItems) {
+            $include = $item.GetAttribute('Include')
+            $key = "$($item.LocalName)|$include"
+            if (-not $projectKeys.Add($key)) { throw "Duplicate project entry: $key" }
+            if ($item.LocalName -in @('ClCompile', 'ClInclude') -and $include -match '[*?]') {
+              throw "Wildcard source Include is forbidden: $key"
+            }
+          }
+          foreach ($item in $filterItems) {
+            $include = $item.GetAttribute('Include')
+            $key = "$($item.LocalName)|$include"
+            if (-not $filterKeys.Add($key)) { throw "Duplicate filter entry: $key" }
+            if (-not $projectKeys.Contains($key)) { throw "Missing from project: $key" }
+            if (-not (Test-Path (Join-Path 'project' $include))) { throw "Missing file: $include" }
+            $expected = [string](Split-Path $include -Parent)
+            $filterNode = $item.SelectSingleNode("*[local-name()='Filter']")
+            $actual = if ($filterNode) { [string]$filterNode.InnerText } else { '' }
+            if ($actual -cne $expected) { throw "Filter path mismatch: $key ($actual != $expected)" }
+          }
+          foreach ($key in $projectKeys) {
+            if (-not $filterKeys.Contains($key)) { throw "Missing from filters: $key" }
+          }
+
+      - name: Build
+        run: msbuild ${{ env.SOLUTION_FILE_PATH }} /p:Platform=x64 /p:Configuration=${{ env.CONFIGURATION }}

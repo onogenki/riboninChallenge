@@ -32,19 +32,19 @@ bool DebugAnimationPreview::Initialize(
 	}
 
 	humanObject->SetEnvironmentCoefficient(0.3f);
-	humanObject->GetTransform().translate = { 2.0f, 0.0f, 0.0f };
-	humanObject->GetTransform().rotate = { 0.0f, 0.0f, 0.0f };
-	humanObject->GetTransform().scale = { 0.2f, 0.2f, 0.2f };
+	humanObject->SetTranslate({ 2.0f, 0.0f, 0.0f });
+	humanObject->SetRotate({ 0.0f, 0.0f, 0.0f });
+	humanObject->SetScale({ 0.2f, 0.2f, 0.2f });
 	humanObject->PlayAnimation(humanAnimation_);
 	humanObject->SetIsLoop(false);
 
 	handWeapon->GetModel()->SetTexture("Resources/debug/monsterBall.png");
-	handWeapon->GetTransform().scale = { 1.5f, 1.5f, 1.5f };
-	handWeapon->GetTransform().translate = { 0.0f, 0.25f, 0.0f };
+	handWeapon->SetScale({ 1.5f, 1.5f, 1.5f });
+	handWeapon->SetTranslate({ 0.0f, 0.25f, 0.0f });
 
 	walkObject->SetEnvironmentCoefficient(0.3f);
-	walkObject->GetTransform().translate = { -2.0f, 0.0f, 0.0f };
-	walkObject->GetTransform().scale = { 1.0f, 1.0f, 1.0f };
+	walkObject->SetTranslate({ -2.0f, 0.0f, 0.0f });
+	walkObject->SetScale({ 1.0f, 1.0f, 1.0f });
 	walkObject->PlayAnimation(walkAnimation_);
 	walkObject->SetIsLoop(true);
 
@@ -77,10 +77,15 @@ void DebugAnimationPreview::Update(const Context& context)
 	if (walkObject_) {
 		if (Length(moveDirection) > 0.0f) {
 			moveDirection = Normalize(moveDirection);
-			walkObject_->GetTransform().translate.x += moveDirection.x * 2.0f * context.deltaTime;
-			walkObject_->GetTransform().translate.z += moveDirection.z * 2.0f * context.deltaTime;
+			// 歩行先と向きを先に計算し、Objectへ同じフレーム内で反映します。
+			Vector3 walkPosition = walkObject_->GetTranslate();
+			walkPosition.x += moveDirection.x * 2.0f * context.deltaTime;
+			walkPosition.z += moveDirection.z * 2.0f * context.deltaTime;
+			walkObject_->SetTranslate(walkPosition);
 			// 移動ベクトルからY回転を作り、モデル正面を歩行方向へ合わせます。
-			walkObject_->GetTransform().rotate.y = std::atan2(moveDirection.x, moveDirection.z);
+			Vector3 walkRotation = walkObject_->GetRotate();
+			walkRotation.y = std::atan2(moveDirection.x, moveDirection.z);
+			walkObject_->SetRotate(walkRotation);
 			walkObject_->SetAnimationPlaying(true);
 		} else {
 			walkObject_->SetAnimationPlaying(false);

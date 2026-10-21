@@ -56,6 +56,22 @@ public:
 	bool IsEnabled() const;
 
 private:
+	// 本編に影響しない契約確認を、Collider・生成管理・鏡・Cameraの順に実行します。
+	void VerifyColliderAndEditorContracts();
+	void VerifyEnemyManagerOwnership(Object3dCommon* object3dCommon);
+	Vector3 VerifyCarryMirrorControls(const InitializeContext& context);
+	void VerifyFixedMirrorAndDoor(const std::vector<std::unique_ptr<FixedMirror>>& fixedMirrors);
+	void VerifyLaserBlockingAndDrop(const Vector3& mirrorPosition);
+	void VerifyCameraControls();
+	// 毎フレームの描画・接地・Light Puzzle結果を、後続の操作検証より先に記録します。
+	void ObserveFrame(const UpdateContext& context, float deltaTime);
+	// 置いた鏡の衝突登録と、Playerの向きへの追従を順に確認します。
+	void VerifyDroppedMirrorAndFacing(const UpdateContext& context);
+	// 接地後にPlayerを床外へ一度だけ移し、落下したかを確認します。
+	void VerifyFallProbe();
+	// 成功または時間切れになった時だけ、判定結果をログに残して終了します。
+	void FinishWhenReady();
+
 	// 自動確認が使う本編オブジェクトへの非所有ポインタです。
 	Player* player_ = nullptr;
 	CarryableMirror* carryableMirror_ = nullptr;

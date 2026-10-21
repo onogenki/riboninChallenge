@@ -79,7 +79,8 @@ public:
 	ID3D12Device* GetDevice() const { return device_.Get(); }
 	ID3D12GraphicsCommandList* GetCommandList()const { return commandList_.Get(); }
 
-	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue.Get(); }
+	// GPU命令を実行するキューを返します。所有権はDirectXCommonに残します。
+	ID3D12CommandQueue* GetCommandQueue() const { return commandQueue_.Get(); }
 	ID3D12CommandAllocator* GetCommandAllocator() const { return commandAllocators_[frameIndex_].Get(); }
 	// 描画中のSwapChain枠とフレーム番号です。枠のFence待ち後だけ同じUpload領域を再利用できます。
 	UINT GetFrameIndex() const { return frameIndex_; }
@@ -89,20 +90,35 @@ public:
 	uint32_t GetGaussianBlurTextureSrvIndex() const { return gaussianBlurTextureSrvIndex_; }
 	uint32_t GetDepthStencilSrvIndex() const { return depthStencilSrvIndex_; }
 	D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilViewHandle() const { return dsvHandle_; }
-	uint32_t GetClientWidth() const { return width; }
-	uint32_t GetClientHeight() const { return height; }
+	// 描画先の再生成にも使う、現在のクライアント領域の幅・高さです。
+	uint32_t GetClientWidth() const { return width_; }
+	uint32_t GetClientHeight() const { return height_; }
 	float GetDeltaTime() const { return deltaTime_; }
 
 	//最大SRV数(最大テクスチャ枚数)
 	static const uint32_t kMaxSRVCount;
 
-	//スワップチェーンリソースの数を取得
-	size_t GetSwapChainResourcesNum() const { return 2;}
+	// SwapChainの設定と配列が同じ枚数を使うよう、共通の枚数を返します。
+	size_t GetSwapChainResourcesNum() const { return kSwapChainBufferCount; }
 
 	//GPU待ち関数
 	void WaitForGPU();
+	// @brief 描画先を同期的に読み戻します。GPU待ちが入るため連続撮影には使いません。
+	// @param pixels 成功時にRGBA順の画素を受け取る出力先です。
+	// @param outWidth 成功時に画像の幅を受け取る出力先です。
+	// @param outHeight 成功時に画像の高さを受け取る出力先です。
+	// @param usePostEffectTexture trueならポストエフェクト後、falseならScene描画先を読みます。
+	// @return GPUから画素を取得できた時だけtrueです。
 	bool CaptureGameTexturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight, bool usePostEffectTexture);
+	// @brief 描画先のコピーを空きスロットへ予約し、後のフレームで取得できるようにします。
+	// @param usePostEffectTexture trueならポストエフェクト後、falseならScene描画先を予約します。
+	// @return 空きスロットとGPU資源を確保して予約できた時だけtrueです。
 	bool QueueGameTextureCapture(bool usePostEffectTexture);
+	// @brief GPUが完了した最古の撮影予約から画素を取り出します。
+	// @param pixels 成功時にRGBA順の画素を受け取る出力先です。
+	// @param outWidth 成功時に画像の幅を受け取る出力先です。
+	// @param outHeight 成功時に画像の高さを受け取る出力先です。
+	// @return 未完了ならfalseです。予約を消費した時はtrueで、取得失敗なら画素は空です。
 	bool TryGetGameTextureCapturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight);
 
 	// 転送用資源とCommand Listを準備できた時だけコピー・GPU待ちを行い、SRV登録へ進める。
@@ -136,61 +152,60 @@ private:
 	};
 
 	static constexpr size_t kCaptureReadbackSlotCount_ = 4;
+	// 表示用Buffer・Command Allocator・Fence・RTVは同じ二枚分を所有します。
+	static constexpr size_t kSwapChainBufferCount = 2;
 
 	DirectXCommon() = default;
 	~DirectXCommon();
 
 	Microsoft::WRL::ComPtr<ID3D12Device>device_;
-	Microsoft::WRL::ComPtr<IDXGIFactory7>dxgiFactory;
-	Microsoft::WRL::ComPtr < ID3D12Debug1> debugController;
-	Microsoft::WRL::ComPtr < IDXGIAdapter4> useAdapter;
-	Microsoft::WRL::ComPtr < ID3D12InfoQueue> infoQueue;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocators_[2];
-	Microsoft::WRL::ComPtr < ID3D12CommandQueue> commandQueue;
-	Microsoft::WRL::ComPtr < ID3D12Resource> resource;
-	Microsoft::WRL::ComPtr < ID3D12Fence> fence;
-	Microsoft::WRL::ComPtr < IDxcUtils> dxcUtils;
-	Microsoft::WRL::ComPtr < IDxcCompiler3> dxcCompiler;
+	Microsoft::WRL::ComPtr<IDXGIFactory7>dxgiFactory_;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocators_[kSwapChainBufferCount];
+	Microsoft::WRL::ComPtr < ID3D12CommandQueue> commandQueue_;
+	Microsoft::WRL::ComPtr < ID3D12Fence> fence_;
+	Microsoft::WRL::ComPtr < IDxcUtils> dxcUtils_;
+	Microsoft::WRL::ComPtr < IDxcCompiler3> dxcCompiler_;
 	//現時点でincludeはしないが、includeに対応するための設定を行っておく
-	Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler;
+	Microsoft::WRL::ComPtr<IDxcIncludeHandler> includeHandler_;
 
 	Microsoft::WRL::ComPtr < ID3D12GraphicsCommandList> commandList_;
 
-	//フェンス値
-	UINT64 fenceVal = 0;
-	UINT64 frameFenceValues_[2] = {};
+	// 描画・撮影・転送のSignalで共有し、投入順に単調増加するFence値です。
+	UINT64 signaledFenceValue_ = 0;
+	UINT64 frameFenceValues_[kSwapChainBufferCount] = {};
 	UINT frameIndex_ = 0;
 	uint64_t frameSerial_ = 0;
 	std::array<CaptureReadbackSlot, kCaptureReadbackSlotCount_> captureReadbackSlots_{};
 	UINT64 captureSequence_ = 0;
 
 	//スワップチェーンを生成する
-	Microsoft::WRL::ComPtr < IDXGISwapChain4> swapChain;
-	Microsoft::WRL::ComPtr < ID3D12Resource> swapChainResources[2];
+	Microsoft::WRL::ComPtr < IDXGISwapChain4> swapChain_;
+	Microsoft::WRL::ComPtr < ID3D12Resource> swapChainResources_[kSwapChainBufferCount];
 
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc_{};
 	D3D12_RENDER_TARGET_VIEW_DESC rtvDesc_{};
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap;
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> rtvDescriptorHeap_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srvDescriptorHeap_;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> dsvDescriptorHeap_;
 
-	//フェンス生成
+	// Fence作成時だけ渡す初期値です。投入済みの値はsignaledFenceValue_が管理します。
 	uint64_t fenceValue_ = 0;
 
 	HANDLE fenceEvent_ = nullptr;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource;
+	// 深度とステンシルのTextureを一つだけ所有し、DSVとSRVの両方から参照します。
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthStencilResource_;
 	uint32_t depthStencilSrvIndex_ = UINT32_MAX;
 	bool isDepthStencilShaderResource_ = false;
-	UINT descriptorSizeSRV = 0;
-	UINT descriptorSizeRTV = 0;
-	UINT descriptorSizeDSV = 0;
+	UINT descriptorSizeSRV_ = 0;
+	UINT descriptorSizeRTV_ = 0;
+	UINT descriptorSizeDSV_ = 0;
 
 	//描画先のRTVとDSVを設定する
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle_{};
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_[2]{};
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle_[kSwapChainBufferCount]{};
 
 	// Sceneの描画先として使うオフスクリーンRenderTexture
 	Microsoft::WRL::ComPtr<ID3D12Resource> renderTextureResource_;
@@ -210,13 +225,11 @@ private:
 	//ビューポート
 	D3D12_VIEWPORT viewport_{};
 
-	HRESULT hr = S_OK;
-
 	//シザー短形
 	D3D12_RECT scissorRect_{};
 
 	//WindowsAPI
-	WinApp* winApp = nullptr;
+	WinApp* winApp_ = nullptr;
 
 	//FPS固定初期化
 	void InitializeFixFPS();
@@ -232,8 +245,8 @@ private:
 	std::chrono::microseconds kMinTime_{};
 	float deltaTime_ = 1.0f / 60.0f;
 
-	uint32_t width = WinApp::kClientWidth; // 幅・高さをメンバに
-	uint32_t height = WinApp::kClientHeight;
+	uint32_t width_ = WinApp::kClientWidth; // 幅・高さをメンバに
+	uint32_t height_ = WinApp::kClientHeight;
 
 
 };

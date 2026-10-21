@@ -199,7 +199,7 @@ void DebugTimePlaybackSmoke::Start(
 	state.timePlaybackSmokeTarget_.translate.y += 1.5f;
 	state.timePlaybackSmokeTarget_.rotate.y += 0.75f;
 	state.timePlaybackSmokeTarget_.scale = { 1.4f, 0.8f, 1.2f };
-	context.objectPlane->GetTransform() = state.timePlaybackSmokeTarget_;
+	context.objectPlane->SetTransform(state.timePlaybackSmokeTarget_);
 	context.objectPlane->RecordTransformEdit(state.timePlaybackSmokeOrigin_, 2.0f);
 	context.objectPlane->SetTransformReturning(true);
 	if (!context.objectPlane->IsTransformReturning() ||
@@ -303,7 +303,9 @@ void DebugTimePlaybackSmoke::Update(
 			}
 			Object3d* addedObject = context.normalObjects->back().get();
 			const Transform beforeEdit = addedObject->GetTransform();
-			addedObject->GetTransform().translate.x += 2.0f;
+			Transform editedTransform = beforeEdit;
+			editedTransform.translate.x += 2.0f;
+			addedObject->SetTransform(editedTransform);
 			addedObject->RecordTransformEdit(beforeEdit);
 			addedObject->SetTransformReturning(true);
 			context.clearAddedSceneModels();

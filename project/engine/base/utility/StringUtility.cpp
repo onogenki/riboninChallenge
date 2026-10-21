@@ -11,13 +11,18 @@ namespace StringUtility
 			return std::wstring();
 		}
 		//変換後に必要となるバッファのサイズを取得
-		int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), nullptr, 0);
+		const int sizeNeeded = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), nullptr, 0);
+		if (sizeNeeded <= 0) {
+			return {};
+		}
 
 		//必要なサイズでwstringを確保
 		std::wstring result(sizeNeeded, L'\0');
 
-		//実際に変換を行う
-		MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), &result[0], sizeNeeded);
+		// 変換失敗時に未完成の文字列を返さず、Audioなどの利用側へ空文字列を渡します。
+		if (MultiByteToWideChar(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), result.data(), sizeNeeded) == 0) {
+			return {};
+		}
 
 		return result;
 	}
@@ -30,13 +35,18 @@ namespace StringUtility
 			return std::string();
 		}
 		//変換後に必要となるバッファのサイズ(バイト数)を取得
-		int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), nullptr, 0, nullptr, nullptr);
+		const int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), nullptr, 0, nullptr, nullptr);
+		if (sizeNeeded <= 0) {
+			return {};
+		}
 
 		//必要なサイズでstringを確保
 		std::string result(sizeNeeded, '\0');
 
-		//実際に変換を行う
-		WideCharToMultiByte(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), &result[0], sizeNeeded, nullptr, nullptr);
+		// 逆変換でも失敗を空文字列として返し、空バッファを参照しません。
+		if (WideCharToMultiByte(CP_UTF8, 0, str.c_str(), static_cast<int>(str.length()), result.data(), sizeNeeded, nullptr, nullptr) == 0) {
+			return {};
+		}
 
 		return result;
 	}

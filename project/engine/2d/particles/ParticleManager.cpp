@@ -36,8 +36,9 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
     InitializeDefaultQuad();
     InitializeMaterial();
 
-    //フィールドの設定
-    accelerationField_.acceleration = { 15.0f,0.0f,0.0f };
+    // 初期の風の強さを一か所で示し、風の範囲とは別の設定だと分かるようにします。
+    constexpr float kDefaultWindAccelerationX = 15.0f;
+    accelerationField_.acceleration = { kDefaultWindAccelerationX,0.0f,0.0f };
     accelerationField_.area.min = { -1.0f,-1.0f,-1.0f };
     accelerationField_.area.max = { 1.0f,1.0f,1.0f };
 
@@ -295,7 +296,7 @@ void ParticleManager::RemoveExistingGroup(const std::string& name)
 }
 
 // 画像と描画領域がそろったグループだけ登録し、呼び出し元へ成否を返します。
-bool ParticleManager::CreateParticleGroup(const std::string name, const std::string textureFilePath) {
+bool ParticleManager::CreateParticleGroup(const std::string& name, const std::string& textureFilePath) {
 	if (!PrepareGroupResources(textureFilePath)) {
 		return false;
 	}
@@ -311,13 +312,15 @@ bool ParticleManager::CreateParticleGroup(const std::string name, const std::str
     }
 
 	// 完成したGroupだけを置き換え、途中失敗時には古い粒子を残します。
-    RemoveExistingGroup(name);
-    particleGroups_[name] = std::move(newGroup);
+    // 呼び出し元のnameが旧Group由来でも、削除後に参照切れを起こさないよう所有します。
+    const std::string groupName = name;
+    RemoveExistingGroup(groupName);
+    particleGroups_[groupName] = std::move(newGroup);
 	return true;
 }
 
 // Ringの画像と円環頂点を登録し、呼び出し元へ成否を返します。
-bool ParticleManager::CreateRingParticleGroup(const std::string name, const std::string textureFilePath)
+bool ParticleManager::CreateRingParticleGroup(const std::string& name, const std::string& textureFilePath)
 {
 	if (!PrepareGroupResources(textureFilePath)) {
 		return false;
@@ -375,22 +378,24 @@ bool ParticleManager::CreateRingParticleGroup(const std::string name, const std:
     }
 
 	// 頂点まで完成してから旧Groupを外し、失敗時の粒子を失わないようにします。
-    RemoveExistingGroup(name);
-    particleGroups_[name] = std::move(newGroup);
+    // 名前を所有してから旧Groupを消し、呼び出し元の参照が旧Groupを指しても安全にします。
+    const std::string groupName = name;
+    RemoveExistingGroup(groupName);
+    particleGroups_[groupName] = std::move(newGroup);
 	return true;
 }
 
 // 不正な寸法と頂点Bufferのサイズ超過を生成前に拒否し、既存Groupを残します。
 bool ParticleManager::CreateCylinderParticleGroup(
-    const std::string name,
-    const std::string textureFilePath,
+    const std::string& name,
+    const std::string& textureFilePath,
     uint32_t divide,
     float topRadius,
     float bottomRadius,
     float height)
 {
 	constexpr uint32_t kVerticesPerDivide = 6;
-	const size_t maxDivideForVertexView =
+	constexpr size_t maxDivideForVertexView =
 		(std::numeric_limits<uint32_t>::max)() / (sizeof(VertexData) * kVerticesPerDivide);
 	if (divide < 3 || divide > maxDivideForVertexView ||
 		!std::isfinite(topRadius) || topRadius <= 0.0f ||
@@ -455,8 +460,10 @@ bool ParticleManager::CreateCylinderParticleGroup(
     }
 
 	// 頂点まで完成してから旧Groupを外し、失敗時の粒子を失わないようにします。
-    RemoveExistingGroup(name);
-    particleGroups_[name] = std::move(newGroup);
+    // 名前を所有してから旧Groupを消し、呼び出し元の参照が旧Groupを指しても安全にします。
+    const std::string groupName = name;
+    RemoveExistingGroup(groupName);
+    particleGroups_[groupName] = std::move(newGroup);
 	return true;
 }
 
@@ -546,23 +553,27 @@ bool ParticleManager::IsCollision(const AABB& aabb, const Vector3& point)
 
 void ParticleManager::UpdateCylinderParticle(Particle& particle, float signedDeltaTime, bool returning)
 {
-    particle.transform.rotate.y += 1.5f * signedDeltaTime;
+    // 円柱の回転速度と伸縮範囲を固定し、逆再生でも同じ境界を使います。
+    constexpr float kCylinderRotationSpeed = 1.5f;
+    constexpr float kCylinderMaximumScaleY = 1.2f;
+    constexpr float kCylinderMinimumScaleY = 0.5f;
+    particle.transform.rotate.y += kCylinderRotationSpeed * signedDeltaTime;
 
     // 逆再生時は、境界で反転した速度を先に戻してからスケールを巻き戻す。
     if (returning) {
-        if (particle.transform.scale.y >= 1.2f && particle.scaleVelocityY < 0.0f) {
+        if (particle.transform.scale.y >= kCylinderMaximumScaleY && particle.scaleVelocityY < 0.0f) {
             particle.scaleVelocityY *= -1.0f;
-        } else if (particle.transform.scale.y <= 0.5f && particle.scaleVelocityY > 0.0f) {
+        } else if (particle.transform.scale.y <= kCylinderMinimumScaleY && particle.scaleVelocityY > 0.0f) {
             particle.scaleVelocityY *= -1.0f;
         }
     }
 
     particle.transform.scale.y += particle.scaleVelocityY * signedDeltaTime;
-    if (particle.transform.scale.y >= 1.2f) {
-        particle.transform.scale.y = 1.2f;
+    if (particle.transform.scale.y >= kCylinderMaximumScaleY) {
+        particle.transform.scale.y = kCylinderMaximumScaleY;
         particle.scaleVelocityY *= -1.0f;
-    } else if (particle.transform.scale.y <= 0.5f) {
-        particle.transform.scale.y = 0.5f;
+    } else if (particle.transform.scale.y <= kCylinderMinimumScaleY) {
+        particle.transform.scale.y = kCylinderMinimumScaleY;
         particle.scaleVelocityY *= -1.0f;
     }
 }

@@ -1,10 +1,10 @@
 #include "Object3dCommon.h"
 
-#include <cassert>
+#include <stdexcept>
 #include <vector>
 
 
-// 平面鏡へ反射Textureを描くためのRootSignatureとGraphics Pipelineをまとめる。
+// 平面鏡へ反射Textureを渡す結合位置を作り、失敗時は鏡Pipelineへ進みません。
 void Object3dCommon::CreateMirrorRootSignature()
 {
 	D3D12_DESCRIPTOR_RANGE textureRange{};
@@ -51,15 +51,20 @@ void Object3dCommon::CreateMirrorRootSignature()
 		D3D_ROOT_SIGNATURE_VERSION_1,
 		&signatureBlob,
 		&errorBlob);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !signatureBlob) {
+		throw std::runtime_error("Object3dCommon: mirror root signature serialization failed");
+	}
 	hr = dxCommon_->GetDevice()->CreateRootSignature(
 		0,
 		signatureBlob->GetBufferPointer(),
 		signatureBlob->GetBufferSize(),
 		IID_PPV_ARGS(&mirrorRootSignature_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !mirrorRootSignature_) {
+		throw std::runtime_error("Object3dCommon: mirror root signature creation failed");
+	}
 }
 
+// 鏡面専用Shaderをまとめ、生成失敗時は未完成の鏡面描画を止めます。
 void Object3dCommon::CreateMirrorGraphicsPipeline()
 {
 	D3D12_INPUT_ELEMENT_DESC inputElements[3]{};
@@ -83,7 +88,9 @@ void Object3dCommon::CreateMirrorGraphicsPipeline()
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShader = dxCommon_->CompileShader(
 		L"resources/shaders/Mirror.PS.hlsl",
 		L"ps_6_0");
-	assert(vertexShader && pixelShader);
+	if (!vertexShader || !pixelShader) {
+		throw std::runtime_error("Object3dCommon: mirror shader is unavailable");
+	}
 
 	D3D12_BLEND_DESC blendDesc{};
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
@@ -113,6 +120,8 @@ void Object3dCommon::CreateMirrorGraphicsPipeline()
 	const HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
 		&pipelineDesc,
 		IID_PPV_ARGS(&mirrorGraphicsPipelineState_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !mirrorGraphicsPipelineState_) {
+		throw std::runtime_error("Object3dCommon: mirror graphics pipeline creation failed");
+	}
 }
 

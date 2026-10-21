@@ -11,7 +11,7 @@ void DirectXCommon::PreDraw(const Vector4* clearColorOverride)
 		D3D12_RESOURCE_BARRIER depthStencilBarrier{};
 		depthStencilBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		depthStencilBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		depthStencilBarrier.Transition.pResource = depthStencilResource.Get();
+		depthStencilBarrier.Transition.pResource = depthStencilResource_.Get();
 		depthStencilBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 		depthStencilBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 		depthStencilBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -114,7 +114,7 @@ void DirectXCommon::PreDrawForDepthBasedOutlineTexture()
 		D3D12_RESOURCE_BARRIER depthStencilBarrier{};
 		depthStencilBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 		depthStencilBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-		depthStencilBarrier.Transition.pResource = depthStencilResource.Get();
+		depthStencilBarrier.Transition.pResource = depthStencilResource_.Get();
 		depthStencilBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
 		depthStencilBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 		depthStencilBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -207,6 +207,7 @@ void DirectXCommon::PreDrawForGaussianVerticalTexture()
 	commandList_->RSSetScissorRects(1, &scissorRect_);
 }
 
+// Scene描画先を読み取り状態へ戻し、ImGui用SwapChainを描画状態へ切り替えます。
 void DirectXCommon::PreDrawForSwapChain(bool usePostEffectTexture)
 {
 	// Sceneの描画結果を後でSRVから読めるよう、RenderTextureを書き込み状態から読み取り状態へ変更する
@@ -237,11 +238,11 @@ void DirectXCommon::PreDrawForSwapChain(bool usePostEffectTexture)
 	}
 
 	// ImGuiを表示するため、SwapChainを描画可能な状態へ変更する
-	const UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+	const UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
 	D3D12_RESOURCE_BARRIER swapChainBarrier{};
 	swapChainBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	swapChainBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-	swapChainBarrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
+	swapChainBarrier.Transition.pResource = swapChainResources_[backBufferIndex].Get();
 	swapChainBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 	swapChainBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	swapChainBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -258,10 +259,11 @@ void DirectXCommon::PreDrawForSwapChain(bool usePostEffectTexture)
 	commandList_->RSSetScissorRects(1, &scissorRect_);
 }
 
+// 描画命令をGPUへ渡してPresentし、Fenceで次のバックバッファの安全な再利用を待ちます。
 void DirectXCommon::PostDraw()
 {
 	//バックバッファの番号取得
-	UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
+	UINT backBufferIndex = swapChain_->GetCurrentBackBufferIndex();
 
 	//TransitionBarrierの設定
 	D3D12_RESOURCE_BARRIER barrier{};
@@ -270,7 +272,7 @@ void DirectXCommon::PostDraw()
 	//Noneにしておく
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
 	//バリアを張る対象のリソース。現在のバックバッファに対して行う
-	barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
+	barrier.Transition.pResource = swapChainResources_[backBufferIndex].Get();
 	//遷移前(現在)のResourceState
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	//遷移後のResourceState
@@ -279,27 +281,28 @@ void DirectXCommon::PostDraw()
 	//TransitionBarrierを張る
 	commandList_->ResourceBarrier(1, &barrier);
 
-	hr = GetCommandList()->Close();
+	// このフレームのコマンド結果だけを保持し、次の描画へ共有しません。
+	HRESULT hr = GetCommandList()->Close();
 	assert(SUCCEEDED(hr));
 
 	//GPUにコマンドリストの実行を行わせる
 	Microsoft::WRL::ComPtr < ID3D12CommandList> commandLists[] = { GetCommandList() };
-	commandQueue->ExecuteCommandLists(1, commandLists->GetAddressOf());
+	commandQueue_->ExecuteCommandLists(1, commandLists->GetAddressOf());
 	//GPUとOSに画面の交渉を行うように通知する
-	swapChain->Present(1, 0);
+	swapChain_->Present(1, 0);
 
 	//Fenceの値を更新
-	const UINT64 signalValue = ++fenceVal;
+	const UINT64 signalValue = ++signaledFenceValue_;
 	//GPUがここまでたどり着いたときに、Fenceの値を指定した値に代入するようにSignalを送る
-	commandQueue->Signal(fence.Get(), signalValue);
+	commandQueue_->Signal(fence_.Get(), signalValue);
 	frameFenceValues_[frameIndex_] = signalValue;
 	//Fenceの値が指定したSignal値にたどり着いているか確認する
 	//GetCompletedValueの初期値はFence作成時に渡した初期値
-	frameIndex_ = swapChain->GetCurrentBackBufferIndex();
-	if (frameFenceValues_[frameIndex_] != 0 && fence->GetCompletedValue() < frameFenceValues_[frameIndex_])
+	frameIndex_ = swapChain_->GetCurrentBackBufferIndex();
+	if (frameFenceValues_[frameIndex_] != 0 && fence_->GetCompletedValue() < frameFenceValues_[frameIndex_])
 	{
 		//指定したSignalにたどり着いていないので、たどり着くまで待つようにイベントを設定する
-		fence->SetEventOnCompletion(frameFenceValues_[frameIndex_], fenceEvent_);
+		fence_->SetEventOnCompletion(frameFenceValues_[frameIndex_], fenceEvent_);
 		//イベント待つ
 		WaitForSingleObject(fenceEvent_, INFINITE);
 	}

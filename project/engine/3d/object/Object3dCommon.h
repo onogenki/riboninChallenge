@@ -35,7 +35,7 @@ public:
 	void SetCommonDrawSetting();
 	// 壁の奥だけにObjectの半透明シルエットを描く共通Pipelineを設定します。
 	void SetOccludedSilhouetteDrawSetting();
-	// 比較・検証用の骨変形Compute Pipelineを設定します。通常の骨付き描画では使いません。
+	// 骨付きモデルの壁越しシルエット用に頂点を変形するCompute Pipelineを設定します。
 	void SetSkinningComputeSetting();
 	// 反射Textureを平面へ投影する固定鏡専用の描画設定へ切り替えます。
 	void SetMirrorDrawSetting();

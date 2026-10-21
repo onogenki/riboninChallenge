@@ -16,6 +16,7 @@ StageHazardLights::~StageHazardLights() = default;
 // 各危険LightのRendererを作り、見えない光の判定だけが残らないよう失敗を返します。
 bool StageHazardLights::Initialize(DirectXCommon* directXCommon)
 {
+	Reset();
 	const auto createRenderer = [directXCommon](
 		std::unique_ptr<LaserRenderer>& renderer,
 		const Vector4& color,
@@ -39,6 +40,18 @@ bool StageHazardLights::Initialize(DirectXCommon* directXCommon)
 		return false;
 	}
 	return true;
+}
+
+// Stage間で前Frameの線分や軌道の経過時間を持ち越さないよう、実行状態だけを初期化します。
+void StageHazardLights::Reset()
+{
+	ceilingSweepSegments_.clear();
+	horizontalMoveSegments_.clear();
+	bottomPulseSegments_.clear();
+	bottomPulseWarningSegments_.clear();
+	orbitSegments_.clear();
+	time_ = 0.0f;
+	isPlayerHit_ = false;
 }
 
 // 時刻から4種類の危険Lightを作り、反射・Player接触・軌道Lightの太さまで更新します。

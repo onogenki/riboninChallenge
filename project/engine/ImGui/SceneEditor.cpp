@@ -185,7 +185,7 @@ namespace {
 
 	bool BuildEditorWorldBounds(const Object3d& object, Vector3& minimum, Vector3& maximum)
 	{
-		Model* model = object.GetModel();
+		const Model* model = object.GetModel();
 		if (!model || model->GetModelData().vertices.empty()) {
 			return false;
 		}

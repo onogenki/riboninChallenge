@@ -27,7 +27,7 @@
       <WarningLevel>Level4</WarningLevel>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\engine\audio;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\engine\audio;$(ProjectDir)..\engine\base\utility;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions Condition="'$(Configuration)'=='Debug'">_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)'!='Debug'">NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization Condition="'$(Configuration)'=='Debug'">Disabled</Optimization>
@@ -41,10 +41,12 @@
     <ClCompile Include="..\engine\audio\AudioMixer.cpp" />
     <ClCompile Include="..\engine\audio\BgmPlayer.cpp" />
     <ClCompile Include="..\engine\audio\SoundEffectPlayer.cpp" />
+    <ClCompile Include="..\engine\base\utility\StringUtility.cpp" />
     <ClInclude Include="..\engine\audio\Audio.h" />
     <ClInclude Include="..\engine\audio\AudioMixer.h" />
     <ClInclude Include="..\engine\audio\BgmPlayer.h" />
     <ClInclude Include="..\engine\audio\SoundEffectPlayer.h" />
+    <ClInclude Include="..\engine\base\utility\StringUtility.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

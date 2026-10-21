@@ -24,6 +24,8 @@ public:
 
 	// 危険Lightの描画用Rendererを全て準備し、一つでも描けない時は失敗を返します。
 	bool Initialize(DirectXCommon* directXCommon);
+	// Stage切替時に、危険Lightの時間と前Frameの線分を初期状態へ戻します。
+	void Reset();
 
 	// 時刻から危険Lightを更新し、反射・Player接触までを計算します。
 	void Update(

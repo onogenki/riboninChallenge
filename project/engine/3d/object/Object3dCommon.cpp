@@ -1,10 +1,13 @@
 #include "Object3dCommon.h"
-#include <cassert>
+#include <stdexcept>
 #include <vector>
 
+// 全Sceneが借りる描画設定を順に作り、未完成のPipelineを使用側へ渡しません。
 void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 {
-	assert(dxCommon);
+	if (!dxCommon || !dxCommon->GetDevice()) {
+		throw std::invalid_argument("Object3dCommon: DirectX device is unavailable");
+	}
 	dxCommon_ = dxCommon;
 
 	// ルートシグネチャの生成
@@ -15,12 +18,12 @@ void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 	CreateMirrorRootSignature();
 	CreateMirrorGraphicsPipeline();
 
-	// 骨ありModelは、元から使っていたVertex Shader方式で頂点を変形します。
-	// Compute Shader方式は比較用として残しますが、通常描画には使いません。
+	// 通常の骨付き描画はVertex Shader方式で頂点を変形します。
+	// 壁越しシルエットでは変形済み頂点が必要なので、Compute Shader方式も用意します。
 	CreateSkinningRootSignature();
 	CreateSkinningGraphicsPipeline();
 
-	// Compute Shader方式の設定も、将来の比較・検証用に初期化します。
+	// 骨付きモデルの壁越しシルエット描画に備え、Compute Pipelineも初期化します。
 	CreateSkinningComputeRootSignature();
 	CreateSkinningComputePipeline();
 
@@ -59,6 +62,7 @@ void Object3dCommon::SetSkinningCommonDrawSetting()
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
+// 骨付きモデルの壁越しシルエットを変形済みの形で描くため、Compute設定へ切り替えます。
 void Object3dCommon::SetSkinningComputeSetting()
 {
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
@@ -75,6 +79,7 @@ void Object3dCommon::SetMirrorDrawSetting()
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
+// 通常モデルのShader結合位置を確定し、生成失敗なら次のPipelineを作りません。
 void Object3dCommon::CreateRootSignature()
 {
 	// RootSignature作成
@@ -169,18 +174,19 @@ void Object3dCommon::CreateRootSignature()
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
 	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature,
 		D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr))
-	{
-		assert(false);
+	if (FAILED(hr) || !signatureBlob) {
+		throw std::runtime_error("Object3dCommon: object root signature serialization failed");
 	}
 
 	// バイナリを元に生成
 	hr = dxCommon_->GetDevice()->CreateRootSignature(0,
 		signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(),
 		IID_PPV_ARGS(&rootSignature_)); // メンバ変数 rootSignature_ に保存
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !rootSignature_) {
+		throw std::runtime_error("Object3dCommon: object root signature creation failed");
+	}
 }
-// グラフィックスパイプラインの生成
+// 通常モデルのShaderとPipelineを作り、失敗した状態でDrawへ進ませません。
 void Object3dCommon::CreateGraphicsPipeline()
 {
 	HRESULT hr = S_FALSE;
@@ -212,7 +218,7 @@ void Object3dCommon::CreateGraphicsPipeline()
 	blendDesc.RenderTarget[0].RenderTargetWriteMask =
 		D3D12_COLOR_WRITE_ENABLE_ALL;
 
-	// RasiterZerStateの設定
+	// RasterizerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	// カリングしない(裏面表示しない)
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -222,11 +228,15 @@ void Object3dCommon::CreateGraphicsPipeline()
 	// shaderをコンパイルする
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Object3d.VS.hlsl",
 		L"vs_6_0");
-	assert(vertexShaderBlob != nullptr);
+	if (!vertexShaderBlob) {
+		throw std::runtime_error("Object3dCommon: object vertex shader is unavailable");
+	}
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon_->CompileShader(L"resources/shaders/Object3d.PS.hlsl",
 		L"ps_6_0");
-	assert(pixelShaderBlob != nullptr);
+	if (!pixelShaderBlob) {
+		throw std::runtime_error("Object3dCommon: object pixel shader is unavailable");
+	}
 
 	// DepthStencilStateの設定
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
@@ -265,7 +275,9 @@ void Object3dCommon::CreateGraphicsPipeline()
 	// 実際に生成
 	hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
 		IID_PPV_ARGS(&graphicsPipelineState_)); // メンバ変数 graphicsPipelineState_ に保存
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !graphicsPipelineState_) {
+		throw std::runtime_error("Object3dCommon: object graphics pipeline creation failed");
+	}
 }
 
 // 通常Modelと同じ頂点形式で、壁に隠れた部分だけを半透明色で描くPipelineを作成します。
@@ -292,8 +304,9 @@ void Object3dCommon::CreateOccludedSilhouetteGraphicsPipeline()
 		L"resources/shaders/Object3d.VS.hlsl", L"vs_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon_->CompileShader(
 		L"resources/shaders/OccludedSilhouette.PS.hlsl", L"ps_6_0");
-	assert(vertexShaderBlob != nullptr);
-	assert(pixelShaderBlob != nullptr);
+	if (!vertexShaderBlob || !pixelShaderBlob) {
+		throw std::runtime_error("Object3dCommon: silhouette shader is unavailable");
+	}
 
 	D3D12_BLEND_DESC blendDesc{};
 	blendDesc.RenderTarget[0].BlendEnable = true;
@@ -334,5 +347,7 @@ void Object3dCommon::CreateOccludedSilhouetteGraphicsPipeline()
 	const HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
 		&pipelineDesc,
 		IID_PPV_ARGS(&occludedSilhouetteGraphicsPipelineState_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !occludedSilhouetteGraphicsPipelineState_) {
+		throw std::runtime_error("Object3dCommon: silhouette graphics pipeline creation failed");
+	}
 }

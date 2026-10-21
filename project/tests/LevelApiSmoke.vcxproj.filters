@@ -11,11 +11,17 @@
     <ClCompile Include="..\engine\level\MapChipField.cpp"><Filter>LevelData</Filter></ClCompile>
     <ClCompile Include="..\engine\level\MapChipRegistry.cpp"><Filter>LevelData</Filter></ClCompile>
     <ClCompile Include="..\engine\level\StageMapObjectIndex.cpp"><Filter>LevelData</Filter></ClCompile>
+    <ClCompile Include="..\engine\level\FileHotReload.cpp"><Filter>LevelData</Filter></ClCompile>
     <ClCompile Include="..\game\stage1\StageMapChipFactory.cpp"><Filter>GameStage</Filter></ClCompile>
+    <ClCompile Include="..\game\stage1\StageMapFileMonitor.cpp"><Filter>GameStage</Filter></ClCompile>
+    <ClCompile Include="..\game\stage1\StageMapSelection.cpp"><Filter>GameStage</Filter></ClCompile>
     <ClInclude Include="..\engine\level\LevelLoader.h"><Filter>LevelData</Filter></ClInclude>
     <ClInclude Include="..\engine\level\MapChipField.h"><Filter>LevelData</Filter></ClInclude>
     <ClInclude Include="..\engine\level\MapChipRegistry.h"><Filter>LevelData</Filter></ClInclude>
     <ClInclude Include="..\engine\level\StageMapObjectIndex.h"><Filter>LevelData</Filter></ClInclude>
+    <ClInclude Include="..\engine\level\FileHotReload.h"><Filter>LevelData</Filter></ClInclude>
     <ClInclude Include="..\game\stage1\StageMapChipFactory.h"><Filter>GameStage</Filter></ClInclude>
+    <ClInclude Include="..\game\stage1\StageMapFileMonitor.h"><Filter>GameStage</Filter></ClInclude>
+    <ClInclude Include="..\game\stage1\StageMapSelection.h"><Filter>GameStage</Filter></ClInclude>
   </ItemGroup>
 </Project>

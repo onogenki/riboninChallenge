@@ -183,93 +183,24 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 		return;
 	}
 
-	// GameObjectを作らずに、Colliderだけで重なり・非重なり・無効状態を確認します。
-	SphereCollider firstSphereCollider({ 0.0f, 0.0f, 0.0f }, 1.0f);
-	SphereCollider overlappingSphereCollider({ 1.5f, 0.0f, 0.0f }, 1.0f);
-	SphereCollider separatedSphereCollider({ 3.0f, 0.0f, 0.0f }, 1.0f);
-	const bool detectsOverlap = firstSphereCollider.Check(overlappingSphereCollider).isCollision;
-	const bool ignoresSeparatedCollider = !firstSphereCollider.Check(separatedSphereCollider).isCollision;
-	overlappingSphereCollider.SetEnabled(false);
-	const bool ignoresDisabledCollider = !firstSphereCollider.Check(overlappingSphereCollider).isCollision;
-	ObbCollider overlappingObbCollider{};
-	overlappingObbCollider.SetLocalShape({}, { 1.0f, 1.0f, 1.0f });
-	overlappingObbCollider.SyncTransform({ { 1.0f, 1.0f, 1.0f }, {}, { 1.5f, 0.0f, 0.0f } });
-	const Collision::CollisionInfo sphereToObbCollision =
-		firstSphereCollider.Check(overlappingObbCollider);
-	const Collision::CollisionInfo obbToSphereCollision =
-		overlappingObbCollider.Check(firstSphereCollider);
-	const bool detectsSphereObbOverlap = sphereToObbCollision.isCollision;
-	// 呼び出す側を入れ替えても衝突し、押し出す法線だけ反対向きになります。
-	const bool detectsObbSphereOverlap =
-		obbToSphereCollision.isCollision &&
-		Dot(sphereToObbCollision.normal, obbToSphereCollision.normal) < -0.99f;
-	ObbCollider secondObbCollider{};
-	secondObbCollider.SetLocalShape({}, { 1.0f, 1.0f, 1.0f });
-	secondObbCollider.SyncTransform({ { 1.0f, 1.0f, 1.0f }, {}, { 2.5f, 0.0f, 0.0f } });
-	const bool detectsObbObbOverlap =
-		overlappingObbCollider.Check(secondObbCollider).isCollision;
-	// Player利用側ではColliderの取り出しを省き、Player自身へ判定を依頼できます。
-	ObbCollider playerProbeCollider{};
-	playerProbeCollider.SetLocalShape({}, { 2.0f, 2.0f, 2.0f });
-	playerProbeCollider.SyncTransform({
-		{ 1.0f, 1.0f, 1.0f },
-		{},
-		player_->GetPosition(),
-	});
-	const bool playerChecksObbDirectly =
-		player_->CheckCollision(playerProbeCollider).isCollision;
-	// Enemyなどの球Colliderも、Playerから直接判定を呼べます。
-	SphereCollider playerSphereProbeCollider{};
-	playerSphereProbeCollider.SetShape(player_->GetPosition(), 1.0f);
-	const bool playerChecksSphereDirectly =
-		player_->CheckCollision(playerSphereProbeCollider).isCollision;
-	gameplaySmokeSphereColliderApi_ =
-		detectsOverlap &&
-		ignoresSeparatedCollider &&
-		ignoresDisabledCollider &&
-		detectsSphereObbOverlap &&
-		detectsObbSphereOverlap &&
-		detectsObbObbOverlap &&
-		playerChecksObbDirectly &&
-		playerChecksSphereDirectly;
-	gameplaySmokeStageMapColliderFlags_ = CheckStageMapColliderFlags();
-	gameplaySmokeMirrorEditAtomicity_ = CheckMirrorEditsRejectPartialUpdate();
-	gameplaySmokeStageEditorRollback_ = CheckStageEditorFailureRollback();
+	VerifyColliderAndEditorContracts();
 
-	// StageがEnemyを直接newせず、Managerへ一覧生成と寿命管理を任せられるか確認します。
-	EnemyManager enemyManager;
-	enemyManager.Initialize(context.object3dCommon);
-	const std::vector<Enemy::SpawnData> enemySpawnDataList{
-		{ "debug/sphere.obj", { -2.0f, 0.0f, 0.0f }, 0.5f, false },
-		{ "debug/sphere.obj", { 2.0f, 0.0f, 0.0f }, 0.5f, false },
-	};
-	const std::vector<Enemy*> spawnedEnemies =
-		enemyManager.SpawnAll(enemySpawnDataList);
-	// よく使う一体生成は、SpawnDataを組み立てずに短い引数だけで呼べます。
-	Enemy* simpleSpawnedEnemy =
-		enemyManager.Spawn("debug/sphere.obj", { 0.0f, 0.0f, 0.0f }, 0.5f);
-	const bool hasExpectedSpawnedEnemies =
-		spawnedEnemies.size() == 2 && simpleSpawnedEnemy != nullptr && enemyManager.GetCount() == 3 &&
-		enemyManager.GetEnemy(0) == spawnedEnemies[0] &&
-		enemyManager.GetEnemy(1) == spawnedEnemies[1] &&
-		enemyManager.GetEnemy(2) == simpleSpawnedEnemy;
-	// EnemyもPlayerと同じように、自分のColliderを意識せず判定を呼べます。
-	if (hasExpectedSpawnedEnemies) {
-		spawnedEnemies[1]->SetPosition({ -1.25f, 0.0f, 0.0f });
-	}
-	const bool enemyChecksEnemyDirectly =
-		hasExpectedSpawnedEnemies &&
-		spawnedEnemies[0]->CheckCollision(spawnedEnemies[1]->GetCollider()).isCollision;
-	// 同じManagerを再利用しても、前のステージのEnemyを残さないことを確認します。
-	enemyManager.Initialize(context.object3dCommon);
-	const bool initializeClearsEnemies = enemyManager.GetCount() == 0;
-	enemyManager.Clear();
-	gameplaySmokeEnemyManagerSpawn_ =
-		hasExpectedSpawnedEnemies && enemyChecksEnemyDirectly && initializeClearsEnemies &&
-		enemyManager.GetCount() == 0;
+	VerifyEnemyManagerOwnership(context.object3dCommon);
 
 	const auto& fixedMirrors = *fixedMirrors_;
 
+	const Vector3 mirrorPosition = VerifyCarryMirrorControls(context);
+
+	VerifyFixedMirrorAndDoor(fixedMirrors);
+
+	VerifyLaserBlockingAndDrop(mirrorPosition);
+
+	VerifyCameraControls();
+}
+
+// 携帯鏡の拾う操作・反射面・水平操作を順に確認し、元の床位置を返します。
+Vector3 Stage1GameplaySmoke::VerifyCarryMirrorControls(const InitializeContext& context)
+{
 	gameplaySmokeStartPosition_ = player_->GetPosition();
 	gameplaySmokeStartY_ = gameplaySmokeStartPosition_.y;
 	const Vector3 mirrorPosition = carryableMirror_->GetMirror().GetCenter();
@@ -397,58 +328,13 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 		isHorizontalMirrorFacingDown &&
 		isHorizontalMirrorFurtherForward &&
 		doesLongRightMouseHoldKeepVertical;
+	return mirrorPosition;
+}
 
-	// 鏡床は上から下へ向かうLightを、下から上へ反射することを確認します。
-	if (mirrorFloor_) {
-		Laser mirrorFloorProbe;
-		const Mirror& mirrorFloor = mirrorFloor_->GetMirror();
-		mirrorFloorProbe.SetOrigin({
-			mirrorFloor.GetCenter().x,
-			mirrorFloor.GetCenter().y + 3.0f,
-			mirrorFloor.GetCenter().z,
-		});
-		mirrorFloorProbe.SetDirection({ 0.0f, -1.0f, 0.0f });
-		mirrorFloorProbe.SetMaxDistance(8.0f);
-		mirrorFloorProbe.SetMaxReflectionCount(1);
-		mirrorFloorProbe.Update({ &mirrorFloor });
-		Laser mirrorFloorBackfaceProbe;
-		mirrorFloorBackfaceProbe.SetOrigin({
-			mirrorFloor.GetCenter().x,
-			mirrorFloor.GetCenter().y - 3.0f,
-			mirrorFloor.GetCenter().z,
-		});
-		mirrorFloorBackfaceProbe.SetDirection({ 0.0f, 1.0f, 0.0f });
-		mirrorFloorBackfaceProbe.SetMaxDistance(8.0f);
-		mirrorFloorBackfaceProbe.SetMaxReflectionCount(1);
-		mirrorFloorBackfaceProbe.Update({ &mirrorFloor });
-		gameplaySmokeMirrorFloorReflectsLaser_ =
-			mirrorFloorProbe.GetSegments().size() >= 2 &&
-			mirrorFloorProbe.GetSegments().front().hitMirror &&
-			mirrorFloorProbe.GetSegments()[1].end.y > mirrorFloorProbe.GetSegments()[1].start.y &&
-			mirrorFloorBackfaceProbe.GetSegments().size() >= 2 &&
-			mirrorFloorBackfaceProbe.GetSegments().front().hitMirror &&
-			mirrorFloorBackfaceProbe.GetSegments()[1].end.y < mirrorFloorBackfaceProbe.GetSegments()[1].start.y;
-	}
-
-	// 斜め回転した大型MirrorがDoor Switchへ光を送れることを確認します。
-	if (!fixedMirrors.empty() && fixedMirrors.front()) {
-		const Mirror diagonalDoorMirror(
-			fixedMirrors.front()->GetMirror().GetCenter(),
-			{ std::sin(largeMirrorBaseYaw_ + largeMirrorTargetYawOffset_), 0.0f,
-				std::cos(largeMirrorBaseYaw_ + largeMirrorTargetYawOffset_) },
-			fixedMirrors.front()->GetMirror().GetWidth(),
-			fixedMirrors.front()->GetMirror().GetHeight());
-		Laser diagonalDoorLaser;
-		diagonalDoorLaser.SetOrigin(doorLaserOrigin_);
-		diagonalDoorLaser.SetDirection(doorLaserDirection_);
-		diagonalDoorLaser.SetMaxDistance(20.0f);
-		diagonalDoorLaser.SetMaxReflectionCount(1);
-		diagonalDoorLaser.Update({ &diagonalDoorMirror });
-		const Sphere diagonalDoorSwitch{ doorSwitchPosition_, doorSwitchRadius_ };
-		gameplaySmokeDoorDiagonalReflection_ =
-			diagonalDoorLaser.IsHitSphere(diagonalDoorSwitch, laserCollisionRadius_);
-	}
-
+// 携帯鏡による遮光と床へ戻す操作を確認し、通常Laserの遮光も検証します。
+void Stage1GameplaySmoke::VerifyLaserBlockingAndDrop(const Vector3& mirrorPosition)
+{
+	const Mirror& carryMirror = carryableMirror_->GetMirror();
 	const auto laserHitsSphere = [&](const Laser& testLaser, const Sphere& sphere) {
 		return testLaser.IsHitSphere(sphere, laserCollisionRadius_);
 	};
@@ -519,7 +405,159 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	gameplaySmokeMirrorBlocksPlayer_ =
 		blockedLaser.GetSegments().size() >= 2 &&
 		!laserHitsSphere(blockedLaser, testPlayerSphere);
+}
 
+// Colliderと編集処理の契約を、Stage本編を変えずに検証します。
+void Stage1GameplaySmoke::VerifyColliderAndEditorContracts()
+{
+	// GameObjectを作らずに、Colliderだけで重なり・非重なり・無効状態を確認します。
+	SphereCollider firstSphereCollider({ 0.0f, 0.0f, 0.0f }, 1.0f);
+	SphereCollider overlappingSphereCollider({ 1.5f, 0.0f, 0.0f }, 1.0f);
+	SphereCollider separatedSphereCollider({ 3.0f, 0.0f, 0.0f }, 1.0f);
+	const bool detectsOverlap = firstSphereCollider.Check(overlappingSphereCollider).isCollision;
+	const bool ignoresSeparatedCollider = !firstSphereCollider.Check(separatedSphereCollider).isCollision;
+	overlappingSphereCollider.SetEnabled(false);
+	const bool ignoresDisabledCollider = !firstSphereCollider.Check(overlappingSphereCollider).isCollision;
+	ObbCollider overlappingObbCollider{};
+	overlappingObbCollider.SetLocalShape({}, { 1.0f, 1.0f, 1.0f });
+	overlappingObbCollider.SyncTransform({ { 1.0f, 1.0f, 1.0f }, {}, { 1.5f, 0.0f, 0.0f } });
+	const Collision::CollisionInfo sphereToObbCollision =
+		firstSphereCollider.Check(overlappingObbCollider);
+	const Collision::CollisionInfo obbToSphereCollision =
+		overlappingObbCollider.Check(firstSphereCollider);
+	const bool detectsSphereObbOverlap = sphereToObbCollision.isCollision;
+	// 呼び出す側を入れ替えても衝突し、押し出す法線だけ反対向きになります。
+	const bool detectsObbSphereOverlap =
+		obbToSphereCollision.isCollision &&
+		Dot(sphereToObbCollision.normal, obbToSphereCollision.normal) < -0.99f;
+	ObbCollider secondObbCollider{};
+	secondObbCollider.SetLocalShape({}, { 1.0f, 1.0f, 1.0f });
+	secondObbCollider.SyncTransform({ { 1.0f, 1.0f, 1.0f }, {}, { 2.5f, 0.0f, 0.0f } });
+	const bool detectsObbObbOverlap =
+		overlappingObbCollider.Check(secondObbCollider).isCollision;
+	// Player利用側ではColliderの取り出しを省き、Player自身へ判定を依頼できます。
+	ObbCollider playerProbeCollider{};
+	playerProbeCollider.SetLocalShape({}, { 2.0f, 2.0f, 2.0f });
+	playerProbeCollider.SyncTransform({
+		{ 1.0f, 1.0f, 1.0f },
+		{},
+		player_->GetPosition(),
+	});
+	const bool playerChecksObbDirectly =
+		player_->CheckCollision(playerProbeCollider).isCollision;
+	// Enemyなどの球Colliderも、Playerから直接判定を呼べます。
+	SphereCollider playerSphereProbeCollider{};
+	playerSphereProbeCollider.SetShape(player_->GetPosition(), 1.0f);
+	const bool playerChecksSphereDirectly =
+		player_->CheckCollision(playerSphereProbeCollider).isCollision;
+	gameplaySmokeSphereColliderApi_ =
+		detectsOverlap &&
+		ignoresSeparatedCollider &&
+		ignoresDisabledCollider &&
+		detectsSphereObbOverlap &&
+		detectsObbSphereOverlap &&
+		detectsObbObbOverlap &&
+		playerChecksObbDirectly &&
+		playerChecksSphereDirectly;
+	gameplaySmokeStageMapColliderFlags_ = CheckStageMapColliderFlags();
+	gameplaySmokeMirrorEditAtomicity_ = CheckMirrorEditsRejectPartialUpdate();
+	gameplaySmokeStageEditorRollback_ = CheckStageEditorFailureRollback();
+}
+
+// Enemyの生成と所有・解放をManagerへ任せられるか検証します。
+void Stage1GameplaySmoke::VerifyEnemyManagerOwnership(Object3dCommon* object3dCommon)
+{
+	// StageがEnemyを直接newせず、Managerへ一覧生成と寿命管理を任せられるか確認します。
+	EnemyManager enemyManager;
+	enemyManager.Initialize(object3dCommon);
+	const std::vector<Enemy::SpawnData> enemySpawnDataList{
+		{ "debug/sphere.obj", { -2.0f, 0.0f, 0.0f }, 0.5f, false },
+		{ "debug/sphere.obj", { 2.0f, 0.0f, 0.0f }, 0.5f, false },
+	};
+	const std::vector<Enemy*> spawnedEnemies =
+		enemyManager.SpawnAll(enemySpawnDataList);
+	// よく使う一体生成は、SpawnDataを組み立てずに短い引数だけで呼べます。
+	Enemy* simpleSpawnedEnemy =
+		enemyManager.Spawn("debug/sphere.obj", { 0.0f, 0.0f, 0.0f }, 0.5f);
+	const bool hasExpectedSpawnedEnemies =
+		spawnedEnemies.size() == 2 && simpleSpawnedEnemy != nullptr && enemyManager.GetCount() == 3 &&
+		enemyManager.GetEnemy(0) == spawnedEnemies[0] &&
+		enemyManager.GetEnemy(1) == spawnedEnemies[1] &&
+		enemyManager.GetEnemy(2) == simpleSpawnedEnemy;
+	// EnemyもPlayerと同じように、自分のColliderを意識せず判定を呼べます。
+	if (hasExpectedSpawnedEnemies) {
+		spawnedEnemies[1]->SetPosition({ -1.25f, 0.0f, 0.0f });
+	}
+	const bool enemyChecksEnemyDirectly =
+		hasExpectedSpawnedEnemies &&
+		spawnedEnemies[0]->CheckCollision(spawnedEnemies[1]->GetCollider()).isCollision;
+	// 同じManagerを再利用しても、前のステージのEnemyを残さないことを確認します。
+	enemyManager.Initialize(object3dCommon);
+	const bool initializeClearsEnemies = enemyManager.GetCount() == 0;
+	enemyManager.Clear();
+	gameplaySmokeEnemyManagerSpawn_ =
+		hasExpectedSpawnedEnemies && enemyChecksEnemyDirectly && initializeClearsEnemies &&
+		enemyManager.GetCount() == 0;
+}
+
+// 鏡床とDoorの反射経路を、現在の固定鏡設定で検証します。
+void Stage1GameplaySmoke::VerifyFixedMirrorAndDoor(const std::vector<std::unique_ptr<FixedMirror>>& fixedMirrors)
+{
+	// 鏡床は上から下へ向かうLightを、下から上へ反射することを確認します。
+	if (mirrorFloor_) {
+		Laser mirrorFloorProbe;
+		const Mirror& mirrorFloor = mirrorFloor_->GetMirror();
+		mirrorFloorProbe.SetOrigin({
+			mirrorFloor.GetCenter().x,
+			mirrorFloor.GetCenter().y + 3.0f,
+			mirrorFloor.GetCenter().z,
+		});
+		mirrorFloorProbe.SetDirection({ 0.0f, -1.0f, 0.0f });
+		mirrorFloorProbe.SetMaxDistance(8.0f);
+		mirrorFloorProbe.SetMaxReflectionCount(1);
+		mirrorFloorProbe.Update({ &mirrorFloor });
+		Laser mirrorFloorBackfaceProbe;
+		mirrorFloorBackfaceProbe.SetOrigin({
+			mirrorFloor.GetCenter().x,
+			mirrorFloor.GetCenter().y - 3.0f,
+			mirrorFloor.GetCenter().z,
+		});
+		mirrorFloorBackfaceProbe.SetDirection({ 0.0f, 1.0f, 0.0f });
+		mirrorFloorBackfaceProbe.SetMaxDistance(8.0f);
+		mirrorFloorBackfaceProbe.SetMaxReflectionCount(1);
+		mirrorFloorBackfaceProbe.Update({ &mirrorFloor });
+		gameplaySmokeMirrorFloorReflectsLaser_ =
+			mirrorFloorProbe.GetSegments().size() >= 2 &&
+			mirrorFloorProbe.GetSegments().front().hitMirror &&
+			mirrorFloorProbe.GetSegments()[1].end.y > mirrorFloorProbe.GetSegments()[1].start.y &&
+			mirrorFloorBackfaceProbe.GetSegments().size() >= 2 &&
+			mirrorFloorBackfaceProbe.GetSegments().front().hitMirror &&
+			mirrorFloorBackfaceProbe.GetSegments()[1].end.y < mirrorFloorBackfaceProbe.GetSegments()[1].start.y;
+	}
+
+	// 斜め回転した大型MirrorがDoor Switchへ光を送れることを確認します。
+	if (!fixedMirrors.empty() && fixedMirrors.front()) {
+		const Mirror diagonalDoorMirror(
+			fixedMirrors.front()->GetMirror().GetCenter(),
+			{ std::sin(largeMirrorBaseYaw_ + largeMirrorTargetYawOffset_), 0.0f,
+				std::cos(largeMirrorBaseYaw_ + largeMirrorTargetYawOffset_) },
+			fixedMirrors.front()->GetMirror().GetWidth(),
+			fixedMirrors.front()->GetMirror().GetHeight());
+		Laser diagonalDoorLaser;
+		diagonalDoorLaser.SetOrigin(doorLaserOrigin_);
+		diagonalDoorLaser.SetDirection(doorLaserDirection_);
+		diagonalDoorLaser.SetMaxDistance(20.0f);
+		diagonalDoorLaser.SetMaxReflectionCount(1);
+		diagonalDoorLaser.Update({ &diagonalDoorMirror });
+		const Sphere diagonalDoorSwitch{ doorSwitchPosition_, doorSwitchRadius_ };
+		gameplaySmokeDoorDiagonalReflection_ =
+			diagonalDoorLaser.IsHitSphere(diagonalDoorSwitch, laserCollisionRadius_);
+	}
+}
+
+// 描画用Cameraとは独立したControllerで、段階操作と壁制限を検証します。
+void Stage1GameplaySmoke::VerifyCameraControls()
+{
 	// 描画用Cameraとは別の小さなControllerを作り、段階操作と壁制限を確認します。
 	Camera testCamera;
 	CameraController testController;
@@ -640,16 +678,9 @@ bool Stage1GameplaySmoke::IsEnabled() const
 	return gameplaySmokeEnabled_;
 }
 
-// Stage1の本編結果を集め、環境変数で起動した時だけ自動確認ログを出力します。
-void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
+// 接地・反射Texture・危険Light・Doorの結果を、各フレームで先に蓄積します。
+void Stage1GameplaySmoke::ObserveFrame(const UpdateContext& context, float deltaTime)
 {
-	if (!gameplaySmokeEnabled_ || !player_) {
-		return;
-	}
-
-	if (!fixedMirrors_ || !context.hazardLights) {
-		return;
-	}
 	const auto& fixedMirrors = *fixedMirrors_;
 
 	++gameplaySmokeFrame_;
@@ -681,6 +712,11 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 	gameplaySmokeDoorStartsClosed_ =
 		gameplaySmokeDoorStartsClosed_ ||
 		(!context.isDoorSwitchReceivingLight && context.doorOpenAmount <= 0.01f);
+}
+
+// 置いた鏡の衝突登録を見てから、Playerへ一時的に持たせて向きの追従を確認します。
+void Stage1GameplaySmoke::VerifyDroppedMirrorAndFacing(const UpdateContext& context)
+{
 	// 置いたMirrorのOBBが、実際にPlayerへ渡す障害物一覧へ含まれるかを確認します。
 	// Collider単体の存在だけでなく、StageCollisionWorldへの登録漏れもここで検出できます。
 	if (gameplaySmokeDroppedMirror_ && carryableMirror_ &&
@@ -733,6 +769,11 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 			gameplaySmokeStageMirrorProbeFinished_ = true;
 		}
 	}
+}
+
+// 鏡の追従検証後に一度だけ床外へ移し、Playerの接地解除と落下を記録します。
+void Stage1GameplaySmoke::VerifyFallProbe()
+{
 	// 床の端へ歩かせる検証は、Stageの床形状が変わると成立しません。
 	// 開始演出後に床から離れた位置へ一度だけ移し、重力と落下だけを独立して確認します。
 	if (gameplaySmokeSawGrounded_ &&
@@ -752,7 +793,27 @@ void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
 		player_->GetPosition().y < gameplaySmokeStartY_ - 1.0f) {
 		gameplaySmokeFell_ = true;
 	}
+}
 
+// Stage1の本編結果を順に確認し、終了条件を満たした時だけログを出力します。
+void Stage1GameplaySmoke::Update(const UpdateContext& context, float deltaTime)
+{
+	if (!gameplaySmokeEnabled_ || !player_) {
+		return;
+	}
+
+	if (!fixedMirrors_ || !context.hazardLights) {
+		return;
+	}
+	ObserveFrame(context, deltaTime);
+	VerifyDroppedMirrorAndFacing(context);
+	VerifyFallProbe();
+	FinishWhenReady();
+}
+
+// 成功条件か時間制限に達した時だけ全項目を判定し、今回の結果を記録します。
+void Stage1GameplaySmoke::FinishWhenReady()
+{
 	const bool finishedSuccessfully =
 		gameplaySmokeFell_ && gameplaySmokeElapsedTime_ >= 3.0f;
 	const bool timedOut =
