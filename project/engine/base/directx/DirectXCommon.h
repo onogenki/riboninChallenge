@@ -138,17 +138,18 @@ private:
 	void ConfigureScissorRect();
 	void CreateDxcCompiler();
 
+	// 撮影一件のGPUコピーと完了順を所有し、未完了の資源を再利用させません。
 	struct CaptureReadbackSlot {
-		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator;
-		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList;
-		Microsoft::WRL::ComPtr<ID3D12Resource> readbackResource;
-		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
-		UINT64 totalBytes = 0;
-		UINT64 fenceValue = 0;
-		UINT64 sequence = 0;
-		int width = 0;
-		int height = 0;
-		bool pending = false;
+		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator_;
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList_;
+		Microsoft::WRL::ComPtr<ID3D12Resource> readbackResource_;
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint_{};
+		UINT64 totalBytes_ = 0;
+		UINT64 fenceValue_ = 0;
+		UINT64 sequence_ = 0;
+		int width_ = 0;
+		int height_ = 0;
+		bool pending_ = false;
 	};
 
 	static constexpr size_t kCaptureReadbackSlotCount_ = 4;

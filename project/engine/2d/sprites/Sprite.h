@@ -13,7 +13,7 @@
 
 class SpriteCommon;
 
-// 1枚の2D画像の位置・色・切り出し範囲と、その描画用GPUデータを所有します。
+// @brief 1枚の2D画像の位置・色・切り出し範囲と、その描画用GPUデータを所有します。
 class Sprite
 {
 public:
@@ -44,15 +44,19 @@ public:
 	Sprite() = default;
 	~Sprite() = default;
 
-	// 共通描画部品を借り、四つのBufferと画像がそろった時だけtrueを返します。
+	// @brief 共通描画部品を借り、四つのBufferと画像を描画前にそろえます。
+	// @param spriteCommon 初期化済みの共通描画部品です。Spriteは所有しません。
+	// @param textureFilePath 最初に表示する画像のパスです。
+	// @return Bufferと画像の準備がすべて成功した時だけtrueです。
 	bool Initialize(SpriteCommon* spriteCommon, const std::string& textureFilePath);
 
 	// 現在の位置・サイズ・切り出し設定から、行列と頂点の値を更新します。
 	void Update();
 
+	// Updateで反映した頂点・行列・画像を使って、一枚のSpriteを描画します。
 	void Draw();
 
-	//getter
+	// 読み取り専用の表示設定を返します。色の取得にはInitializeの成功が必要です。
 	const Vector2& GetPosition() const { return position_; }//座標
 	float GetRotation() const { return rotation_; }//回転
 	const Vector4& GetColor()const { return materialData_->color; }//色
@@ -63,21 +67,33 @@ public:
 	const Vector2& GetTextureLeftTop()const { return textureLeftTop_; }
 	const Vector2& GetTextureSize()const { return textureSize_; }
 
-	//setter
+	// 位置・回転・サイズは次のUpdateで描画行列へ反映します。
+	// @param position anchorPointで指定した基準点の表示座標です。
 	void SetPosition(const Vector2& position) { position_ = position; }//座標
+	// @param rotation Z軸まわりの回転角です。
 	void SetRotation(float rotation) { rotation_ = rotation; }//回転
+	// @param color 画像へ乗算するRGBA色です。Initialize成功後に指定します。
 	void SetColor(const Vector4& color) { materialData_->color = color; }//色
+	// @param size 表示する幅と高さです。
 	void SetSize(const Vector2& size) { size_ = size; }//サイズ
-	// 読込失敗時は現在の画像を維持し、変更しなかったことを返します。
+	// @brief 読込成功時に画像・切り出し位置・表示サイズを更新します。
+	// @param textureFilePath 新しく表示する画像のパスです。
+	// @return 読込成功時だけtrueです。失敗時は現在の画像と表示設定を保ちます。
 	bool SetTexture(const std::string& textureFilePath);
+	// @param anchorPoint 四角形内の基準位置です。{0, 0}は左上、{0.5, 0.5}は中央です。
 	void SetAnchorPoint(const Vector2& anchorPoint) { anchorPoint_ = anchorPoint; }//アンカーポイント
+	// @param isFlipX trueなら表示する画像を左右反転します。
 	void SetIsFlipX(bool isFlipX) { this->isFlipX_ = isFlipX; }
+	// @param isFlipY trueなら表示する画像を上下反転します。
 	void SetIsFlipY(bool isFlipY) { this->isFlipY_ = isFlipY; }
+	// @param textureLeftTop 元画像内で切り出す左上座標です。
 	void SetTextureLeftTop(const Vector2& textureLeftTop) { textureLeftTop_ = textureLeftTop; }
+	// @param textureSize 元画像内で切り出す幅と高さです。
 	void SetTextureSize(const Vector2& textureSize) { textureSize_ = textureSize; }
 
 
-	// 既存の編集APIを維持し、Spriteの変換値を呼び出し元へ渡します。
+	// @brief 既存APIとして内部Transformを返します。次のUpdateで位置・回転・サイズから上書きされます。
+	// @return Spriteが所有するTransformへの参照です。継続的な変更には各Set関数を使います。
 	Transform& GetTransform() { return transform_; }
 private:
 

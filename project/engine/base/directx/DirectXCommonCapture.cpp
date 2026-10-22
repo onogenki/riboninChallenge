@@ -148,7 +148,7 @@ bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 
 	CaptureReadbackSlot* slot = nullptr;
 	for (CaptureReadbackSlot& candidate : captureReadbackSlots_) {
-		if (!candidate.pending) {
+		if (!candidate.pending_) {
 			slot = &candidate;
 			break;
 		}
@@ -174,7 +174,7 @@ bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 		return false;
 	}
 
-	if (!slot->readbackResource || slot->totalBytes != totalBytes) {
+	if (!slot->readbackResource_ || slot->totalBytes_ != totalBytes) {
 		D3D12_HEAP_PROPERTIES heapProperties{};
 		heapProperties.Type = D3D12_HEAP_TYPE_READBACK;
 
@@ -187,39 +187,39 @@ bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 		readbackDesc.SampleDesc.Count = 1;
 		readbackDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-		slot->readbackResource.Reset();
+		slot->readbackResource_.Reset();
 		const HRESULT createResult = device_->CreateCommittedResource(
 			&heapProperties,
 			D3D12_HEAP_FLAG_NONE,
 			&readbackDesc,
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			nullptr,
-			IID_PPV_ARGS(&slot->readbackResource));
+			IID_PPV_ARGS(&slot->readbackResource_));
 		if (FAILED(createResult)) {
 			return false;
 		}
 	}
 
 	HRESULT result = S_OK;
-	if (!slot->commandAllocator) {
+	if (!slot->commandAllocator_) {
 		result = device_->CreateCommandAllocator(
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			IID_PPV_ARGS(&slot->commandAllocator));
+			IID_PPV_ARGS(&slot->commandAllocator_));
 		if (FAILED(result)) {
 			return false;
 		}
 	}
-	if (!slot->commandList) {
+	if (!slot->commandList_) {
 		result = device_->CreateCommandList(
 			0,
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
-			slot->commandAllocator.Get(),
+			slot->commandAllocator_.Get(),
 			nullptr,
-			IID_PPV_ARGS(&slot->commandList));
+			IID_PPV_ARGS(&slot->commandList_));
 	} else {
-		result = slot->commandAllocator->Reset();
+		result = slot->commandAllocator_->Reset();
 		if (SUCCEEDED(result)) {
-			result = slot->commandList->Reset(slot->commandAllocator.Get(), nullptr);
+			result = slot->commandList_->Reset(slot->commandAllocator_.Get(), nullptr);
 		}
 	}
 	if (FAILED(result)) {
@@ -239,7 +239,7 @@ bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 	toCopySource.Transition.StateBefore = sourceStateBefore;
 	toCopySource.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
 	toCopySource.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-	slot->commandList->ResourceBarrier(1, &toCopySource);
+	slot->commandList_->ResourceBarrier(1, &toCopySource);
 
 	D3D12_TEXTURE_COPY_LOCATION copySource{};
 	copySource.pResource = sourceResource;
@@ -247,21 +247,21 @@ bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 	copySource.SubresourceIndex = 0;
 
 	D3D12_TEXTURE_COPY_LOCATION copyDestination{};
-	copyDestination.pResource = slot->readbackResource.Get();
+	copyDestination.pResource = slot->readbackResource_.Get();
 	copyDestination.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 	copyDestination.PlacedFootprint = footprint;
-	slot->commandList->CopyTextureRegion(&copyDestination, 0, 0, 0, &copySource, nullptr);
+	slot->commandList_->CopyTextureRegion(&copyDestination, 0, 0, 0, &copySource, nullptr);
 
 	D3D12_RESOURCE_BARRIER restoreState = toCopySource;
 	restoreState.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
 	restoreState.Transition.StateAfter = sourceStateBefore;
-	slot->commandList->ResourceBarrier(1, &restoreState);
+	slot->commandList_->ResourceBarrier(1, &restoreState);
 
-	result = slot->commandList->Close();
+	result = slot->commandList_->Close();
 	if (FAILED(result)) {
 		return false;
 	}
-	ID3D12CommandList* commandLists[] = { slot->commandList.Get() };
+	ID3D12CommandList* commandLists[] = { slot->commandList_.Get() };
 	commandQueue_->ExecuteCommandLists(1, commandLists);
 	// Fence値と投入順を残し、完了していないGPUコピーや前後の入れ替わりを取り出し側で防ぎます。
 	const UINT64 signalValue = ++signaledFenceValue_;
@@ -270,13 +270,13 @@ bool DirectXCommon::QueueGameTextureCapture(bool usePostEffectTexture)
 		return false;
 	}
 
-	slot->footprint = footprint;
-	slot->totalBytes = totalBytes;
-	slot->fenceValue = signalValue;
-	slot->sequence = ++captureSequence_;
-	slot->width = static_cast<int>(sourceDesc.Width);
-	slot->height = static_cast<int>(sourceDesc.Height);
-	slot->pending = true;
+	slot->footprint_ = footprint;
+	slot->totalBytes_ = totalBytes;
+	slot->fenceValue_ = signalValue;
+	slot->sequence_ = ++captureSequence_;
+	slot->width_ = static_cast<int>(sourceDesc.Width);
+	slot->height_ = static_cast<int>(sourceDesc.Height);
+	slot->pending_ = true;
 	return true;
 }
 
@@ -288,34 +288,34 @@ bool DirectXCommon::TryGetGameTextureCapturePixels(
 {
 	CaptureReadbackSlot* oldestSlot = nullptr;
 	for (CaptureReadbackSlot& candidate : captureReadbackSlots_) {
-		if (candidate.pending && (!oldestSlot || candidate.sequence < oldestSlot->sequence)) {
+		if (candidate.pending_ && (!oldestSlot || candidate.sequence_ < oldestSlot->sequence_)) {
 			oldestSlot = &candidate;
 		}
 	}
-	if (!oldestSlot || !fence_ || fence_->GetCompletedValue() < oldestSlot->fenceValue) {
+	if (!oldestSlot || !fence_ || fence_->GetCompletedValue() < oldestSlot->fenceValue_) {
 		return false;
 	}
 
-	outWidth = oldestSlot->width;
-	outHeight = oldestSlot->height;
+	outWidth = oldestSlot->width_;
+	outHeight = oldestSlot->height_;
 	const size_t tightImageSize =
 		static_cast<size_t>(outWidth) * static_cast<size_t>(outHeight) * 4;
 	pixels.resize(tightImageSize);
 
 	unsigned char* mappedData = nullptr;
-	D3D12_RANGE readRange{ 0, oldestSlot->totalBytes };
-	const HRESULT mapResult = oldestSlot->readbackResource->Map(
+	D3D12_RANGE readRange{ 0, oldestSlot->totalBytes_ };
+	const HRESULT mapResult = oldestSlot->readbackResource_->Map(
 		0, &readRange, reinterpret_cast<void**>(&mappedData));
 	if (FAILED(mapResult) || !mappedData) {
 		pixels.clear();
 		outWidth = 0;
 		outHeight = 0;
-		oldestSlot->pending = false;
+		oldestSlot->pending_ = false;
 		return true;
 	}
 
 	const size_t sourceRowPitch =
-		static_cast<size_t>(oldestSlot->footprint.Footprint.RowPitch);
+		static_cast<size_t>(oldestSlot->footprint_.Footprint.RowPitch);
 	const size_t tightRowPitch = static_cast<size_t>(outWidth) * 4;
 	const __m128i bgraShuffle = _mm_setr_epi8(
 		2, 1, 0, 3,
@@ -329,7 +329,7 @@ bool DirectXCommon::TryGetGameTextureCapturePixels(
 		0, 0, 0, static_cast<char>(0xFF));
 	for (int y = 0; y < outHeight; ++y) {
 		const unsigned char* sourceRow =
-			mappedData + oldestSlot->footprint.Offset + static_cast<size_t>(y) * sourceRowPitch;
+			mappedData + oldestSlot->footprint_.Offset + static_cast<size_t>(y) * sourceRowPitch;
 		unsigned char* destinationRow = pixels.data() + static_cast<size_t>(y) * tightRowPitch;
 		int x = 0;
 		for (; x + 4 <= outWidth; x += 4) {
@@ -351,8 +351,8 @@ bool DirectXCommon::TryGetGameTextureCapturePixels(
 		}
 	}
 	D3D12_RANGE writtenRange{ 0, 0 };
-	oldestSlot->readbackResource->Unmap(0, &writtenRange);
-	oldestSlot->pending = false;
+	oldestSlot->readbackResource_->Unmap(0, &writtenRange);
+	oldestSlot->pending_ = false;
 	return true;
 }
 
