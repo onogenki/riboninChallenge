@@ -2,7 +2,7 @@
 #include"Vector3.h"
 #include"Quaternion.h"
 
-// 拡大・Euler角回転・移動を一組にし、2D・3D・UVの行列を作る入力として渡します。
+// @brief 拡大・Euler角回転・移動を一組にし、2D・3D・UVの行列を作る入力として渡します。
 struct Transform
 {
 	Vector3 scale{ 1.0f, 1.0f, 1.0f };
@@ -10,7 +10,7 @@ struct Transform
 	Vector3 translate{};
 };
 
-// 骨のAnimationなど、回転をQuaternionで補間する対象の変換値を保持します。
+// @brief 骨のAnimationなど、回転をQuaternionで補間する対象の変換値を保持します。
 struct QuaternionTransform
 {
 	Vector3 scale{ 1.0f, 1.0f, 1.0f };

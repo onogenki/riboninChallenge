@@ -1,6 +1,6 @@
-[![.github/workflows/DebugBuild.yml](https://github.com/onogenki/riboninCharenge/actions/workflows/DebugBuild.yml/badge.svg)](https://github.com/onogenki/riboninCharenge/actions/workflows/DebugBuild.yml)
-
 # riboninChallenge
+
+[Debug x64 のビルド設定](.github/workflows/DebugBuild.yml)
 
 ## 初めて使う方へ
 

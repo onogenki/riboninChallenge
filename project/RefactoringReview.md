@@ -8,7 +8,7 @@
 
 | 元レビューの主な指摘 | 現在確認できたこと | 残る判断 |
 | --- | --- | --- |
-| ソリューション名と具体的なスペルミス | 現行のソリューション・プロジェクトは`riboninChallenge`。`Adapater`・`paletter`・`RasiterZerState`・`enviromentColor`・`riboninCharenge`は現行のengine・game・shader・主プロジェクトで該当なし | Git履歴と過去の説明文は改名対象にしない。全識別子の辞書検査は未実施 |
+| ソリューション名と具体的なスペルミス | 現行のソリューション・プロジェクトは`riboninChallenge`。`Adapater`・`paletter`・`RasiterZerState`・`enviromentColor`と旧プロジェクト名は現行のengine・game・shader・主プロジェクトで該当なし | Git履歴は改名対象にしない。全識別子の辞書検査は未実施 |
 | VSフィルタと実ファイルの一致 | 主プロジェクトの登録302件とfiltersの302件が一致。重複・差分・物理パスとのフィルタ階層違い・ソースIncludeのワイルドカードは各0件 | 今後のファイル追加でも同じ検査を続ける |
 | 文字列変換と撮影の二重管理 | `Audio.cpp`は`StringUtility::ConvertString()`を呼び、旧`GameViewCapture`の自作ファイルは現行ツリーにない | 撮影全経路の同等性は、変更時の実画面と保存結果で引き続き確認する |
 | 巨大なSmoke関数 | `Stage1GameplaySmoke::Initialize()`は入力保存と検証関数の呼出し、`CaptureManager::UpdateSmokeBeforeCapture()`はScene別関数への振分けになっている | 個々の検証関数を行数だけで再分割しない |
@@ -411,7 +411,7 @@
 - Release・携帯鏡・配置編集の変更後、ゲーム本体のDebug／Development／Release x64ビルドが成功。これだけでは鏡の操作やShaderの実表示が正しい証拠にはしない。
 - DevelopmentをVisual StudioのF5から起動し、TitleのSprite・SkyBox・平面の表示を確認。Loadingの白画面を捉えたのはVisual Studio側のキャプチャなので、Releaseの赤い余白修正の検証には数えない。
 - Title Edit ViewでSpriteのXを0→100へ直接入力し、Inspectorの100表示と画像の移動を確認。Copy Placement C++を押し、クリップボードがSetPosition({100.000000f,0.000000f})、Size 512x512、Anchor 0,0、Rotation 0のコードになったことを確認した。実行中の編集のみで素材や配置ファイルへ保存していない。
-- EnterによるTitle→Stage1は今回も自動操作で確認できなかった。起動手順全体は未確認のまま。後の照合ではゲームプロセスもriboninCharengeウィンドウも終了しており、古い画面座標を使った操作は停止した。
+- EnterによるTitle→Stage1は今回も自動操作で確認できなかった。起動手順全体は未確認のまま。後の照合ではゲームプロセスも当時のゲームウィンドウも終了しており、古い画面座標を使った操作は停止した。
 - AudioApiSmoke：Debug／Developmentとも27項目PASS、SUCCESS: failures=0、終了コード0。無効ID・停止済みID、音源読込の再利用、Pause／Resume、BGMフェード停止、SE登録を確認。聴感、故障時、再生中Mixer変更は対象外。
 - テストのWarningLevel 4でAudio::LoadFileのReadSampleにC4245が出た。特殊ストリーム番号をDWORDへ明示変換して3か所で共有し、変数名streamIndexも訂正。音源や再生順は変えず、再ビルド・再テストではこの警告が消えた。
 - この型指定修正後も、ゲーム本体をDevelopment→Release→Debug x64の順で再ビルドし、全て終了コード0。出力にプロジェクト設定由来の警告・エラーなし。最後のDebug x64ビルドまで完了。
