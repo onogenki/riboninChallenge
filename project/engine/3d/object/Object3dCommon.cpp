@@ -43,6 +43,15 @@ void Object3dCommon::SetCommonDrawSetting()
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
+// 通常モデルと同じShaderを使い、半透明の一体だけを既存の背景へ合成します。
+void Object3dCommon::SetTransparentDrawSetting()
+{
+	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+	commandList->SetGraphicsRootSignature(rootSignature_.Get());
+	commandList->SetPipelineState(transparentGraphicsPipelineState_.Get());
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
 // 通常の壁より奥にある部分だけを描く、壁越しシルエット用のPipelineを設定します。
 void Object3dCommon::SetOccludedSilhouetteDrawSetting()
 {
@@ -277,6 +286,21 @@ void Object3dCommon::CreateGraphicsPipeline()
 		IID_PPV_ARGS(&graphicsPipelineState_)); // メンバ変数 graphicsPipelineState_ に保存
 	if (FAILED(hr) || !graphicsPipelineState_) {
 		throw std::runtime_error("Object3dCommon: object graphics pipeline creation failed");
+	}
+
+	// Player消失中だけα合成し、半透明の球が後続の光を深度で隠さないようにします。
+	graphicsPipelineStateDesc.BlendState.RenderTarget[0].BlendEnable = TRUE;
+	graphicsPipelineStateDesc.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	graphicsPipelineStateDesc.BlendState.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+	graphicsPipelineStateDesc.BlendState.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	graphicsPipelineStateDesc.BlendState.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	graphicsPipelineStateDesc.BlendState.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+	graphicsPipelineStateDesc.BlendState.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	graphicsPipelineStateDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+	hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(
+		&graphicsPipelineStateDesc, IID_PPV_ARGS(&transparentGraphicsPipelineState_));
+	if (FAILED(hr) || !transparentGraphicsPipelineState_) {
+		throw std::runtime_error("Object3dCommon: transparent object graphics pipeline creation failed");
 	}
 }
 

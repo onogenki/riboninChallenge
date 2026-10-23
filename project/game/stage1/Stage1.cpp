@@ -28,6 +28,7 @@
 #include "StageSceneRenderer.h"
 #include "StageTitleOverlay.h"
 #include "StagePauseOverlay.h"
+#include "../gameOver/GameOverScene.h"
 #include "debug/StagePuzzleDebugUi.h"
 #include <cmath>
 #include <dinput.h>
@@ -76,6 +77,10 @@ void Stage1::Initialize()
 	pauseState_ = PauseState::kPlaying;
 	hasStageFrameBeenDrawn_ = false;
 	hasStageBgmStarted_ = false;
+	lightDeathCount_ = 0;
+	isLightDeathPlaying_ = false;
+	isLeavingForGameOver_ = false;
+	lightDeathElapsedTime_ = 0.0f;
 	if (!InitializeRenderSystems()) {
 		Logger::Log("Stage1 initialization failed: light puzzle renderer could not be prepared.");
 		PostQuitMessage(1);
@@ -472,36 +477,55 @@ void Stage1::Update()
 
 	// ---------- プレイヤーの移動と重力 ----------
 	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
-	const bool isStageStartPlaying = UpdateStagePlayer(deltaTime);
+	const bool wasLightDeathPlaying = isLightDeathPlaying_;
+	if (wasLightDeathPlaying) {
+		UpdateLightDeath(deltaTime);
+	}
+	const bool isStageStartPlaying = wasLightDeathPlaying ? false : UpdateStagePlayer(deltaTime);
 	UpdateStageBgm(deltaTime);
 	// 本編のDoor・危険Lightの結果だけを、自動確認部品へ渡します。
-	gameplaySmoke_.Update(
-		{
-			&hazardLights_,
-			&collisionWorld_.GetSolidObbs(),
-			lightPuzzle_.IsDoorSwitchReceivingLight(),
-			lightPuzzle_.GetDoorOpenAmount(),
-		},
-		deltaTime);
-	UpdateMirrorGameplay();
-	UpdateLightPuzzle(deltaTime);
+	if (!wasLightDeathPlaying) {
+		gameplaySmoke_.Update(
+			{
+				&hazardLights_,
+				&collisionWorld_.GetSolidObbs(),
+				lightPuzzle_.IsDoorSwitchReceivingLight(),
+				lightPuzzle_.GetDoorOpenAmount(),
+			},
+			deltaTime);
+		UpdateMirrorGameplay();
+	}
+	UpdateLightPuzzle(deltaTime, !wasLightDeathPlaying);
 	// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
 	hazardLights_.Update(
 		deltaTime,
-		player_ ? &player_->GetSphere() : nullptr,
+		player_ && !wasLightDeathPlaying ? &player_->GetSphere() : nullptr,
 		[this](const std::vector<LaserSegment>& sourceSegments)
 		{
 			return ReflectHazardLightSegments(sourceSegments);
 		});
 	// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
 	stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
+	// 接触判定より先に警告の方向と範囲を更新し、死亡演出へそのまま引き継ぎます。
+	if (player_ && !wasLightDeathPlaying) {
+		stageLightWarning_.Update(*player_, lightPuzzle_, hazardLights_, deltaTime);
+	}
+	if (!wasLightDeathPlaying && !isStageStartPlaying &&
+		(lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit())) {
+		BeginLightDeath();
+	}
 
 	// ---------- カメラとデバッグ UI の更新 ----------
-	UpdateStageCamera(deltaTime, isStageStartPlaying);
+	if (isLightDeathPlaying_) {
+		// 死亡位置からCameraを動かさず、既存の行列更新だけ行います。
+		cameraManager_->Update();
+	} else {
+		UpdateStageCamera(deltaTime, isStageStartPlaying);
+	}
 	UpdateReflectionCameras();
 	ImGuiManager::GetInstance()->Begin("Stage1");
 	// Gameplay中もPlayerの球Colliderを表示し、Laser接触を黄色で確認できるようにする
-	if (player_) {
+	if (player_ && !isLightDeathPlaying_) {
 		ImGuiManager::GetInstance()->DrawPlayerCollisionDebug(
 			player_->GetSphere(),
 			cameraManager_->GetActiveCamera(),
@@ -669,6 +693,81 @@ bool Stage1::UpdateStagePlayer(float deltaTime)
 	return false;
 }
 
+// 接触を一度だけ記録し、次フレームからPlayer入力・衝突・Camera追従を止めます。
+void Stage1::BeginLightDeath()
+{
+	if (!player_ || isLightDeathPlaying_) {
+		return;
+	}
+	++lightDeathCount_;
+	isLightDeathPlaying_ = true;
+	lightDeathElapsedTime_ = 0.0f;
+	lightDeathStartPosition_ = player_->GetPosition();
+	stageLightWarning_.BeginDeath();
+	player_->SetMirrorGuardMode(false);
+}
+
+// 消失と上昇を素早く見せ、一秒後に復帰またはGame Overへ進めます。
+void Stage1::UpdateLightDeath(float deltaTime)
+{
+	if (!player_ || isLeavingForGameOver_) {
+		return;
+	}
+	constexpr float kDeathDuration = 1.0f;
+	constexpr float kFadeDuration = 0.4f;
+	constexpr float kRiseDuration = 0.55f;
+	constexpr float kDeathRiseHeight = 4.0f;
+	lightDeathElapsedTime_ = (std::min)(lightDeathElapsedTime_ + deltaTime, kDeathDuration);
+	const float progress = lightDeathElapsedTime_ / kDeathDuration;
+	const float riseProgress = (std::min)(lightDeathElapsedTime_ / kRiseDuration, 1.0f);
+	const float fadeProgress = (std::min)(lightDeathElapsedTime_ / kFadeDuration, 1.0f);
+	player_->SetPosition({
+		lightDeathStartPosition_.x,
+		lightDeathStartPosition_.y + kDeathRiseHeight * riseProgress,
+		lightDeathStartPosition_.z,
+	});
+	player_->GetObject().SetOpacity(1.0f - fadeProgress);
+	// 透明化と同時に鏡面反射を強め、青白い光は消え切る前だけ最大になります。
+	player_->GetObject().SetSpecularGlow(
+		1.0f + 10.0f * fadeProgress,
+		12.0f * fadeProgress * (1.0f - fadeProgress));
+	stageLightWarning_.UpdateDeath(*player_, fadeProgress);
+	if (progress < 1.0f) {
+		return;
+	}
+
+	const Vector3 respawnPosition = hasStagePlayerStart_
+		? stagePlayerStartPosition_
+		: Vector3{ 0.0f, -0.8f, 5.0f };
+	// ワープ直前のCamera位置を保存し、復帰後の同じ向き・距離をPlayerの初期位置へ移します。
+	Camera* deathCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
+	const Vector3 deathCameraPosition = deathCamera ? deathCamera->GetTranslate() : Vector3{};
+	const Vector3 deathCameraRotation = deathCamera ? deathCamera->GetRotate() : Vector3{};
+	player_->ResetForRespawn(respawnPosition);
+	if (lightDeathCount_ >= 3) {
+		// 切替フェード中にも初期位置のPlayerが一瞬映らないよう、透明のまま待機します。
+		player_->GetObject().SetOpacity(0.0f);
+		stageLightWarning_.UpdateDeath(*player_, 1.0f);
+		GameOverScene::SetRetryStageId(stageMapSelection_.GetStageId());
+		isLeavingForGameOver_ = SceneManager::GetInstance()->ChangeSceneWithFade("GAME_OVER");
+		return;
+	}
+	stageLightWarning_.Reset(*player_);
+	if (cameraManager_ && mainCamera_) {
+		stageCameraEvents_.RestoreMainCamera(*cameraManager_);
+		mainCamera_->SetTranslate({
+			deathCameraPosition.x + respawnPosition.x - lightDeathStartPosition_.x,
+			deathCameraPosition.y + respawnPosition.y - lightDeathStartPosition_.y,
+			deathCameraPosition.z + respawnPosition.z - lightDeathStartPosition_.z,
+		});
+		mainCamera_->SetRotate(deathCameraRotation);
+		if (cameraController_) {
+			cameraController_->SynchronizeToCamera(respawnPosition);
+		}
+	}
+	isLightDeathPlaying_ = false;
+}
+
 // 固定鏡の位置・向きから、各鏡面用Cameraの反射行列を更新します。
 void Stage1::UpdateReflectionCameras()
 {
@@ -689,7 +788,7 @@ void Stage1::UpdateReflectionCameras()
 }
 
 // 鏡の状態を受け取り、Laser・Switch・DoorのPuzzle規則を専用部品へ任せます。
-void Stage1::UpdateLightPuzzle(float deltaTime)
+void Stage1::UpdateLightPuzzle(float deltaTime, bool checkPlayerCollision)
 {
 	if (!chargeSwitch_ || !doorSwitch_ || !lightDoor_ ||
 		fixedMirrors_.empty() || !fixedMirrors_.front()) {
@@ -700,7 +799,7 @@ void Stage1::UpdateLightPuzzle(float deltaTime)
 		deltaTime,
 		reflectors,
 		collisionWorld_.GetLightBlockingObbs(),
-		player_ ? &player_->GetSphere() : nullptr,
+		player_ && checkPlayerCollision ? &player_->GetSphere() : nullptr,
 		fixedMirrors_.front().get(),
 		laserEmitter_,
 		doorLaserEmitter_,

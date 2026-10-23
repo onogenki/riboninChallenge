@@ -39,6 +39,18 @@ public:
 	const Object3d::DirectionalLight& GetDirectionalLight() const { return directionalLightData_; }
 	// Camera用バッファの空き成分で、Objectごとの裏面の明るさを渡します。
 	void SetBackFaceBrightness(float brightness) { cameraData_->backFaceBrightness = brightness; }
+	// 個体別の透明度をCamera用Constant Bufferへ渡します。
+	void SetOpacity(float opacity) { cameraData_->opacity = opacity; }
+	// 一体分の反射倍率と発光量を、通常描画と鏡面描画で同じ値へ固定します。
+	void SetSpecularGlow(float specularBoost, float glowIntensity) {
+		cameraData_->specularBoost = specularBoost;
+		cameraData_->glowIntensity = glowIntensity;
+	}
+	// Playerの回転とは独立したLightの世界方向と警告の強さを描画へ渡します。
+	void SetLightWarning(const Vector3& worldDirection, float strength) {
+		cameraData_->warningDirection = worldDirection;
+		cameraData_->warningStrength = strength;
+	}
 
 private:
 	// GPUの描画が終わるまで行列・Camera・Lightを上書きしないよう、一回の描画に使う値を保持します。

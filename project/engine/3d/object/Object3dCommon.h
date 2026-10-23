@@ -33,6 +33,8 @@ public:
 
 	// 通常モデル用のRoot Signature・Pipeline・三角形描画を設定します。
 	void SetCommonDrawSetting();
+	// 個体別Opacityが1未満の通常モデルだけ、深度を書かない透過Pipelineへ切り替えます。
+	void SetTransparentDrawSetting();
 	// 壁の奥だけにObjectの半透明シルエットを描く共通Pipelineを設定します。
 	void SetOccludedSilhouetteDrawSetting();
 	// 骨付きモデルの壁越しシルエット用に頂点を変形するCompute Pipelineを設定します。
@@ -77,6 +79,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	// PipelineState
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> transparentGraphicsPipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> occludedSilhouetteGraphicsPipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> mirrorRootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> mirrorGraphicsPipelineState_;

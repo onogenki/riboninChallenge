@@ -44,6 +44,7 @@ bool Object3d::Initialize(Object3dCommon* object3dCommon)
 	transform_ = { {1.0f,1.0f,1.0f},{0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f} };
 	transformPlayback_.Reset();
 	animationReturnState_.Reset();
+	opacity_ = 1.0f;
 	return true;
 }
 
@@ -194,7 +195,11 @@ void Object3d::Draw()
 
 	// Animation・SkyBox・鏡の直後でも、通常モデル用の頂点形式とRoot Signatureへ戻します。
 	// Root Signatureを切り替えた後で、このObjectの行列・Light・Textureを設定します。
-	object3dCommon_->SetCommonDrawSetting();
+	if (opacity_ < 1.0f) {
+		object3dCommon_->SetTransparentDrawSetting();
+	} else {
+		object3dCommon_->SetCommonDrawSetting();
+	}
 	if (!gpuData_ || !gpuData_->BindForObjectDraw(commandList)) {
 		return;
 	}
@@ -277,6 +282,35 @@ void Object3d::SetBackFaceBrightness(float brightness)
 {
 	if (gpuData_) {
 		gpuData_->SetBackFaceBrightness(std::clamp(brightness, 0.0f, 1.0f));
+	}
+}
+
+// 共有ModelのMaterialを触らず、このObjectだけの透明度とPipeline選択をそろえます。
+void Object3d::SetOpacity(float opacity)
+{
+	opacity_ = std::clamp(opacity, 0.0f, 1.0f);
+	if (gpuData_) {
+		gpuData_->SetOpacity(opacity_);
+	}
+}
+
+// Playerだけを強く光らせるため、共有材質ではなくObject専用Constant Bufferを変更します。
+void Object3d::SetSpecularGlow(float specularBoost, float glowIntensity)
+{
+	if (gpuData_) {
+		gpuData_->SetSpecularGlow(
+			std::clamp(specularBoost, 1.0f, 16.0f),
+			std::clamp(glowIntensity, 0.0f, 4.0f));
+	}
+}
+
+// モデルのローカル向きでなく世界方向を渡し、Playerが振り向いても光源側を固定します。
+void Object3d::SetLightWarning(const Vector3& worldDirection, float strength)
+{
+	if (gpuData_) {
+		const Vector3 direction = Length(worldDirection) > 0.0001f
+			? Normalize(worldDirection) : Vector3{ 0.0f, 0.0f, 1.0f };
+		gpuData_->SetLightWarning(direction, std::clamp(strength, 0.0f, 1.0f));
 	}
 }
 

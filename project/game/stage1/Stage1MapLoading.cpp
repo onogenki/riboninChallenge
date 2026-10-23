@@ -20,6 +20,16 @@ bool Stage::LoadStage(int stageId, bool resetPlayerPosition)
 	// 前のStageで開いたDoorや危険Lightの時刻を持ち越さず、新しい配置を初期状態から動かします。
 	lightPuzzle_.ResetProgress();
 	hazardLights_.Reset();
+	// 別Stageへ切り替えた時だけ死亡回数と演出を初期化し、前Stageの失敗を持ち越しません。
+	lightDeathCount_ = 0;
+	isLightDeathPlaying_ = false;
+	isLeavingForGameOver_ = false;
+	lightDeathElapsedTime_ = 0.0f;
+	if (player_) {
+		player_->GetObject().SetOpacity(1.0f);
+		player_->GetObject().SetSpecularGlow(1.0f, 0.0f);
+		stageLightWarning_.Reset(*player_);
+	}
 	const StageMapSelection::Definition* definition = stageMapSelection_.GetDefinition();
 	stageMapFileMonitor_.Start(definition->levelFilePath, definition->mapChipFilePath);
 	return true;
