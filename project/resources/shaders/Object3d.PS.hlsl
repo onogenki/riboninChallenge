@@ -58,6 +58,12 @@ struct Camera
 {
     float32_t3 worldPosition;
     float32_t backFaceBrightness;
+    float32_t opacity;
+    float32_t specularBoost;
+    float32_t glowIntensity;
+    float32_t padding;
+    float32_t3 warningDirection;
+    float32_t warningStrength;
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
@@ -93,6 +99,11 @@ PixelShaderOutput main(
     }
     //視線ベクトル
     float32_t3 toEye = normalize(gCamera.worldPosition - input.worldPosition);
+    // 透過中の球は奥側の面を重ねない。表面越しに球の内側が見える違和感を防ぎます。
+    if (gCamera.opacity < 1.0f && dot(input.normal, toEye) < 0.0f)
+    {
+        discard;
+    }
     
     ///
     ///平行光源
@@ -182,8 +193,29 @@ PixelShaderOutput main(
             specularPowSpot * gMaterial.specularIntensity * float32_t3(1.0f, 1.0f, 1.0f);
     }
     
+    // 世界空間の法線とLight方向で球の片側だけに反射を出し、Playerの回転から独立させます。
+    float32_t warningLevel = saturate(gCamera.warningStrength);
+    float32_t warningThreshold = lerp(0.94f, -1.10f, warningLevel);
+    float32_t warningMask = warningLevel * smoothstep(
+        warningThreshold - 0.10f,
+        warningThreshold + 0.10f,
+        dot(N, normalize(gCamera.warningDirection)));
+    // 反射範囲が広がるにつれ、青白さから黄色へ滑らかに変えます。
+    float32_t3 warningColor = lerp(
+        float32_t3(0.55f, 0.80f, 1.0f),
+        float32_t3(1.0f, 0.86f, 0.15f),
+        smoothstep(0.25f, 0.95f, warningLevel));
+
     //全ての光を合成
-    output.color.rgb = ambientLight + diffuseDirectionalLight + specularDirectionalLight + diffusePointLight + specularPointLight + diffuseSpotLight + specularSpotLight;
+    output.color.rgb = ambientLight + diffuseDirectionalLight + diffusePointLight + diffuseSpotLight;
+    // Player消失中だけ反射光を強め、ほかのObjectは倍率1で従来の見た目を保ちます。
+    float32_t3 specularLight =
+        specularDirectionalLight + specularPointLight + specularSpotLight;
+    output.color.rgb +=
+        specularLight * gCamera.specularBoost;
+    output.color.rgb += specularLight * warningMask * 6.0f * warningColor;
+    // ハイライトが届きにくい角度でも、光源側の小さな反射だけは見えるようにします。
+    output.color.rgb += warningColor * warningMask * (0.15f + 0.70f * warningLevel);
     
     
 	// 係数が0より大きいときだけキューブマップの反射光を加算する。
@@ -197,13 +229,17 @@ PixelShaderOutput main(
     } 
     // アルファ
     output.color.a =
-        gMaterial.color.a * textureColor.a;
+        gMaterial.color.a * textureColor.a * gCamera.opacity;
     
 	// 完全透明なピクセルは深度・色バッファへ書き込まない。
 	if (output.color.a == 0.0f)
     {
         discard;
     }
+    // 反射が当たりにくい角度でも、輪郭寄りの青白い光で消失を見せます。
+    float32_t rim = pow(1.0f - saturate(dot(N, toEye)), 2.0f);
+    output.color.rgb += warningColor *
+        gCamera.glowIntensity * (0.35f + 0.65f * rim);
     
    
     // 元の法線側を表面とします。携帯鏡の+Z法線と同じため、縦持ち・横持ちの両方で判別できます。

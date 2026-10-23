@@ -83,6 +83,18 @@ void Player::SetPosition(const Vector3& position)
 	object_.SetTranslate(position_);
 }
 
+// ワープ後に直前の落下速度や構え状態が残らないよう、Playerの初期状態を一度に復元します。
+void Player::ResetForRespawn(const Vector3& position)
+{
+	SetPosition(position);
+	facingYaw_ = 0.0f;
+	isMirrorGuardMode_ = false;
+	object_.SetRotate({ 0.0f, 0.0f, 0.0f });
+	object_.SetOpacity(1.0f);
+	object_.SetSpecularGlow(1.0f, 0.0f);
+	object_.SetLightWarning({ 0.0f, 0.0f, 1.0f }, 0.0f);
+}
+
 // 入力値を受け取り、移動・重力・衝突解決を順番に実行します。
 void Player::UpdateWithControl(
 	float deltaTime,

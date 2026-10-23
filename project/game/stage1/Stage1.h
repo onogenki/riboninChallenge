@@ -11,6 +11,7 @@
 #include "StageCollisionWorld.h"
 #include "StageLightPuzzle.h"
 #include "StageLighting.h"
+#include "StageLightWarning.h"
 #include "StageMapFileMonitor.h"
 #include "StageMapRuntime.h"
 #include "StageMapSelection.h"
@@ -92,6 +93,10 @@ private:
 	std::unique_ptr<Object3d> CreateRuntimeObject(const std::string& modelName);
 	// 開始演出・自動確認・通常入力のいずれかでPlayerを更新し、開始演出中ならtrueを返します。
 	bool UpdateStagePlayer(float deltaTime);
+	// 接触後の一秒だけPlayerを上昇・透過させ、復帰かGame Overを決定します。
+	void UpdateLightDeath(float deltaTime);
+	// ライトの接触を一回だけ数え、CameraとPlayerの通常更新を止めます。
+	void BeginLightDeath();
 	// 通常Cameraを各鏡面で反転し、反射Cameraの位置と回転を更新します。
 	void UpdateReflectionCameras();
 	// ---------- 鏡・Laserギミック ----------
@@ -103,7 +108,7 @@ private:
 	// 一本の危険LightをLaserとして追跡し、反射後の全線分を返します。
 	std::vector<LaserSegment> ReflectHazardLightSegments(const std::vector<LaserSegment>& sourceSegments) const;
 	// 鏡の更新後に、Laser・Switch・DoorのPuzzle状態を更新します。
-	void UpdateLightPuzzle(float deltaTime);
+	void UpdateLightPuzzle(float deltaTime, bool checkPlayerCollision = true);
 	// ---------- Camera制御 ----------
 
 	// Playerを自動追尾する通常Cameraを更新します。
@@ -181,6 +186,8 @@ private:
 	// ---------- 時間制御で動く危険Light ----------
 	// 危険Lightの軌道・反射後線分・Player接触・描画をまとめるStage固有ギミックです。
 	StageHazardLights hazardLights_{};
+	// Player周囲のAABBと反射後Light線分から、個体別の接近予兆だけを更新します。
+	StageLightWarning stageLightWarning_{};
 	// ---------- Light PuzzleのSwitchとDoor ----------
 
 	// 携帯鏡で反射したLaserを受け、一定時間で大型Mirrorを起動する充電Switchです。
@@ -197,6 +204,12 @@ private:
 	Vector3 stagePlayerStartPosition_{ 0.0f, -0.8f, 5.0f };
 	// PlayerStartがstage1.jsonに書かれていた時だけtrueになります。
 	bool hasStagePlayerStart_ = false;
+	// 危険Lightに触れた回数と、一秒の消失演出をStage本編だけが管理します。
+	int lightDeathCount_ = 0;
+	bool isLightDeathPlaying_ = false;
+	bool isLeavingForGameOver_ = false;
+	float lightDeathElapsedTime_ = 0.0f;
+	Vector3 lightDeathStartPosition_{};
 	// 床の見た目です。寿命はsceneObjects_、判定形状はcollisionWorld_が管理します。
 	Object3d* floor_ = nullptr;
 	// ---------- 通常Cameraと開始演出 ----------

@@ -426,6 +426,7 @@
   <ItemGroup>
     <!-- Visual Studioが個別に追跡できるよう、game側もワイルドカードを使わず列挙します。 -->
     <ClCompile Include="game\GameSceneRegistration.cpp" />
+	<ClCompile Include="game\gameOver\GameOverScene.cpp" />
 	<ClCompile Include="game\StartupRouteSmoke.cpp" />
 	<ClCompile Include="game\loading\LoadingScene.cpp" />
 	<ClCompile Include="game\stageSelect\StageSelectScene.cpp" />
@@ -445,6 +446,7 @@
     <ClCompile Include="game\stage1\Stage1.cpp" />
     <ClCompile Include="game\stage1\Stage1EditorUi.cpp" />
     <ClCompile Include="game\stage1\StageLighting.cpp" />
+	<ClCompile Include="game\stage1\StageLightWarning.cpp" />
     <ClCompile Include="game\stage1\Stage1MapLoading.cpp" />
     <ClCompile Include="game\stage1\StageMapChipFactory.cpp" />
     <ClCompile Include="game\stage1\StageMapSelection.cpp" />
@@ -462,6 +464,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game\GameSceneRegistration.h" />
+	<ClInclude Include="game\gameOver\GameOverScene.h" />
 	<ClInclude Include="game\StartupRouteSmoke.h" />
 	<ClInclude Include="game\loading\LoadingScene.h" />
 	<ClInclude Include="game\stageSelect\StageSelectScene.h" />
@@ -487,6 +490,7 @@
     <ClInclude Include="game\stage1\StageHazardLights.h" />
     <ClInclude Include="game\stage1\StageLightPuzzle.h" />
     <ClInclude Include="game\stage1\StageLighting.h" />
+	<ClInclude Include="game\stage1\StageLightWarning.h" />
     <ClInclude Include="game\stage1\StageReflectionRenderer.h" />
     <ClInclude Include="game\stage1\StageSceneRenderer.h" />
     <ClInclude Include="game\stage1\StageStart.h" />

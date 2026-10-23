@@ -261,6 +261,12 @@ bool Object3dGpuData::CreateCameraData(DirectXCommon* dxCommon)
 	}
 	cameraData_->worldPosition = { 0.0f, 0.0f, 10.0f };
 	cameraData_->backFaceBrightness = 1.0f;
+	cameraData_->opacity = 1.0f;
+	cameraData_->specularBoost = 1.0f;
+	cameraData_->glowIntensity = 0.0f;
+	cameraData_->padding = 0.0f;
+	cameraData_->warningDirection = { 0.0f, 0.0f, 1.0f };
+	cameraData_->warningStrength = 0.0f;
 	return true;
 }
 

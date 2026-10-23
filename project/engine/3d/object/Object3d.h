@@ -75,9 +75,18 @@ public:
 		Vector3 worldPosition;
 		// 通常は1。板の裏面を区別したいObjectだけ、1より小さくします。
 		float backFaceBrightness = 1.0f;
+		// 共有Modelの材質を変えず、この個体だけを透明にする倍率です。
+		float opacity = 1.0f;
+		// 消失演出中だけ鏡面反射と青白い発光を強めます。
+		float specularBoost = 1.0f;
+		float glowIntensity = 0.0f;
+		float padding = 0.0f;
+		// ワールド空間のLight方向なので、Playerの向きを変えても反射側を保ちます。
+		Vector3 warningDirection{ 0.0f, 0.0f, 1.0f };
+		float warningStrength = 0.0f;
 	};
-	// HLSLのfloat3 + floatと同じ16byte配置を維持します。
-	static_assert(sizeof(CameraForGPU) == 16);
+	// HLSLのCamera定数バッファと同じ48byte配置を維持します。
+	static_assert(sizeof(CameraForGPU) == 48);
 
 	struct ReflectionData
 	{
@@ -161,6 +170,12 @@ public:
 	void SetEnvironmentCoefficient(float coefficient);
 	// 共有Modelの材質を変えず、このObjectの裏面だけを暗くします。
 	void SetBackFaceBrightness(float brightness);
+	// 共有Modelへ影響させず、このObject一体だけの透明度を設定します。
+	void SetOpacity(float opacity);
+	// 共有ModelやStageのLightを変えず、このObjectだけの反射と発光を調整します。
+	void SetSpecularGlow(float specularBoost, float glowIntensity);
+	// 近づくLightの世界方向と強さを、このObjectの反射面にだけ渡します。
+	void SetLightWarning(const Vector3& worldDirection, float strength);
 	// 読込成功時だけこのObjectのTextureを上書きし、失敗時は以前の設定を保ってfalseを返します。
 	bool SetTextureOverride(const std::string& texturePath);
 	void ClearTextureOverride() { textureSrvIndexOverride_ = UINT32_MAX; }
@@ -211,6 +226,8 @@ private:
 
 	// 行列・Light・CameraをGPUへ渡すConstant Bufferをまとめた描画用データです。
 	std::unique_ptr<Object3dGpuData> gpuData_;
+	// 1未満の時だけ透過用Pipelineを選び、通常Objectの描画順は変えません。
+	float opacity_ = 1.0f;
 
 	//アニメーション
 	Model::Animation currentAnimation_;//アニメーション読み込み

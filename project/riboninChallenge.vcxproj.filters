@@ -58,6 +58,9 @@
     <Filter Include="game\stageSelect">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000013}</UniqueIdentifier>
     </Filter>
+	<Filter Include="game\gameOver">
+	  <UniqueIdentifier>{00000000-0000-4000-8000-000000000024}</UniqueIdentifier>
+	</Filter>
     <Filter Include="resources\shaders">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000014}</UniqueIdentifier>
     </Filter>
@@ -539,6 +542,9 @@
 	<ClCompile Include="game\stage1\StageLighting.cpp">
       <Filter>game\stage1</Filter>
     </ClCompile>
+	<ClCompile Include="game\stage1\StageLightWarning.cpp">
+	  <Filter>game\stage1</Filter>
+	</ClCompile>
 	<ClCompile Include="game\stage1\Stage1MirrorGameplay.cpp">
       <Filter>game\stage1</Filter>
     </ClCompile>
@@ -600,6 +606,9 @@
     <ClCompile Include="game\GameSceneRegistration.cpp">
       <Filter>game</Filter>
     </ClCompile>
+	<ClCompile Include="game\gameOver\GameOverScene.cpp">
+	  <Filter>game\gameOver</Filter>
+	</ClCompile>
 	<ClCompile Include="game\loading\LoadingScene.cpp">
 	  <Filter>game\loading</Filter>
 	</ClCompile>
@@ -926,6 +935,9 @@
 	<ClInclude Include="game\stage1\StageLighting.h">
 		<Filter>game\stage1</Filter>
 	</ClInclude>
+	<ClInclude Include="game\stage1\StageLightWarning.h">
+		<Filter>game\stage1</Filter>
+	</ClInclude>
 	<ClInclude Include="game\stage1\StageReflectionRenderer.h">
       <Filter>game\stage1</Filter>
     </ClInclude>
@@ -981,6 +993,9 @@
     <ClInclude Include="game\GameSceneRegistration.h">
       <Filter>game</Filter>
     </ClInclude>
+	<ClInclude Include="game\gameOver\GameOverScene.h">
+	  <Filter>game\gameOver</Filter>
+	</ClInclude>
 	<ClInclude Include="game\loading\LoadingScene.h">
 	  <Filter>game\loading</Filter>
 	</ClInclude>
