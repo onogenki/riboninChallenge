@@ -6,6 +6,10 @@
 #include <string>
 #include <memory>
 #include <filesystem>
+
+namespace Engine
+{
+
 // 読み込んだモデルを一元所有し、Object3dへ所有権のない参照を渡します。
 class ModelManager
 {
@@ -50,4 +54,6 @@ private:
 	// モデルごとの前回読込時刻です。存在しない時は監視対象にしません。
 	std::map<std::string, std::filesystem::file_time_type> modelWriteTimes_;
 };
+
+}
 

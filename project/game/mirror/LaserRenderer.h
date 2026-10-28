@@ -9,7 +9,7 @@
 #include <vector>
 #include <wrl.h>
 
-class Camera;
+namespace Engine { class Camera; }
 class DirectXCommon;
 
 // Laserが計算した線分を、ゲーム本体の3D空間へ描画します。
@@ -17,7 +17,7 @@ class LaserRenderer
 {
 public:
 	bool Initialize(DirectXCommon* dxCommon, size_t maximumSegmentCount = 32);
-	void Draw(const std::vector<LaserSegment>& segments, const Camera& camera);
+	void Draw(const std::vector<LaserSegment>& segments, const Engine::Camera& camera);
 	// 3D空間における光線の幅を設定する。
 	void SetBeamWidth(float width) { beamWidth_ = width; }
 	// 背景と区別しやすい色へ、Laser全体の描画色を設定する。

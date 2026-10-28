@@ -10,6 +10,9 @@
 
 using namespace MyMath;
 
+namespace Engine
+{
+
 // SkinClusterのGPU Resource作成、Palette更新、Compute Skinning、Skinned描画をまとめる。
 // 通常モデルの読込・描画と分け、骨ありモデルの処理だけを追えるようにする。
 // 生成途中の失敗はDescriptorを返し、完成した時だけObject3dへ渡す。
@@ -322,5 +325,7 @@ void Model::DrawSkinned(const SkinCluster& skinCluster, uint32_t textureSrvIndex
 		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
 	}
+}
+
 }
 

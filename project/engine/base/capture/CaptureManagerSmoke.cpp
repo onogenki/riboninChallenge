@@ -41,7 +41,7 @@ void CaptureManager::UpdateSmokeBeforeCapture()
 		return;
 	}
 
-	const std::string& sceneName = SceneManager::GetInstance()->GetCurrentSceneName();
+	const std::string& sceneName = Engine::SceneManager::GetInstance()->GetCurrentSceneName();
 	if (sceneName == "TITLE") {
 		UpdateTitleSmoke();
 	} else if (sceneName == "STAGE1") {
@@ -63,7 +63,7 @@ void CaptureManager::UpdateTitleSmoke()
 	if (smokeFrame_ >= 6 && smokeFrame_ <= 13) {
 		QueuePhotoCapture();
 	}
-	if (smokeFrame_ == 20 && !SceneManager::GetInstance()->ChangeScene("DEBUG")) {
+	if (smokeFrame_ == 20 && !Engine::SceneManager::GetInstance()->ChangeScene("DEBUG")) {
 		FinishSmoke(false, "Could not request TITLE to DEBUG scene change.");
 	}
 }

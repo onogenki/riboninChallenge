@@ -50,8 +50,8 @@ void SceneRenderPipeline::DrawObjects(
 
 // Sceneごとの重複したSprite描画ループをなくし、共通設定漏れを防ぎます。
 void SceneRenderPipeline::DrawSprites(
-	SpriteCommon* spriteCommon,
-	const std::vector<std::unique_ptr<Sprite>>& sprites,
+	Engine::SpriteCommon* spriteCommon,
+	const std::vector<std::unique_ptr<Engine::Sprite>>& sprites,
 	size_t firstSpriteIndex)
 {
 	if (!spriteCommon) {
@@ -61,7 +61,7 @@ void SceneRenderPipeline::DrawSprites(
 	spriteCommon->SetCommonDrawSetting();
 	// Titleの導入Spriteだけを除外できるよう、指定位置から描画します。
 	for (size_t index = firstSpriteIndex; index < sprites.size(); ++index) {
-		const std::unique_ptr<Sprite>& sprite = sprites[index];
+		const std::unique_ptr<Engine::Sprite>& sprite = sprites[index];
 		if (sprite) {
 			sprite->Draw();
 		}
@@ -71,7 +71,7 @@ void SceneRenderPipeline::DrawSprites(
 // Scene描画後のPostEffect・SwapChain・ImGui・Presentを共通の順番で実行します。
 void SceneRenderPipeline::End(
 	DirectXCommon* directXCommon,
-	const Camera* activeCamera,
+	const Engine::Camera* activeCamera,
 	bool drawImGui)
 {
 	if (!directXCommon) {
@@ -80,7 +80,7 @@ void SceneRenderPipeline::End(
 
 	PostEffect* postEffect = PostEffect::GetInstance();
 	// Scene固有のSpriteを描き終えた後に白フェードを重ねます。
-	SceneManager::GetInstance()->DrawFadeOverlay();
+	Engine::SceneManager::GetInstance()->DrawFadeOverlay();
 	const bool isPostEffectEnabled = postEffect->IsEnabled();
 	if (isPostEffectEnabled) {
 		if (postEffect->IsGaussianFilter()) {

@@ -13,7 +13,10 @@
 #include "SrvManager.h"
 #include "TimePlayback.h"
 
-class CameraManager;
+namespace Engine { class CameraManager; }
+
+namespace Engine
+{
 
 struct ParticlePlaybackSnapshot
 {
@@ -243,4 +246,6 @@ private:
     float windTimer_ = 0.0f;//吹く時間
     bool isField_ = false;//風が吹いてるかどうか
 };
+
+} // namespace Engine
 

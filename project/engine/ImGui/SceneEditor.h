@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-class Camera;
+namespace Engine { class Camera; }
 
 // ImGui上でリソース棚とシーン内オブジェクトの編集UIを構築する。
 // 実データの追加・削除はコールバックでDebugSceneへ委譲する。
@@ -38,7 +38,7 @@ public:
 	};
 
 	struct ViewportOptions {
-		Camera* camera = nullptr;
+		Engine::Camera* camera = nullptr;
 		std::vector<ViewportObject> objects;
 		std::function<void(int)> onSelectionChanged;
 		std::function<void(int, const Transform&)> onTransformChanged;
@@ -46,7 +46,7 @@ public:
 
 	struct SpriteViewportObject {
 		std::string label;
-		Sprite* sprite = nullptr;
+		Engine::Sprite* sprite = nullptr;
 	};
 
 	struct SpriteViewportState {
@@ -108,7 +108,7 @@ public:
 	struct InspectorOptions {
 		// インスペクターが直接編集するシーンデータとUI制御用の設定。
 		const char* description = nullptr;
-		std::vector<std::unique_ptr<Sprite>>* sprites = nullptr;
+		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
 		Object3d::DirectionalLight* directionalLight = nullptr;
@@ -142,6 +142,6 @@ public:
 	// Edit View上で2Dスプライトを選択し、移動・回転・サイズを編集します。
 	static void DrawSpriteViewportEditor(SpriteViewportState& state, const SpriteViewportOptions& options);
 	// 表示中のScene View上で、右・中ボタンとホイールによる安全なカメラ操作を行います。
-	static void UpdateViewportCamera(Camera* camera, bool inputBlocked = false);
+	static void UpdateViewportCamera(Engine::Camera* camera, bool inputBlocked = false);
 	static void DrawInspector(const InspectorOptions& options);
 };

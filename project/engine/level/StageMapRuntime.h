@@ -9,10 +9,11 @@
 #include <vector>
 
 class Object3dRenderContext;
-class Camera;
+class Object3dCommon;
+namespace Engine { class Camera; }
 
 // LevelLoaderが読んだ通常3Dモデルを、ゲーム中のObject3dとして管理するクラスです。
-// Player、Camera、鏡などのゲーム固有処理は持たず、Stage1やStage2から共通利用できます。
+// Player、Camera、鏡などのゲーム固有処理は持たず、Stage番号に関係なく共通利用できます。
 class StageMapRuntime
 {
 public:
@@ -46,21 +47,34 @@ public:
 		const MyMath::OBB& GetObb() const { return collider.GetShape(); }
 	};
 
-	// Sceneが持つ照明設定を保ったObject3dを作る関数です。
+	// モデル名から完成済みObjectを返す、呼出し元の生成関数です。
 	using CreateObjectFunction = std::function<std::unique_ptr<Object3d>(const std::string& modelName)>;
-
-	// 読み込んだマップデータから、通常3Dモデルをすべて作り直します。
+	// @brief 呼出し元のFactory関数で通常3D配置物を仮生成し、全件成功後だけ採用します。
+	// @param objectDataList JSON・CSVから分類された配置データです。nullptrの要素は失敗扱いです。
+	// @param createObject モデル名から完成済みObjectを作る有効な関数です。
+	// @return 全件を生成できた時だけtrueです。失敗時は旧配置を保持します。
 	bool Rebuild(
 		const std::vector<const LevelLoader::ObjectData*>& objectDataList,
 		const CreateObjectFunction& createObject);
-	// 既存モデルを作り直さず、Editorで変更したTransformなどだけを反映します。
+	// @brief 共通描画設定を借り、Object3dFactoryで全モデルを仮生成してから採用します。
+	// @param objectDataList JSON・CSVから分類された配置データです。
+	// @param object3dCommon Factoryがモデルを描画可能にするための共通設定です。所有しません。
+	// @return 共通設定があり、全件を生成できた時だけtrueです。失敗時は旧配置を保持します。
+	bool Rebuild(
+		const std::vector<const LevelLoader::ObjectData*>& objectDataList,
+		Object3dCommon* object3dCommon);
+	// @brief 既存モデルを作り直さず、Editorで変更したTransformなどだけを反映します。
+	// @param objectDataList 実行中モデルのsourceNameと照合する配置データです。対応のないモデルは維持します。
 	void ApplyEdits(const std::vector<const LevelLoader::ObjectData*>& objectDataList);
-	// control_pointsを持つモデルを、経過時間に合わせて移動します。
+	// @brief control_pointsを持つモデルを動かし、移動後のColliderを同期します。
+	// @param deltaTime 前回の更新からの経過秒です。SceneがGame View中だけ渡します。
 	void UpdatePaths(float deltaTime);
-	// Sceneが一度作ったCamera・Light設定を、Runtimeが所有する全モデルへ反映します。
+	// @brief Sceneが一度作ったCamera・Light設定を、所有する全モデルへ反映します。
+	// @param renderContext Sceneが同じフレームで組み立てた描画準備です。所有しません。
 	void UpdateRenderObjects(const Object3dRenderContext& renderContext);
-	// Mirror反射Cameraまたは通常Cameraの行列を、Runtimeが所有する全モデルへ反映します。
-	void UpdateCameraForDraw(Camera* camera);
+	// @brief Mirror反射Cameraまたは通常Cameraの行列を、所有する全モデルへ反映します。
+	// @param camera 次に描画する視点です。Sceneが所有し、このクラスは保持しません。
+	void UpdateCameraForDraw(Engine::Camera* camera);
 	// Object3d用Pipeline設定後に、Runtimeが所有する全モデルを描画します。
 	void Draw() const;
 	// Editor変更・移動経路で変わったモデルTransformをColliderへ反映します。

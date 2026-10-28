@@ -1,14 +1,14 @@
 #include "DebugGameViewCameraController.h"
 
 #include "Camera.h"
-#include "DebugAssetPreview.h"
+#include "preview/DebugAssetPreview.h"
 #include "ImGuiManager.h"
 #include "Input.h"
 #include <algorithm>
 
 // Edit View・Preview状態を考慮しながら、Game ViewのCamera移動・回転・拡縮を更新します。
 void DebugGameViewCameraController::Update(
-	Camera* activeCamera,
+	Engine::Camera* activeCamera,
 	DebugAssetPreview& assetPreview)
 {
 	if (!activeCamera) {

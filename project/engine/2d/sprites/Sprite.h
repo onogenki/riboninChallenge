@@ -11,7 +11,8 @@
 #include "SpriteCommon.h"
 #include <string>
 
-class SpriteCommon;
+namespace Engine
+{
 
 // @brief 1枚の2D画像の位置・色・切り出し範囲と、その描画用GPUデータを所有します。
 class Sprite
@@ -92,9 +93,9 @@ public:
 	void SetTextureSize(const Vector2& textureSize) { textureSize_ = textureSize; }
 
 
-	// @brief 既存APIとして内部Transformを返します。次のUpdateで位置・回転・サイズから上書きされます。
-	// @return Spriteが所有するTransformへの参照です。継続的な変更には各Set関数を使います。
-	Transform& GetTransform() { return transform_; }
+	// @brief 描画用Transformを読み取り専用で返し、Set関数とUpdateの更新順を守ります。
+	// @return Spriteが所有するTransformへの読み取り専用参照です。値の変更には各Set関数を使います。
+	const Transform& GetTransform() const { return transform_; }
 private:
 
 	SpriteCommon* spriteCommon_ = nullptr;
@@ -147,3 +148,5 @@ private:
 	// 途中生成したGPU資源と、それを指すCPUポインタを一緒に外す。
 	void ResetGpuResources();
 };
+
+} // namespace Engine

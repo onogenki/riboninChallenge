@@ -10,6 +10,7 @@
 namespace
 {
 	constexpr const char* kBackToTitleTexture = "resources/font/backSpaceTitle.png";
+	constexpr const char* kStageSelectTexture = "resources/font/stageSelect.png";
 	constexpr const char* kEnterTexture = "resources/font/ENTER.png";
 	constexpr float kScreenMargin = 24.0f;
 }
@@ -20,8 +21,8 @@ StageSelectOverlay::StageSelectOverlay() = default;
 // 所有するSpriteを、完全な型を知る場所で解放します。
 StageSelectOverlay::~StageSelectOverlay() = default;
 
-// 背景とは別に二枚の案内画像を読み、両方できた時だけSceneへ渡します。
-bool StageSelectOverlay::Initialize(SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
+// 背景とは別に三枚の画像を読み、すべてできた時だけSceneへ渡します。
+bool StageSelectOverlay::Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
 {
 	sprites_.clear();
 	if (!spriteCommon || !directXCommon || !spriteCommon->Initialize(directXCommon)) {
@@ -29,18 +30,26 @@ bool StageSelectOverlay::Initialize(SpriteCommon* spriteCommon, DirectXCommon* d
 	}
 	TextureManager* textureManager = TextureManager::GetInstance();
 	if (!textureManager->LoadTexture(kBackToTitleTexture) ||
+		!textureManager->LoadTexture(kStageSelectTexture) ||
 		!textureManager->LoadTexture(kEnterTexture)) {
 		return false;
 	}
 
-	auto backSprite = std::make_unique<Sprite>();
+	auto backSprite = std::make_unique<Engine::Sprite>();
 	if (!backSprite->Initialize(spriteCommon, kBackToTitleTexture)) {
 		return false;
 	}
 	backSprite->SetTextureLeftTop({ 467.0f, 848.0f });
 	backSprite->SetTextureSize({ 1189.0f, 419.0f });
 
-	auto enterSprite = std::make_unique<Sprite>();
+	auto stageSelectSprite = std::make_unique<Engine::Sprite>();
+	if (!stageSelectSprite->Initialize(spriteCommon, kStageSelectTexture)) {
+		return false;
+	}
+	stageSelectSprite->SetTextureLeftTop({ 17.0f, 973.0f });
+	stageSelectSprite->SetTextureSize({ 1955.0f, 271.0f });
+
+	auto enterSprite = std::make_unique<Engine::Sprite>();
 	if (!enterSprite->Initialize(spriteCommon, kEnterTexture)) {
 		return false;
 	}
@@ -49,19 +58,20 @@ bool StageSelectOverlay::Initialize(SpriteCommon* spriteCommon, DirectXCommon* d
 
 	sprites_.push_back(std::move(backSprite));
 	sprites_.push_back(std::move(enterSprite));
+	sprites_.push_back(std::move(stageSelectSprite));
 	Update(static_cast<float>(directXCommon->GetClientWidth()),
 		static_cast<float>(directXCommon->GetClientHeight()));
 	return true;
 }
 
-// 切り抜き後の縦横比を保ち、リサイズ後も操作案内を指定位置に置きます。
+// 切り抜き後の縦横比を保ち、中央の見出しを左上の案内と同じ高さに置きます。
 void StageSelectOverlay::Update(float clientWidth, float clientHeight)
 {
-	if (sprites_.size() != 2 || clientWidth <= 0.0f || clientHeight <= 0.0f) {
+	if (sprites_.size() != 3 || clientWidth <= 0.0f || clientHeight <= 0.0f) {
 		return;
 	}
 
-	Sprite* backSprite = sprites_[0].get();
+	Engine::Sprite* backSprite = sprites_[0].get();
 	const Vector2& backTextureSize = backSprite->GetTextureSize();
 	const float backWidth = (std::min)(
 		clientWidth * 0.30f,
@@ -71,7 +81,14 @@ void StageSelectOverlay::Update(float clientWidth, float clientHeight)
 	backSprite->SetSize({ backWidth, backHeight });
 	backSprite->Update();
 
-	Sprite* enterSprite = sprites_[1].get();
+	Engine::Sprite* stageSelectSprite = sprites_[2].get();
+	const Vector2& stageSelectTextureSize = stageSelectSprite->GetTextureSize();
+	const float stageSelectWidth = backHeight * stageSelectTextureSize.x / stageSelectTextureSize.y;
+	stageSelectSprite->SetPosition({ (clientWidth - stageSelectWidth) * 0.5f, kScreenMargin });
+	stageSelectSprite->SetSize({ stageSelectWidth, backHeight });
+	stageSelectSprite->Update();
+
+	Engine::Sprite* enterSprite = sprites_[1].get();
 	const Vector2& enterTextureSize = enterSprite->GetTextureSize();
 	const float enterWidth = (std::min)(
 		clientWidth * 0.42f,
@@ -88,8 +105,8 @@ void StageSelectOverlay::Finalize()
 	sprites_.clear();
 }
 
-// SceneRenderPipelineが二枚を順に重ねられるよう、読み取り用一覧を返します。
-const std::vector<std::unique_ptr<Sprite>>& StageSelectOverlay::GetSprites() const
+// SceneRenderPipelineが三枚を順に重ねられるよう、読み取り用一覧を返します。
+const std::vector<std::unique_ptr<Engine::Sprite>>& StageSelectOverlay::GetSprites() const
 {
 	return sprites_;
 }

@@ -3,9 +3,10 @@
 #include "BaseScene.h"
 #include <memory>
 
-class CameraManager;
-class Camera;
-class SkyBox;
+namespace Engine { class CameraManager; }
+namespace Engine { class Camera; }
+class GameOverOverlay;
+namespace Engine { class SkyBox; }
 
 // 共通の夜空を表示し、Backspaceで選択画面、Enterで失敗したStageを最初から作り直します。
 class GameOverScene : public BaseScene
@@ -25,9 +26,10 @@ public:
 
 private:
 	static int retryStageId_;
-	std::unique_ptr<CameraManager> cameraManager_;
-	std::unique_ptr<Camera> mainCamera_;
-	std::unique_ptr<SkyBox> skyBox_;
+	std::unique_ptr<Engine::CameraManager> cameraManager_;
+	std::unique_ptr<Engine::Camera> mainCamera_;
+	std::unique_ptr<Engine::SkyBox> skyBox_;
+	std::unique_ptr<GameOverOverlay> overlay_;
 	bool isReady_ = false;
 	bool isLeaving_ = false;
 };

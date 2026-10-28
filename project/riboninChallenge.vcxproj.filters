@@ -28,6 +28,12 @@
     <Filter Include="engine\debug">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000009}</UniqueIdentifier>
     </Filter>
+    <Filter Include="engine\debug\preview">
+      <UniqueIdentifier>{2C1826C4-890A-4402-8E56-D4F227083A14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="engine\debug\smoke">
+      <UniqueIdentifier>{778FB617-CC64-46AA-9F23-86A8F21830C9}</UniqueIdentifier>
+    </Filter>
     <Filter Include="engine\ecs">
       <UniqueIdentifier>{00000000-0000-4000-8000-00000000000a}</UniqueIdentifier>
     </Filter>
@@ -49,11 +55,17 @@
     <Filter Include="game\loading">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000010}</UniqueIdentifier>
     </Filter>
+    <Filter Include="game\title">
+      <UniqueIdentifier>{00000000-0000-4000-8000-000000000025}</UniqueIdentifier>
+    </Filter>
     <Filter Include="game\mirror">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000011}</UniqueIdentifier>
     </Filter>
-    <Filter Include="game\stage1">
+    <Filter Include="game\stage">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\stage\render">
+      <UniqueIdentifier>{00000000-0000-4000-8000-000000000026}</UniqueIdentifier>
     </Filter>
     <Filter Include="game\stageSelect">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000013}</UniqueIdentifier>
@@ -103,10 +115,10 @@
     <Filter Include="engine\base\utility">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000021}</UniqueIdentifier>
     </Filter>
-    <Filter Include="game\stage1\debug">
+    <Filter Include="game\stage\debug">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000022}</UniqueIdentifier>
     </Filter>
-    <Filter Include="game\stage1\editor">
+    <Filter Include="game\stage\editor">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000023}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -341,8 +353,8 @@
     <ClCompile Include="engine\base\app\Framework.cpp">
       <Filter>engine\base\app</Filter>
     </ClCompile>
-    <ClCompile Include="engine\base\app\Game.cpp">
-      <Filter>engine\base\app</Filter>
+    <ClCompile Include="game\Game.cpp">
+      <Filter>game</Filter>
     </ClCompile>
     <ClCompile Include="engine\base\app\Input.cpp">
       <Filter>engine\base\app</Filter>
@@ -350,8 +362,8 @@
     <ClCompile Include="engine\base\utility\Logger.cpp">
       <Filter>engine\base\utility</Filter>
     </ClCompile>
-	<ClCompile Include="engine\base\scene\SceneFactory.cpp">
-      <Filter>engine\base\scene</Filter>
+	<ClCompile Include="game\SceneFactory.cpp">
+      <Filter>game</Filter>
     </ClCompile>
 	<ClCompile Include="engine\base\scene\BaseScene.cpp">
       <Filter>engine\base\scene</Filter>
@@ -360,9 +372,6 @@
       <Filter>engine\base\scene</Filter>
     </ClCompile>
 	<ClCompile Include="engine\base\scene\SceneManager.cpp">
-      <Filter>engine\base\scene</Filter>
-    </ClCompile>
-    <ClCompile Include="engine\base\scene\GameSceneRegistry.cpp">
       <Filter>engine\base\scene</Filter>
     </ClCompile>
     <ClCompile Include="engine\base\directx\SrvManager.cpp">
@@ -380,8 +389,8 @@
 	<ClCompile Include="engine\ImGui\ImGuiManagerGameViewDebug.cpp">
       <Filter>engine\ImGui</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\editor\ImGuiManagerStagePuzzle.cpp">
-	  <Filter>game\stage1\editor</Filter>
+	<ClCompile Include="game\stage\editor\ImGuiManagerStagePuzzle.cpp">
+	  <Filter>game\stage\editor</Filter>
     </ClCompile>
 	<ClCompile Include="engine\ImGui\ImGuiManagerStageLevelEditor.cpp">
       <Filter>engine\ImGui</Filter>
@@ -407,17 +416,17 @@
 	<ClCompile Include="engine\ImGui\SceneEditorShelfDrop.cpp">
       <Filter>engine\ImGui</Filter>
     </ClCompile>
-	<ClCompile Include="engine\ImGui\TitleEditor.cpp">
-      <Filter>engine\ImGui</Filter>
+	<ClCompile Include="game\title\TitleEditor.cpp">
+      <Filter>game\title</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\editor\StageEditor.cpp">
-	  <Filter>game\stage1\editor</Filter>
+	<ClCompile Include="game\stage\editor\StageEditor.cpp">
+	  <Filter>game\stage\editor</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\editor\StageEditViewport.cpp">
-	  <Filter>game\stage1\editor</Filter>
+	<ClCompile Include="game\stage\editor\StageEditViewport.cpp">
+	  <Filter>game\stage\editor</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\editor\StageLevelEditor.cpp">
-	  <Filter>game\stage1\editor</Filter>
+	<ClCompile Include="game\stage\editor\StageLevelEditor.cpp">
+	  <Filter>game\stage\editor</Filter>
     </ClCompile>
     <ClCompile Include="engine\level\FileHotReload.cpp">
       <Filter>engine\level</Filter>
@@ -446,11 +455,11 @@
 	<ClCompile Include="engine\debug\DebugParticleEffects.cpp">
       <Filter>engine\debug</Filter>
     </ClCompile>
-	<ClCompile Include="engine\debug\DebugAnimationPreview.cpp">
-      <Filter>engine\debug</Filter>
+	<ClCompile Include="engine\debug\preview\DebugAnimationPreview.cpp">
+      <Filter>engine\debug\preview</Filter>
     </ClCompile>
-	<ClCompile Include="engine\debug\DebugAssetPreview.cpp">
-      <Filter>engine\debug</Filter>
+	<ClCompile Include="engine\debug\preview\DebugAssetPreview.cpp">
+      <Filter>engine\debug\preview</Filter>
     </ClCompile>
 	<ClCompile Include="engine\debug\DebugCollisionOverlay.cpp">
       <Filter>engine\debug</Filter>
@@ -461,8 +470,8 @@
 	<ClCompile Include="engine\debug\DebugInspectorTabs.cpp">
       <Filter>engine\debug</Filter>
     </ClCompile>
-	<ClCompile Include="engine\debug\DebugModelShelf.cpp">
-      <Filter>engine\debug</Filter>
+	<ClCompile Include="engine\debug\preview\DebugModelShelf.cpp">
+      <Filter>engine\debug\preview</Filter>
     </ClCompile>
 	<ClCompile Include="engine\debug\DebugSceneEditor.cpp">
       <Filter>engine\debug</Filter>
@@ -494,23 +503,23 @@
 		<ClCompile Include="engine\debug\DebugViewportPlacement.cpp">
       <Filter>engine\debug</Filter>
     </ClCompile>
-	<ClCompile Include="engine\debug\DebugTimePlaybackSmoke.cpp">
-      <Filter>engine\debug</Filter>
+	<ClCompile Include="engine\debug\smoke\DebugTimePlaybackSmoke.cpp">
+      <Filter>engine\debug\smoke</Filter>
     </ClCompile>
-	<ClCompile Include="engine\debug\DebugUiSmoke.cpp">
-      <Filter>engine\debug</Filter>
+	<ClCompile Include="engine\debug\smoke\DebugUiSmoke.cpp">
+      <Filter>engine\debug\smoke</Filter>
     </ClCompile>
 	<ClCompile Include="game\StartupRouteSmoke.cpp">
 	  <Filter>game</Filter>
 	</ClCompile>
-    <ClCompile Include="game\stage1\debug\StagePuzzleDebugUi.cpp">
-      <Filter>game\stage1\debug</Filter>
+    <ClCompile Include="game\stage\debug\StagePuzzleDebugUi.cpp">
+      <Filter>game\stage\debug</Filter>
     </ClCompile>
-    <ClCompile Include="game\stage1\debug\Stage1GameplaySmoke.cpp">
-      <Filter>game\stage1\debug</Filter>
+    <ClCompile Include="game\stage\debug\Stage1GameplaySmoke.cpp">
+      <Filter>game\stage\debug</Filter>
     </ClCompile>
-    <ClInclude Include="game\stage1\debug\Stage1GameplaySmoke.h">
-      <Filter>game\stage1\debug</Filter>
+    <ClInclude Include="game\stage\debug\Stage1GameplaySmoke.h">
+      <Filter>game\stage\debug</Filter>
     </ClInclude>
     <ClCompile Include="engine\scene\DebugScene.cpp">
       <Filter>engine\scene</Filter>
@@ -521,56 +530,71 @@
 	<ClCompile Include="engine\scene\DebugSceneContexts.cpp">
       <Filter>engine\scene</Filter>
     </ClCompile>
-    <ClCompile Include="game\stage1\Stage1.cpp">
-      <Filter>game\stage1</Filter>
+    <ClCompile Include="game\stage\Stage.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\Stage1EditorUi.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageEditorUi.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\Stage1MapLoading.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageMapLoading.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\StageMapChipFactory.cpp">
-		<Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageMapChipFactory.cpp">
+		<Filter>game\stage</Filter>
 	</ClCompile>
-	<ClCompile Include="game\stage1\StageMapSelection.cpp">
-		<Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageMapSelection.cpp">
+		<Filter>game\stage</Filter>
 	</ClCompile>
-	<ClCompile Include="game\stage1\StageMapFileMonitor.cpp">
-		<Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageMapFileMonitor.cpp">
+		<Filter>game\stage</Filter>
 	</ClCompile>
-	<ClCompile Include="game\stage1\StageLighting.cpp">
-      <Filter>game\stage1</Filter>
-    </ClCompile>
-	<ClCompile Include="game\stage1\StageLightWarning.cpp">
-	  <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageMapRepository.cpp">
+		<Filter>game\stage</Filter>
 	</ClCompile>
-	<ClCompile Include="game\stage1\Stage1MirrorGameplay.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageLighting.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\StageCollisionWorld.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageBgmPlayback.cpp">
+	  <Filter>game\stage</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stage\StageGimmickFactory.cpp">
+	  <Filter>game\stage</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stage\StageLightDeath.cpp">
+	  <Filter>game\stage</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stage\StageLightWarning.cpp">
+	  <Filter>game\stage</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stage\StageMirrorGameplay.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\StageLightPuzzle.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageCollisionWorld.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\StageReflectionRenderer.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\StageLightPuzzle.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\StageSceneRenderer.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\render\StageReflectionRenderer.cpp">
+      <Filter>game\stage\render</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\StageCameraEvents.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\render\StageSceneRenderer.cpp">
+      <Filter>game\stage\render</Filter>
     </ClCompile>
-	<ClCompile Include="game\stage1\StageHazardLights.cpp">
-      <Filter>game\stage1</Filter>
+	<ClCompile Include="game\stage\render\StageRenderContext.cpp">
+	  <Filter>game\stage\render</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stage\StageCameraEvents.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-    <ClCompile Include="engine\scene\TitleScene.cpp">
-      <Filter>engine\scene</Filter>
+	<ClCompile Include="game\stage\StageHazardLights.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-    <ClCompile Include="engine\scene\TitleObjectManager.cpp">
-      <Filter>engine\scene</Filter>
+    <ClCompile Include="game\title\TitleScene.cpp">
+      <Filter>game\title</Filter>
+    </ClCompile>
+    <ClCompile Include="game\title\TitleObjectManager.cpp">
+      <Filter>game\title</Filter>
     </ClCompile>
     <ClCompile Include="externals\imgui\imgui.cpp">
       <Filter>externals\imgui</Filter>
@@ -594,19 +618,22 @@
       <Filter>externals\imgui</Filter>
     </ClCompile>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="game\stage1\StageStart.cpp">
-      <Filter>game\stage1</Filter>
+    <ClCompile Include="game\stage\StageStart.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-    <ClCompile Include="game\stage1\StageTitleOverlay.cpp">
-      <Filter>game\stage1</Filter>
+    <ClCompile Include="game\stage\StageTitleOverlay.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
-    <ClCompile Include="game\stage1\StagePauseOverlay.cpp">
-      <Filter>game\stage1</Filter>
+    <ClCompile Include="game\stage\StagePauseOverlay.cpp">
+      <Filter>game\stage</Filter>
     </ClCompile>
     <ClCompile Include="game\GameSceneRegistration.cpp">
       <Filter>game</Filter>
     </ClCompile>
 	<ClCompile Include="game\gameOver\GameOverScene.cpp">
+	  <Filter>game\gameOver</Filter>
+	</ClCompile>
+	<ClCompile Include="game\gameOver\GameOverOverlay.cpp">
 	  <Filter>game\gameOver</Filter>
 	</ClCompile>
 	<ClCompile Include="game\loading\LoadingScene.cpp">
@@ -752,8 +779,8 @@
     <ClInclude Include="engine\base\app\Framework.h">
       <Filter>engine\base\app</Filter>
     </ClInclude>
-    <ClInclude Include="engine\base\app\Game.h">
-      <Filter>engine\base\app</Filter>
+    <ClInclude Include="game\Game.h">
+      <Filter>game</Filter>
     </ClInclude>
     <ClInclude Include="engine\base\app\Input.h">
       <Filter>engine\base\app</Filter>
@@ -761,16 +788,13 @@
     <ClInclude Include="engine\base\utility\Logger.h">
       <Filter>engine\base\utility</Filter>
     </ClInclude>
-    <ClInclude Include="engine\base\scene\SceneFactory.h">
-      <Filter>engine\base\scene</Filter>
+    <ClInclude Include="game\SceneFactory.h">
+      <Filter>game</Filter>
     </ClInclude>
 	<ClInclude Include="engine\base\scene\SceneRenderPipeline.h">
       <Filter>engine\base\scene</Filter>
     </ClInclude>
     <ClInclude Include="engine\base\scene\SceneManager.h">
-      <Filter>engine\base\scene</Filter>
-    </ClInclude>
-    <ClInclude Include="engine\base\scene\GameSceneRegistry.h">
       <Filter>engine\base\scene</Filter>
     </ClInclude>
     <ClInclude Include="engine\base\directx\SrvManager.h">
@@ -794,17 +818,17 @@
 	<ClInclude Include="engine\ImGui\SceneEditorShelfMessages.h">
       <Filter>engine\ImGui</Filter>
     </ClInclude>
-	<ClInclude Include="engine\ImGui\TitleEditor.h">
-      <Filter>engine\ImGui</Filter>
+	<ClInclude Include="game\title\TitleEditor.h">
+      <Filter>game\title</Filter>
     </ClInclude>
-	<ClInclude Include="game\stage1\editor\StageEditor.h">
-	  <Filter>game\stage1\editor</Filter>
+	<ClInclude Include="game\stage\editor\StageEditor.h">
+	  <Filter>game\stage\editor</Filter>
     </ClInclude>
-	<ClInclude Include="game\stage1\editor\StageEditViewport.h">
-	  <Filter>game\stage1\editor</Filter>
+	<ClInclude Include="game\stage\editor\StageEditViewport.h">
+	  <Filter>game\stage\editor</Filter>
     </ClInclude>
-	<ClInclude Include="game\stage1\editor\StageLevelEditor.h">
-	  <Filter>game\stage1\editor</Filter>
+	<ClInclude Include="game\stage\editor\StageLevelEditor.h">
+	  <Filter>game\stage\editor</Filter>
     </ClInclude>
     <ClInclude Include="engine\level\FileHotReload.h">
       <Filter>engine\level</Filter>
@@ -851,11 +875,11 @@
 	<ClInclude Include="engine\debug\DebugParticleEffects.h">
       <Filter>engine\debug</Filter>
     </ClInclude>
-	<ClInclude Include="engine\debug\DebugAnimationPreview.h">
-      <Filter>engine\debug</Filter>
+	<ClInclude Include="engine\debug\preview\DebugAnimationPreview.h">
+      <Filter>engine\debug\preview</Filter>
     </ClInclude>
-	<ClInclude Include="engine\debug\DebugAssetPreview.h">
-      <Filter>engine\debug</Filter>
+	<ClInclude Include="engine\debug\preview\DebugAssetPreview.h">
+      <Filter>engine\debug\preview</Filter>
     </ClInclude>
 	<ClInclude Include="engine\debug\DebugCollisionOverlay.h">
       <Filter>engine\debug</Filter>
@@ -866,8 +890,8 @@
 	<ClInclude Include="engine\debug\DebugInspectorTabs.h">
       <Filter>engine\debug</Filter>
     </ClInclude>
-	<ClInclude Include="engine\debug\DebugModelShelf.h">
-      <Filter>engine\debug</Filter>
+	<ClInclude Include="engine\debug\preview\DebugModelShelf.h">
+      <Filter>engine\debug\preview</Filter>
     </ClInclude>
 	<ClInclude Include="engine\debug\DebugSceneEditor.h">
       <Filter>engine\debug</Filter>
@@ -899,62 +923,77 @@
 		<ClInclude Include="engine\debug\DebugViewportPlacement.h">
       <Filter>engine\debug</Filter>
     </ClInclude>
-	<ClInclude Include="engine\debug\DebugTimePlaybackSmoke.h">
-      <Filter>engine\debug</Filter>
+	<ClInclude Include="engine\debug\smoke\DebugTimePlaybackSmoke.h">
+      <Filter>engine\debug\smoke</Filter>
     </ClInclude>
-	<ClInclude Include="engine\debug\DebugUiSmoke.h">
-      <Filter>engine\debug</Filter>
+	<ClInclude Include="engine\debug\smoke\DebugUiSmoke.h">
+      <Filter>engine\debug\smoke</Filter>
     </ClInclude>
 	<ClInclude Include="game\StartupRouteSmoke.h">
 	  <Filter>game</Filter>
 	</ClInclude>
-	<ClInclude Include="game\stage1\debug\StagePuzzleDebugUi.h">
-	  <Filter>game\stage1\debug</Filter>
+	<ClInclude Include="game\stage\debug\StagePuzzleDebugUi.h">
+	  <Filter>game\stage\debug</Filter>
     </ClInclude>
     <ClInclude Include="engine\scene\DebugScene.h">
       <Filter>engine\scene</Filter>
     </ClInclude>
-    <ClInclude Include="game\stage1\Stage1.h">
-      <Filter>game\stage1</Filter>
+    <ClInclude Include="game\stage\Stage.h">
+      <Filter>game\stage</Filter>
     </ClInclude>
-	<ClInclude Include="game\stage1\StageMapChipFactory.h">
-		<Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\StageMapChipFactory.h">
+		<Filter>game\stage</Filter>
 	</ClInclude>
-	<ClInclude Include="game\stage1\StageMapSelection.h">
-		<Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\StageMapSelection.h">
+		<Filter>game\stage</Filter>
 	</ClInclude>
-	<ClInclude Include="game\stage1\StageMapFileMonitor.h">
-		<Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\StageMapFileMonitor.h">
+		<Filter>game\stage</Filter>
 	</ClInclude>
-	<ClInclude Include="game\stage1\StageCollisionWorld.h">
-      <Filter>game\stage1</Filter>
-    </ClInclude>
-	<ClInclude Include="game\stage1\StageLightPuzzle.h">
-      <Filter>game\stage1</Filter>
-    </ClInclude>
-	<ClInclude Include="game\stage1\StageLighting.h">
-		<Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\StageMapRepository.h">
+		<Filter>game\stage</Filter>
 	</ClInclude>
-	<ClInclude Include="game\stage1\StageLightWarning.h">
-		<Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\StageCollisionWorld.h">
+      <Filter>game\stage</Filter>
+    </ClInclude>
+	<ClInclude Include="game\stage\StageLightPuzzle.h">
+      <Filter>game\stage</Filter>
+    </ClInclude>
+	<ClInclude Include="game\stage\StageLighting.h">
+		<Filter>game\stage</Filter>
 	</ClInclude>
-	<ClInclude Include="game\stage1\StageReflectionRenderer.h">
-      <Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\StageBgmPlayback.h">
+		<Filter>game\stage</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stage\StageGimmickFactory.h">
+		<Filter>game\stage</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stage\StageLightDeath.h">
+	  <Filter>game\stage</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stage\StageLightWarning.h">
+		<Filter>game\stage</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stage\render\StageReflectionRenderer.h">
+      <Filter>game\stage\render</Filter>
     </ClInclude>
-	<ClInclude Include="game\stage1\StageSceneRenderer.h">
-      <Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\render\StageSceneRenderer.h">
+      <Filter>game\stage\render</Filter>
     </ClInclude>
-	<ClInclude Include="game\stage1\StageCameraEvents.h">
-      <Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\render\StageRenderContext.h">
+	  <Filter>game\stage\render</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stage\StageCameraEvents.h">
+      <Filter>game\stage</Filter>
     </ClInclude>
-	<ClInclude Include="game\stage1\StageHazardLights.h">
-      <Filter>game\stage1</Filter>
+	<ClInclude Include="game\stage\StageHazardLights.h">
+      <Filter>game\stage</Filter>
     </ClInclude>
-    <ClInclude Include="engine\scene\TitleScene.h">
-      <Filter>engine\scene</Filter>
+    <ClInclude Include="game\title\TitleScene.h">
+      <Filter>game\title</Filter>
     </ClInclude>
-    <ClInclude Include="engine\scene\TitleObjectManager.h">
-      <Filter>engine\scene</Filter>
+    <ClInclude Include="game\title\TitleObjectManager.h">
+      <Filter>game\title</Filter>
     </ClInclude>
     <ClInclude Include="externals\imgui\imconfig.h">
       <Filter>externals\imgui</Filter>
@@ -981,19 +1020,22 @@
       <Filter>externals\imgui</Filter>
     </ClInclude>
     <ClInclude Include="resource.h" />
-    <ClInclude Include="game\stage1\StageStart.h">
-      <Filter>game\stage1</Filter>
+    <ClInclude Include="game\stage\StageStart.h">
+      <Filter>game\stage</Filter>
     </ClInclude>
-    <ClInclude Include="game\stage1\StageTitleOverlay.h">
-      <Filter>game\stage1</Filter>
+    <ClInclude Include="game\stage\StageTitleOverlay.h">
+      <Filter>game\stage</Filter>
     </ClInclude>
-    <ClInclude Include="game\stage1\StagePauseOverlay.h">
-      <Filter>game\stage1</Filter>
+    <ClInclude Include="game\stage\StagePauseOverlay.h">
+      <Filter>game\stage</Filter>
     </ClInclude>
     <ClInclude Include="game\GameSceneRegistration.h">
       <Filter>game</Filter>
     </ClInclude>
 	<ClInclude Include="game\gameOver\GameOverScene.h">
+	  <Filter>game\gameOver</Filter>
+	</ClInclude>
+	<ClInclude Include="game\gameOver\GameOverOverlay.h">
 	  <Filter>game\gameOver</Filter>
 	</ClInclude>
 	<ClInclude Include="game\loading\LoadingScene.h">

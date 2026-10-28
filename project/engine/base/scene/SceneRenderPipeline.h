@@ -4,12 +4,12 @@
 #include <memory>
 #include <vector>
 
-class Camera;
+namespace Engine { class Camera; }
 class DirectXCommon;
 class Object3d;
 class Object3dCommon;
-class Sprite;
-class SpriteCommon;
+namespace Engine { class Sprite; }
+namespace Engine { class SpriteCommon; }
 struct Vector4;
 
 // Scene共通の描画開始・PostEffect・ImGui出力の順番をまとめる部品です。
@@ -37,9 +37,9 @@ public:
 		ObjectDrawFilter filter = ObjectDrawFilter::kAll);
 	// Spriteの共通Pipelineを設定し、指定位置以降の空でない要素だけ描画します。
 	static void DrawSprites(
-		SpriteCommon* spriteCommon,
-		const std::vector<std::unique_ptr<Sprite>>& sprites,
+		Engine::SpriteCommon* spriteCommon,
+		const std::vector<std::unique_ptr<Engine::Sprite>>& sprites,
 		size_t firstSpriteIndex = 0);
 	// Sceneのモデル描画後に、PostEffect・SwapChain・必要ならImGui・Presentまでを順番に実行します。
-	static void End(DirectXCommon* directXCommon, const Camera* activeCamera, bool drawImGui = true);
+	static void End(DirectXCommon* directXCommon, const Engine::Camera* activeCamera, bool drawImGui = true);
 };

@@ -8,6 +8,9 @@
 
 using namespace MyMath;
 
+namespace Engine
+{
+
 namespace
 {
 	constexpr const char* kParticleTexturePath = "Resources/debug/circle2.png";
@@ -328,7 +331,7 @@ void GPUParticle::DispatchParticleSimulation()
 }
 
 // Cameraと固定画像の両方が準備済みの時だけ、Compute結果を画面へ描きます。
-void GPUParticle::Draw(const Camera* camera)
+void GPUParticle::Draw(const Engine::Camera* camera)
 {
 	if (!camera || !isTextureReady_) {
 		return;
@@ -624,3 +627,5 @@ void GPUParticle::InitializeParticles()
 	transitionForDraw[2].Transition.StateAfter = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
 	commandList->ResourceBarrier(_countof(transitionForDraw), transitionForDraw);
 }
+
+} // namespace Engine

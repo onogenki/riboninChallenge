@@ -21,9 +21,9 @@ std::unique_ptr<Object3d> Object3dFactory::Create(
 }
 
 // 必須DDSと四つのGPU BufferがそろったSkyBoxだけをSceneへ渡します。
-std::unique_ptr<SkyBox> Object3dFactory::CreateSkyBox(
+std::unique_ptr<Engine::SkyBox> Object3dFactory::CreateSkyBox(
 	DirectXCommon* directXCommon,
-	Camera* camera,
+	Engine::Camera* camera,
 	const std::string& texturePath)
 {
 	if (!directXCommon || !camera || texturePath.empty() ||
@@ -31,7 +31,7 @@ std::unique_ptr<SkyBox> Object3dFactory::CreateSkyBox(
 		return nullptr;
 	}
 
-	auto skyBox = std::make_unique<SkyBox>();
+	auto skyBox = std::make_unique<Engine::SkyBox>();
     if (!skyBox->Initialize(directXCommon, camera)) {
         return nullptr;
     }
@@ -47,7 +47,7 @@ bool Object3dFactory::InitializeObject(
 	bool initializeAnimation)
 {
 	// 描画共通設定やモデル名が無い状態では、半端なObject3dを残しません。
-	if (!object3dCommon || modelName.empty() || !ModelManager::GetInstance()->LoadModel(modelName)) {
+	if (!object3dCommon || modelName.empty() || !Engine::ModelManager::GetInstance()->LoadModel(modelName)) {
 		return false;
 	}
 
@@ -71,7 +71,7 @@ bool Object3dFactory::LoadAndPlayAnimation(Object3d& object, const std::string& 
 		return false;
 	}
 
-	const Model::Animation animation = Model::LoadAnimationFile("./resources", modelName);
+	const Engine::Model::Animation animation = Engine::Model::LoadAnimationFile("./resources", modelName);
 	if (animation.duration <= 0.0f) {
 		return false;
 	}

@@ -6,6 +6,9 @@
 
 using namespace MyMath;
 
+namespace Engine
+{
+
 // 読み込んだ画像の寸法を切り出し範囲と表示サイズへ揃え、初期表示を元画像どおりにします。
 void Sprite::AdjustTextureSize()
 {
@@ -237,3 +240,5 @@ bool Sprite::SetTexture(const std::string& textureFilePath) {
 	AdjustTextureSize();
 	return true;
 }
+
+} // namespace Engine

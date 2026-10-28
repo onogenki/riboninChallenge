@@ -20,7 +20,7 @@
 StageSelectScene::StageSelectScene() = default;
 StageSelectScene::~StageSelectScene() = default;
 
-// Title・Stage1と同じ夜空に二枚の案内を重ね、入力前に全素材をそろえます。
+// Title・Stage1と同じ夜空に三枚の画像を重ね、入力前に全素材をそろえます。
 void StageSelectScene::Initialize()
 {
 	isReady_ = false;
@@ -38,7 +38,7 @@ void StageSelectScene::Initialize()
 		return;
 	}
 	overlay_ = std::make_unique<StageSelectOverlay>();
-	if (!overlay_->Initialize(SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
+	if (!overlay_->Initialize(Engine::SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
 		Logger::Log("StageSelect initialization failed: navigation Sprite could not be prepared.");
 		PostQuitMessage(1);
 		return;
@@ -62,9 +62,9 @@ void StageSelectScene::Update()
 	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
 		Input* input = Input::GetInstance();
 		if (input->TriggerKey(DIK_BACK)) {
-			SceneManager::GetInstance()->ChangeSceneWithFade("TITLE");
+			Engine::SceneManager::GetInstance()->ChangeSceneWithFade("TITLE");
 		} else if (input->TriggerKey(DIK_RETURN)) {
-			SceneManager::GetInstance()->ChangeSceneWithFade("STAGE1");
+			Engine::SceneManager::GetInstance()->ChangeSceneWithFade("STAGE1");
 		}
 	}
 }
@@ -77,7 +77,7 @@ void StageSelectScene::Draw()
 	}
 	SceneRenderPipeline::Begin(DirectXCommon::GetInstance());
 	skyBox_->Draw();
-	SceneRenderPipeline::DrawSprites(SpriteCommon::GetInstance(), overlay_->GetSprites());
+	SceneRenderPipeline::DrawSprites(Engine::SpriteCommon::GetInstance(), overlay_->GetSprites());
 	SceneRenderPipeline::End(DirectXCommon::GetInstance(), cameraManager_->GetActiveCamera());
 }
 

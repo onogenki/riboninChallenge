@@ -2,6 +2,9 @@
 #include "DirectXCommon.h"
 #include <wrl.h>
 
+namespace Engine
+{
+
 // 全Spriteで共用するRoot Signatureと描画Pipelineを所有します。
 // Spriteごとの位置・色・Textureは持たず、Draw前の共通設定だけを行います。
 class SpriteCommon
@@ -50,4 +53,6 @@ private:
 	void CreateGraphicsPipeline();
 
 };
+
+} // namespace Engine
 

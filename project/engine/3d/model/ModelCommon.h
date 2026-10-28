@@ -1,6 +1,9 @@
 #pragma once
 #include "DirectXCommon.h"
 
+namespace Engine
+{
+
 // ModelManagerが所有し、各Modelへ共通のDirectX操作窓口を貸します。
 // モデルの頂点・材質・Texture自体は所有しません。
 class ModelCommon
@@ -14,4 +17,6 @@ public:
 private:
 	DirectXCommon* dxCommon_ = nullptr;
 };
+
+}
 

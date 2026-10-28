@@ -10,7 +10,7 @@ void DebugEntityRegistry::RegisterModel(Object3d* object, const std::string& sou
 }
 
 // 新しく追加したSpriteをEntityとして登録し、Inspector選択をそのEntityへ移します。
-void DebugEntityRegistry::RegisterSprite(Sprite* sprite, const std::string& sourceFile)
+void DebugEntityRegistry::RegisterSprite(Engine::Sprite* sprite, const std::string& sourceFile)
 {
 	selectedEntity_ = world_.CreateSpriteEntity(sprite, sourceFile);
 }
@@ -22,7 +22,7 @@ void DebugEntityRegistry::RegisterInitialModel(Object3d* object, const std::stri
 }
 
 // 初期配置やLevel再読込のSpriteを、Inspector選択を変えずに登録します。
-void DebugEntityRegistry::RegisterInitialSprite(Sprite* sprite, const std::string& sourceFile)
+void DebugEntityRegistry::RegisterInitialSprite(Engine::Sprite* sprite, const std::string& sourceFile)
 {
 	world_.CreateSpriteEntity(sprite, sourceFile);
 }
@@ -31,7 +31,7 @@ void DebugEntityRegistry::RegisterInitialSprite(Sprite* sprite, const std::strin
 void DebugEntityRegistry::Synchronize(
 	const std::vector<std::unique_ptr<Object3d>>& normalObjects,
 	const std::vector<std::unique_ptr<Object3d>>& animationObjects,
-	const std::vector<std::unique_ptr<Sprite>>& sprites)
+	const std::vector<std::unique_ptr<Engine::Sprite>>& sprites)
 {
 	std::vector<Object3d*> currentObjects;
 	currentObjects.reserve(normalObjects.size() + animationObjects.size());
@@ -46,7 +46,7 @@ void DebugEntityRegistry::Synchronize(
 		}
 	}
 
-	std::vector<Sprite*> currentSprites;
+	std::vector<Engine::Sprite*> currentSprites;
 	currentSprites.reserve(sprites.size());
 	for (const auto& sprite : sprites) {
 		if (sprite) {
@@ -68,7 +68,7 @@ void DebugEntityRegistry::SelectObject(const Object3d* object)
 }
 
 // 選択したSpriteに対応するEntityをInspector選択にします。
-void DebugEntityRegistry::SelectSprite(const Sprite* sprite)
+void DebugEntityRegistry::SelectSprite(const Engine::Sprite* sprite)
 {
 	selectedEntity_ = world_.FindEntity(sprite);
 }

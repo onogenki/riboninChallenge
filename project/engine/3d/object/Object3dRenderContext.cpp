@@ -15,7 +15,7 @@ void Object3dRenderContext::NormalizeDirectionalLight(Object3d::DirectionalLight
 
 // SpotLight一灯を使うScene用に、CameraとLightへの参照をまとめます。
 Object3dRenderContext::Object3dRenderContext(
-	Camera* camera,
+	Engine::Camera* camera,
 	const Object3d::DirectionalLight& directionalLight,
 	const Object3d::PointLight& pointLight,
 	const Object3d::SpotLight& spotLight)
@@ -28,7 +28,7 @@ Object3dRenderContext::Object3dRenderContext(
 
 // 複数SpotLightを使うStage用に、CameraとLightへの参照をまとめます。
 Object3dRenderContext::Object3dRenderContext(
-	Camera* camera,
+	Engine::Camera* camera,
 	const Object3d::DirectionalLight& directionalLight,
 	const Object3d::PointLight& pointLight,
 	const std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount>& spotLights)

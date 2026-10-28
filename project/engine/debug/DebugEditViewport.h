@@ -5,9 +5,9 @@
 #include <memory>
 #include <vector>
 
-class Camera;
+namespace Engine { class Camera; }
 class Object3d;
-class Sprite;
+namespace Engine { class Sprite; }
 
 // DebugSceneの3D・2D Edit Viewを表示するDebug用UI部品です。
 // 実際のObject・Spriteと選択状態の所有者はDebugSceneで、この部品は選択UIだけを担当します。
@@ -16,10 +16,10 @@ class DebugEditViewport
 public:
 	struct Context
 	{
-		Camera* camera = nullptr;
+		Engine::Camera* camera = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
-		std::vector<std::unique_ptr<Sprite>>* sprites = nullptr;
+		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		// Preview中はEdit Viewで通常SceneのObjectを選択させません。
 		bool isAssetPreviewActive = false;
 		// DebugSceneが所有するViewのCamera・選択表示状態です。

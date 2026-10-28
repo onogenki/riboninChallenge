@@ -8,6 +8,9 @@
 
 using namespace MyMath;
 
+namespace Engine
+{
+
 // Hit、Ring、Lightなど、既成パーティクル演出の発生処理をまとめる。
 // 粒子の更新・GPU描画とは分け、演出を追加する時に探しやすくする。
 void ParticleManager::EmitHitEffect(const std::string& name, uint32_t count, const Vector3& translate, float scaleMultiplier) {
@@ -299,4 +302,6 @@ void ParticleManager::EmitLightSpiral(const std::string& name, uint32_t count, c
         group.particles.push_back(newParticle);
     }
 }
+
+} // namespace Engine
 

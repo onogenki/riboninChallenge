@@ -49,7 +49,7 @@ bool LaserRenderer::CreateDrawResources(DrawResources& resources)
 }
 
 // 鏡と通常画面を別領域へ記録し、GPUが先の描画データを読む前の上書きを防ぎます。
-void LaserRenderer::Draw(const std::vector<LaserSegment>& segments, const Camera& camera)
+void LaserRenderer::Draw(const std::vector<LaserSegment>& segments, const Engine::Camera& camera)
 {
 	if (!dxCommon_ || segments.empty()) {
 		return;

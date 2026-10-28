@@ -9,7 +9,9 @@
 
 using namespace MyMath;
 
-void CameraController::Initialize(Camera* camera, const Vector3& targetPosition)
+namespace Engine
+{
+void CameraController::Initialize(Engine::Camera* camera, const Vector3& targetPosition)
 {
 	// Controller は Camera を作らず、Scene から渡された Camera を操作する
 	camera_ = camera;
@@ -34,7 +36,7 @@ void CameraController::Initialize(Camera* camera, const Vector3& targetPosition)
 }
 
 void CameraController::Initialize(
-	Camera* camera,
+	Engine::Camera* camera,
 	const Vector3& targetPosition,
 	float distance,
 	float orbitYaw,
@@ -550,4 +552,5 @@ float CameraController::MoveTowardsAngle(float current, float target, float maxD
 		return current + difference;
 	}
 	return current + (difference > 0.0f ? maxDelta : -maxDelta);
+}
 }

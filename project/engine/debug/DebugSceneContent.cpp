@@ -112,7 +112,7 @@ bool DebugSceneContent::AddTexture(
 	if (!TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
 		return false;
 	}
-	auto sprite = std::make_unique<Sprite>();
+	auto sprite = std::make_unique<Engine::Sprite>();
 	if (!sprite->Initialize(context.spriteCommon, textureFilePath)) {
 		return false;
 	}
@@ -125,7 +125,7 @@ bool DebugSceneContent::AddTexture(
 		sprite->SetSize({ originalSize.x * scale, originalSize.y * scale });
 	}
 	sprite->SetPosition(position);
-	Sprite* addedSprite = sprite.get();
+	Engine::Sprite* addedSprite = sprite.get();
 	context.sprites->push_back(std::move(sprite));
 	if (context.selectSprite) {
 		context.selectSprite(context.sprites->size() - 1);

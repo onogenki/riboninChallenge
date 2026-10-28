@@ -1,7 +1,12 @@
 #pragma once
 #include "BaseScene.h"
 #include "AbstractSceneFactory.h"
-#include<string>
+#include <string>
+
+namespace Engine
+{
+
+class Sprite;
 
 // 現在Sceneを状態として所有し、Factoryが作った次Sceneへ安全に切り替えるState Patternの本体です。
 class SceneManager
@@ -83,8 +88,9 @@ private:
 	enum class FadePhase { kNone, kFadeIn, kWaitingForDestination, kFadeOut };
 	FadePhase fadePhase_ = FadePhase::kNone;
 	std::string fadeDestination_;
-	std::unique_ptr<class Sprite> fadeSprite_;
+	std::unique_ptr<Engine::Sprite> fadeSprite_;
 	float fadeAlpha_ = 0.0f;
 	bool destinationDrawn_ = false;
 };
+}
 

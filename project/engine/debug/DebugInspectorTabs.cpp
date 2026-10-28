@@ -8,7 +8,7 @@
 #include "ParticleManager.h"
 
 // 一つのEmitterに共通する数・頻度・大きさ・Windの編集UIを描画します。
-void DebugInspectorTabs::DrawEmitterControl(const char* label, ParticleEmitter* emitter)
+void DebugInspectorTabs::DrawEmitterControl(const char* label, Engine::ParticleEmitter* emitter)
 {
 #ifdef USE_IMGUI
 	if (!emitter || !ImGui::TreeNode(label)) {
@@ -64,8 +64,8 @@ void DebugInspectorTabs::Draw(const Context& context)
 		DrawEmitterControl("Plane Particle", context.emitterPlane);
 
 		if (ImGui::Button("Rain Wind")) {
-			ParticleManager::GetInstance()->SetWindEnabled(true);
-			ParticleManager::GetInstance()->SetWindAcceleration({ 0.0f, -0.35f, 0.0f });
+			Engine::ParticleManager::GetInstance()->SetWindEnabled(true);
+			Engine::ParticleManager::GetInstance()->SetWindAcceleration({ 0.0f, -0.35f, 0.0f });
 			if (context.emitterCircle) {
 				context.emitterCircle->SetReceivesWind(true);
 			}

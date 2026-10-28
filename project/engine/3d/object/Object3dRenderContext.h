@@ -5,7 +5,7 @@
 #include <memory>
 #include <vector>
 
-class Camera;
+namespace Engine { class Camera; }
 
 // Sceneが所有するCamera・Lightを、一つのObject3dへ渡すための値です。
 // Object3d自身は「どのSceneのLightか」を知らず、このContextを受け取って描画準備だけを行います。
@@ -14,13 +14,13 @@ class Object3dRenderContext
 public:
 	// SpotLight一灯を使うScene向けの設定です。
 	Object3dRenderContext(
-		Camera* camera,
+		Engine::Camera* camera,
 		const Object3d::DirectionalLight& directionalLight,
 		const Object3d::PointLight& pointLight,
 		const Object3d::SpotLight& spotLight);
 	// 複数SpotLightを使うStage向けの設定です。
 	Object3dRenderContext(
-		Camera* camera,
+		Engine::Camera* camera,
 		const Object3d::DirectionalLight& directionalLight,
 		const Object3d::PointLight& pointLight,
 		const std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount>& spotLights);
@@ -33,7 +33,7 @@ public:
 	void UpdateObjects(const std::vector<std::unique_ptr<Object3d>>& objects) const;
 
 private:
-	Camera* camera_ = nullptr;
+	Engine::Camera* camera_ = nullptr;
 	const Object3d::DirectionalLight* directionalLight_ = nullptr;
 	const Object3d::PointLight* pointLight_ = nullptr;
 	const Object3d::SpotLight* spotLight_ = nullptr;

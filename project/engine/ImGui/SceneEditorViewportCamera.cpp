@@ -11,7 +11,7 @@
 #endif
 
 // Game View上の右・中ドラッグとホイールで、編集対象のCameraを安全に操作します。
-void SceneEditor::UpdateViewportCamera(Camera* camera, bool inputBlocked)
+void SceneEditor::UpdateViewportCamera(Engine::Camera* camera, bool inputBlocked)
 {
 #ifdef USE_IMGUI
 	if (!camera || inputBlocked) {

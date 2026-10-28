@@ -11,7 +11,7 @@ class DebugEntityRegistry;
 class DebugSceneSelection;
 class Object3d;
 class Object3dCommon;
-class Sprite;
+namespace Engine { class Sprite; }
 
 // DebugSceneのscene.json読込とHot Reloadだけを担当する実行部品です。
 // Objectの寿命はDebugSceneが持ち、JSON由来の範囲とEditor追加分の境界だけを管理します。
@@ -23,7 +23,7 @@ public:
 		Object3dCommon* object3dCommon = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
 		const std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
-		const std::vector<std::unique_ptr<Sprite>>* sprites = nullptr;
+		const std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		DebugEntityRegistry* entityRegistry = nullptr;
 		DebugSceneSelection* selection = nullptr;
 	};

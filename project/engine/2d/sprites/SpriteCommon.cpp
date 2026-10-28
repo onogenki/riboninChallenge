@@ -4,6 +4,9 @@
 #include <stdexcept>
 #include <string>
 
+namespace Engine
+{
+
 // 全Spriteが共有する描画設定を作り、失敗時は未完成のPipelineを残しません。
 bool SpriteCommon::Initialize(DirectXCommon* dxCommon)
 {
@@ -238,3 +241,5 @@ void SpriteCommon::CreateGraphicsPipeline()
 		throw std::runtime_error("SpriteCommon: overlay pipeline creation failed");
 	}
 }
+
+} // namespace Engine

@@ -3,6 +3,9 @@
 #include "MyMath.h"
 #include "Object3d.h"
 
+namespace Engine
+{
+
 // 指定間隔でParticleManagerへ発生を依頼し、粒子そのものは所有しません。
 class ParticleEmitter
 {
@@ -38,4 +41,6 @@ private:
     bool receivesWind_;//風に吹かれてるか
 
 };
+
+} // namespace Engine
 

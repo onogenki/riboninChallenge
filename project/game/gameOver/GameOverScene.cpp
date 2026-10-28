@@ -1,4 +1,5 @@
 #include "GameOverScene.h"
+#include "GameOverOverlay.h"
 
 #include "Camera.h"
 #include "CameraManager.h"
@@ -12,6 +13,7 @@
 #include "SceneManager.h"
 #include "SceneRenderPipeline.h"
 #include "SkyBox.h"
+#include "SpriteCommon.h"
 #include <dinput.h>
 #include <Windows.h>
 
@@ -28,7 +30,7 @@ void GameOverScene::SetRetryStageId(int stageId)
 	}
 }
 
-// StageSelectと同じ背景用Camera・夜空を作り、素材が欠けた場合は描画へ進めません。
+// StageSelectと同じ夜空とGameOver専用の案内をそろえ、素材が欠けた場合は描画へ進めません。
 void GameOverScene::Initialize()
 {
 	isReady_ = false;
@@ -46,10 +48,16 @@ void GameOverScene::Initialize()
 		PostQuitMessage(1);
 		return;
 	}
+	overlay_ = std::make_unique<GameOverOverlay>();
+	if (!overlay_->Initialize(Engine::SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
+		Logger::Log("GameOver initialization failed: navigation Sprite could not be prepared.");
+		PostQuitMessage(1);
+		return;
+	}
 	isReady_ = true;
 }
 
-// 死亡時のStage IDを保持したまま、BackspaceとEnterの片方だけでSceneを切り替えます。
+// 案内を画面サイズに合わせ、死亡時のStage IDを保持したままSceneを切り替えます。
 void GameOverScene::Update()
 {
 	if (!isReady_) {
@@ -57,6 +65,9 @@ void GameOverScene::Update()
 	}
 	cameraManager_->Update();
 	skyBox_->Update();
+	overlay_->Update(
+		static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth()),
+		static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight()));
 	ImGuiManager::GetInstance()->Begin("GameOver");
 	ImGuiManager::GetInstance()->End();
 	if (isLeaving_ || !ImGuiManager::GetInstance()->IsGameViewActive()) {
@@ -64,13 +75,13 @@ void GameOverScene::Update()
 	}
 	Input* input = Input::GetInstance();
 	if (input->TriggerKey(DIK_BACK)) {
-		isLeaving_ = SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_SELECT");
+		isLeaving_ = Engine::SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_SELECT");
 	} else if (input->TriggerKey(DIK_RETURN)) {
-		isLeaving_ = SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_RETRY");
+		isLeaving_ = Engine::SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_RETRY");
 	}
 }
 
-// Title・StageSelectと同じ描画Pipelineで夜空を表示し、専用の画像は加えません。
+// 共通Pipelineで夜空の後に専用画像を重ね、フェードと画面提示を最後に行います。
 void GameOverScene::Draw()
 {
 	if (!isReady_) {
@@ -78,13 +89,18 @@ void GameOverScene::Draw()
 	}
 	SceneRenderPipeline::Begin(DirectXCommon::GetInstance());
 	skyBox_->Draw();
+	SceneRenderPipeline::DrawSprites(Engine::SpriteCommon::GetInstance(), overlay_->GetSprites());
 	SceneRenderPipeline::End(DirectXCommon::GetInstance(), cameraManager_->GetActiveCamera());
 }
 
-// Scene終了時は共通資源を所有せず、GameOver固有のCameraとSkyBoxだけ解放します。
+// Scene終了時は共通資源を所有せず、専用Sprite・SkyBox・Cameraだけ解放します。
 void GameOverScene::Finalize()
 {
 	isReady_ = false;
+	if (overlay_) {
+		overlay_->Finalize();
+		overlay_.reset();
+	}
 	skyBox_.reset();
 	mainCamera_.reset();
 	cameraManager_.reset();

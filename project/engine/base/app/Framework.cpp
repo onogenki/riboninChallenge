@@ -107,23 +107,24 @@ void Framework::Initialize()
 	winApp_ = std::make_unique<WinApp>();
 	winApp_->Initialize();
 
-	//DirectXの初期化
-	dxCommon_ = DirectXCommon::GetInstance();
-	dxCommon_->Initialize(winApp_.get());
-
-	//SRVマネージャの初期化
-	srvManager_ = SrvManager::GetInstance();
-	srvManager_->Initialize(dxCommon_);
-	// RenderTextureをShaderから読めるよう、SrvManager初期化後にSRVを生成する
-	dxCommon_->CreateRenderTextureSRV(srvManager_);
-	TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
-	// 失敗した資源の後続を初期化しないため、Sceneが必要とする共通部品を順に準備します。
+	// GPU資源の生成失敗も後段と同じ終了経路へ渡し、未完成のHeapやRTVを使いません。
 	try {
+		//DirectXの初期化
+		dxCommon_ = DirectXCommon::GetInstance();
+		dxCommon_->Initialize(winApp_.get());
+
+		//SRVマネージャの初期化
+		srvManager_ = SrvManager::GetInstance();
+		srvManager_->Initialize(dxCommon_);
+		// RenderTextureをShaderから読めるよう、SrvManager初期化後にSRVを生成する
+		dxCommon_->CreateRenderTextureSRV(srvManager_);
+		TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
+		// 失敗した資源の後続を初期化しないため、Sceneが必要とする共通部品を順に準備します。
 		// RenderTextureをSwapChainへコピーするPostEffectを初期化する
 		PostEffect::GetInstance()->Initialize(dxCommon_, srvManager_);
-		ModelManager::GetInstance()->Initialize(dxCommon_);
-		ParticleManager::GetInstance()->Initialize(dxCommon_, srvManager_);
-		GPUParticle::GetInstance()->Initialize(dxCommon_, srvManager_);
+		Engine::ModelManager::GetInstance()->Initialize(dxCommon_);
+		Engine::ParticleManager::GetInstance()->Initialize(dxCommon_, srvManager_);
+		Engine::GPUParticle::GetInstance()->Initialize(dxCommon_, srvManager_);
 		Audio::GetInstance()->Initialize();
 		isAudioInitialized_ = true;
 
@@ -135,7 +136,7 @@ void Framework::Initialize()
 		isImGuiInitialized_ = true;
 		CaptureManager::GetInstance()->Initialize();
 	} catch (const std::exception& error) {
-		// 必須画像やShaderが欠けた時は、次の初期化とScene開始を止めます。
+		// GPU資源・必須画像・Shaderが欠けた時は、次の初期化とScene開始を止めます。
 		Logger::Log(std::string("Framework initialization failed: ") + error.what());
 		RequestEnd(1);
 	}
@@ -148,7 +149,7 @@ void Framework::Initialize()
 void Framework::SetSceneFactory(std::unique_ptr<AbstractSceneFactory> sceneFactory)
 {
 	sceneFactory_ = std::move(sceneFactory);
-	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
+	Engine::SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
 }
 
 // 終了判定と終了コードを一緒に更新し、派生先が内部状態を書き換えないようにします。
@@ -166,33 +167,40 @@ void Framework::Update()
 		RequestEnd();
 		return;
 	}
-	dxCommon_->ResizeIfNeeded();
+	// Resize失敗時は古い描画先へ描画せず、後続のInput・Scene更新も止めます。
+	try {
+		dxCommon_->ResizeIfNeeded();
+	} catch (const std::exception& error) {
+		Logger::Log(std::string("Framework resize failed: ") + error.what());
+		RequestEnd(1);
+		return;
+	}
 	input_->Update();
 	Audio::GetInstance()->Update();
 	PostEffect::GetInstance()->Update(dxCommon_->GetDeltaTime());
 	// モデル・Textureを保存したフレームだけ再読込するため、すべてのSceneで同じ確認を行います。
 	TextureManager::GetInstance()->UpdateHotReload();
-	ModelManager::GetInstance()->UpdateHotReload();
+	Engine::ModelManager::GetInstance()->UpdateHotReload();
 
 	//マネージャーにシーンの更新(と切り替え)を任せる
-	SceneManager::GetInstance()->Update();
+	Engine::SceneManager::GetInstance()->Update();
 }
 
 // Sceneを先に終了し、共有資源は使う側から作成時と逆の順で解放します。
 void Framework::Finalize()
 {
 
-	SceneManager::GetInstance()->FinalizeCurrentScene();
-	SceneManager::GetInstance()->SetSceneFactory(nullptr);
+	Engine::SceneManager::GetInstance()->FinalizeCurrentScene();
+	Engine::SceneManager::GetInstance()->SetSceneFactory(nullptr);
 
 	CaptureManager::GetInstance()->Finalize();
 	if (isImGuiInitialized_) {
 		imGuiManager_->Finalize();
 		isImGuiInitialized_ = false;
 	}
-	GPUParticle::GetInstance()->Finalize();
-	ParticleManager::GetInstance()->Finalize();
-	ModelManager::GetInstance()->Finalize();
+	Engine::GPUParticle::GetInstance()->Finalize();
+	Engine::ParticleManager::GetInstance()->Finalize();
+	Engine::ModelManager::GetInstance()->Finalize();
 	PostEffect::GetInstance()->Finalize();
 	TextureManager::GetInstance()->Finalize();
 	if (isAudioInitialized_) {

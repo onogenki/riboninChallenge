@@ -1,28 +1,28 @@
 #pragma once
 #include "Object3d.h"
 #include "../debug/DebugParticleEffects.h"
-#include "../debug/DebugAnimationPreview.h"
-#include "../debug/DebugAssetPreview.h"
+#include "../debug/preview/DebugAnimationPreview.h"
+#include "../debug/preview/DebugAssetPreview.h"
 #include "../debug/DebugSceneEditor.h"
 #include "../debug/DebugSceneContent.h"
 #include "../debug/DebugEntityRegistry.h"
 #include "../debug/DebugLevelRuntime.h"
 #include "../debug/DebugGameViewCameraController.h"
 #include "../debug/DebugSceneSelection.h"
-#include "../debug/DebugTimePlaybackSmoke.h"
-#include "../debug/DebugUiSmoke.h"
+#include "../debug/smoke/DebugTimePlaybackSmoke.h"
+#include "../debug/smoke/DebugUiSmoke.h"
 #include"BaseScene.h"
 #include <string>
 #include <vector>
 #include <memory>
 
-class Camera;
-class CameraManager;
+namespace Engine { class Camera; }
+namespace Engine { class CameraManager; }
 class Object3dCommon;
-class ParticleEmitter;
-class SkyBox;
-class Sprite;
-class SpriteCommon;
+namespace Engine { class ParticleEmitter; }
+namespace Engine { class SkyBox; }
+namespace Engine { class Sprite; }
+namespace Engine { class SpriteCommon; }
 
 // Debug用のモデル・Sprite・Cameraを所有し、確認用UIと各部品の進行順を決めるSceneです。
 // モデル生成や個別の描画は専用部品へ任せ、Sceneには全体の流れだけを残します。
@@ -44,10 +44,10 @@ public:
 
 private:
 	// Cameraと描画共通設定はDebugSceneが所有・借用し、他Sceneの状態を書き換えません。
-	std::unique_ptr<CameraManager> cameraManager_;
-	std::unique_ptr<Camera> mainCamera_;
+	std::unique_ptr<Engine::CameraManager> cameraManager_;
+	std::unique_ptr<Engine::Camera> mainCamera_;
 	Object3dCommon* object3dCommon_ = nullptr;
-	SpriteCommon* spriteCommon_ = nullptr;
+	Engine::SpriteCommon* spriteCommon_ = nullptr;
 
 	// ---------- DebugScene開始時の準備 ----------
 
@@ -105,7 +105,7 @@ private:
     // ---------- Debug用Camera ----------
 
     // 上から確認する時に使える補助Cameraです。
-    std::unique_ptr<Camera> upCamera_;
+    std::unique_ptr<Engine::Camera> upCamera_;
 
     // ---------- Scene内の3Dモデル・Sprite・ECS ----------
 
@@ -117,11 +117,11 @@ private:
 	DebugAnimationPreview debugAnimationPreview_{};
 
 	// Debug画面へ追加した2D画像です。
-    std::vector<std::unique_ptr<Sprite>> sprites_;
+    std::vector<std::unique_ptr<Engine::Sprite>> sprites_;
 	// モデル・SpriteのEntity登録とECS Inspectorの選択状態を担当します。
 	DebugEntityRegistry entityRegistry_{};
 	// 背景として描画するSkyBoxです。
-    std::unique_ptr<SkyBox> skyBox_;
+    std::unique_ptr<Engine::SkyBox> skyBox_;
 	// 必須画像・初期Object・Cameraの準備が終わるまで更新と描画を行いません。
 	bool isSceneReady_ = false;
 
@@ -149,14 +149,14 @@ private:
     // ---------- ParticleのEmitter ----------
 
 	// 円形Particleを発生させるEmitterです。
-    std::unique_ptr<ParticleEmitter> emitterCircle_;
+    std::unique_ptr<Engine::ParticleEmitter> emitterCircle_;
 	// 平面Particleを発生させるEmitterです。
-    std::unique_ptr<ParticleEmitter> emitterPlane_;
+    std::unique_ptr<Engine::ParticleEmitter> emitterPlane_;
 
 	// Emitter位置の基準にする平面モデルへの非所有ポインタです。
     Object3d* objectPlane_ = nullptr;
 	// Inspectorで現在選択しているEmitterへの非所有ポインタです。
-    ParticleEmitter* activeEmitter_ = nullptr;
+    Engine::ParticleEmitter* activeEmitter_ = nullptr;
 
     // ---------- Debug画面全体のライト ----------
 

@@ -10,6 +10,9 @@
 #include <utility>
 #include <Windows.h>
 
+namespace Engine
+{
+
 // アプリ全体で共有する一つのSceneManagerを返します。
 SceneManager* SceneManager::GetInstance()
 {
@@ -69,6 +72,7 @@ bool SceneManager::ApplyPendingSceneChange()
 	return true;
 }
 
+// 現在Sceneを描いた後だけ撮影へ進め、描画前の状態を保存しません。
 void SceneManager::Draw()
 {
 	if (scene_)
@@ -170,11 +174,11 @@ bool SceneManager::PrepareFadeSprite()
 		Logger::Log("Fade initialization failed: white texture could not be loaded.");
 		return false;
 	}
-	SpriteCommon* common = SpriteCommon::GetInstance();
+	Engine::SpriteCommon* common = Engine::SpriteCommon::GetInstance();
 	if (!common->GetDxCommon() && !common->Initialize(DirectXCommon::GetInstance())) {
 		return false;
 	}
-	auto sprite = std::make_unique<Sprite>();
+	auto sprite = std::make_unique<Engine::Sprite>();
 	if (!sprite->Initialize(common, kWhiteTexture)) {
 		return false;
 	}
@@ -195,7 +199,7 @@ void SceneManager::DrawFadeOverlay()
 	fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
 	fadeSprite_->Update();
 	// 深度を消さない専用設定で重ね、深度ベースのPostEffectへ元の値を残します。
-	SpriteCommon::GetInstance()->SetOverlayDrawSetting();
+	Engine::SpriteCommon::GetInstance()->SetOverlayDrawSetting();
 	fadeSprite_->Draw();
 }
 
@@ -251,4 +255,5 @@ SceneManager::~SceneManager()
 	{
 		FinalizeCurrentScene();
 	}
+}
 }

@@ -547,6 +547,7 @@ void CaptureManager::DrawImGui()
 #endif
 }
 
+// Sceneの描画後だけ撮影要求を処理し、更新途中の画面を保存しません。
 void CaptureManager::UpdateAfterDraw()
 {
 #ifdef USE_IMGUI
@@ -554,7 +555,7 @@ void CaptureManager::UpdateAfterDraw()
 		return;
 	}
 	if (performanceBaselineEnabled_) {
-		const std::string& performanceScene = SceneManager::GetInstance()->GetCurrentSceneName();
+		const std::string& performanceScene = Engine::SceneManager::GetInstance()->GetCurrentSceneName();
 		if (performanceScene == "DEBUG" || performanceScene == "STAGE1") {
 			++smokeDebugFrame_;
 			const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
@@ -591,7 +592,7 @@ void CaptureManager::UpdateAfterDraw()
 
 	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
 	if (smokeEnabled_ &&
-		SceneManager::GetInstance()->GetCurrentSceneName() == "DEBUG" &&
+		Engine::SceneManager::GetInstance()->GetCurrentSceneName() == "DEBUG" &&
 		smokeDebugFrame_ > 8 &&
 		smokeDebugFrame_ < 45) {
 		++smokePerformanceFrameCount_;

@@ -44,8 +44,8 @@ void DebugSceneRenderer::Draw(const Context& context)
 			context.handWeapon->Draw();
 		}
 
-		ParticleManager::GetInstance()->Draw();
-		GPUParticle::GetInstance()->Draw(context.camera);
+		Engine::ParticleManager::GetInstance()->Draw();
+		Engine::GPUParticle::GetInstance()->Draw(context.camera);
 
 		SceneRenderPipeline::DrawSprites(context.spriteCommon, *context.sprites);
 	}

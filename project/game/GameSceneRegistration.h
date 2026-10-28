@@ -1,3 +1,6 @@
 #pragma once
 
-// このヘッダーを含むことで、game側のScene自動登録用翻訳単位を明示します。
+class SceneFactory;
+
+// ゲームで使うScene生成規則を、起動時に明示的にFactoryへ登録します。
+void RegisterGameScenes(SceneFactory& sceneFactory);

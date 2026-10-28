@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-class Camera;
+namespace Engine { class Camera; }
 
 // 実行中ObjectとECSのColliderを、Debug用のワイヤーフレームとして表示する部品です。
 // 判定結果の変更は行わず、現在の当たり判定を見える形にする責任だけを持ちます。
@@ -26,7 +26,7 @@ public:
 		// ECSで管理するBOX Collider一覧を取得します。所有しません。
 		const Ecs::World* world = nullptr;
 		// 3D座標をGame Viewへ投影するCameraです。所有しません。
-		const Camera* camera = nullptr;
+		const Engine::Camera* camera = nullptr;
 	};
 
 	// Object3dの頂点をワールド座標へ変換し、Debug表示用のAABBを作ります。

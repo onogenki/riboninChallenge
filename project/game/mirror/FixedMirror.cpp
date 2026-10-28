@@ -54,7 +54,7 @@ bool FixedMirror::Initialize(
 		safeTextureSize);
 }
 
-void FixedMirror::UpdateReflectionCamera(const Camera& sourceCamera, const Vector3& sourceForward)
+void FixedMirror::UpdateReflectionCamera(const Engine::Camera& sourceCamera, const Vector3& sourceForward)
 {
 	// 通常Cameraの位置と正面方向を鏡面で反転します。
 	const Vector3 reflectionPosition = mirror_.ReflectPoint(sourceCamera.GetTranslate());
@@ -142,7 +142,7 @@ void FixedMirror::DrawSurface()
 		capturedViewProjection_);
 }
 
-void FixedMirror::DrawSurface(const Camera& camera)
+void FixedMirror::DrawSurface(const Engine::Camera& camera)
 {
 	const Vector3 cameraFromMirror{
 		camera.GetTranslate().x - mirror_.GetCenter().x,

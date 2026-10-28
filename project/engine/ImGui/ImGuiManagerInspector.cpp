@@ -13,7 +13,7 @@
 namespace
 {
 	// 調整した座標・サイズ・基準点を、計算式なしのC++コードとしてコピーします。
-	void DrawSpritePlacementCopy(const Sprite& sprite)
+	void DrawSpritePlacementCopy(const Engine::Sprite& sprite)
 	{
 		if (ImGui::Button("Copy Placement C++")) {
 			const Vector2& position = sprite.GetPosition();
@@ -35,7 +35,7 @@ namespace
 #endif
 
 // Sprite・Model・Particle・Cameraを編集する共通Inspector UIです。
-int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites, bool embedded, int forcedSpriteIndex)
+int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Engine::Sprite>>& sprites, bool embedded, int forcedSpriteIndex)
 {
 #ifdef USE_IMGUI
 
@@ -54,7 +54,7 @@ int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprit
 	// 選択したSpriteの現在色を読み、他のSpriteの編集値を表示しないようにします。
 	if (forcedSpriteIndex >= 0 && forcedSpriteIndex < static_cast<int>(sprites.size())) {
 		selectedSpriteIndex = forcedSpriteIndex;
-		Sprite* targetSprite = sprites[forcedSpriteIndex].get();
+		Engine::Sprite* targetSprite = sprites[forcedSpriteIndex].get();
 		if (targetSprite) {
 			ImGui::Text("Selected 2D Texture / Sprite %d", forcedSpriteIndex);
 			Vector4 color = targetSprite->GetColor();
@@ -481,7 +481,7 @@ std::string ImGuiManager::ParticleWindow(Transform& emitterTransform, bool embed
 	ImGui::DragFloat3("Emitter Scale", &emitterTransform.scale.x, 0.01f, 0.01f, 10.0f);
 
 	ImGui::Separator();
-	ParticleManager* particleManager = ParticleManager::GetInstance();
+	Engine::ParticleManager* particleManager = Engine::ParticleManager::GetInstance();
 	bool particlesReturning = particleManager->IsReturning();
 	if (ImGui::Checkbox("return##Particles", &particlesReturning)) {
 		particleManager->SetReturning(particlesReturning);
@@ -515,7 +515,7 @@ std::string ImGuiManager::ParticleWindow(Transform& emitterTransform, bool embed
 #endif
 }
 
-void ImGuiManager::CameraWindow(CameraManager* cameraManager, bool embedded)
+void ImGuiManager::CameraWindow(Engine::CameraManager* cameraManager, bool embedded)
 {
 #ifdef USE_IMGUI
 
@@ -529,7 +529,7 @@ void ImGuiManager::CameraWindow(CameraManager* cameraManager, bool embedded)
 	ImGui::Separator();
 
 	//カメラ
-	Camera* activeCamera = cameraManager->GetActiveCamera();
+	Engine::Camera* activeCamera = cameraManager->GetActiveCamera();
 	if (activeCamera)
 	{
 		//位置
