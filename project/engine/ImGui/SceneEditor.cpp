@@ -185,12 +185,12 @@ namespace {
 
 	bool BuildEditorWorldBounds(const Object3d& object, Vector3& minimum, Vector3& maximum)
 	{
-		const Model* model = object.GetModel();
+		const Engine::Model* model = object.GetModel();
 		if (!model || model->GetModelData().vertices.empty()) {
 			return false;
 		}
 
-		static std::unordered_map<const Model*, CachedModelBounds> cachedBounds;
+		static std::unordered_map<const Engine::Model*, CachedModelBounds> cachedBounds;
 		auto cached = cachedBounds.find(model);
 		if (cached == cachedBounds.end()) {
 			CachedModelBounds bounds{};
@@ -204,7 +204,7 @@ namespace {
 				std::numeric_limits<float>::lowest(),
 				std::numeric_limits<float>::lowest(),
 			};
-			for (const Model::VertexData& vertex : model->GetModelData().vertices) {
+			for (const Engine::Model::VertexData& vertex : model->GetModelData().vertices) {
 				const Vector3 point{ vertex.position.x, vertex.position.y, vertex.position.z };
 				bounds.minimum.x = (std::min)(bounds.minimum.x, point.x);
 				bounds.minimum.y = (std::min)(bounds.minimum.y, point.y);

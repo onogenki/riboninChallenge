@@ -96,7 +96,7 @@
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <SupportJustMyCode>false</SupportJustMyCode>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)engine\2d;$(ProjectDir)engine\2d\particles;$(ProjectDir)engine\2d\sprites;$(ProjectDir)engine\2d\textures;$(ProjectDir)engine\2d\posteffect;$(ProjectDir)engine\3d;$(ProjectDir)engine\3d\actor;$(ProjectDir)engine\3d\camera;$(ProjectDir)engine\3d\model;$(ProjectDir)engine\3d\object;$(ProjectDir)engine\audio;$(ProjectDir)engine\base;$(ProjectDir)engine\base\app;$(ProjectDir)engine\base\capture;$(ProjectDir)engine\base\directx;$(ProjectDir)engine\base\scene;$(ProjectDir)engine\base\utility;$(ProjectDir)engine\debug;$(ProjectDir)engine\ImGui;$(ProjectDir)engine\math;$(ProjectDir)engine\scene;$(ProjectDir)engine\level;$(ProjectDir)game;$(ProjectDir)game\stage1;$(ProjectDir)game\mirror;$(ProjectDir)externals\imgui;$(ProjectDir)externals\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)engine\2d;$(ProjectDir)engine\2d\particles;$(ProjectDir)engine\2d\sprites;$(ProjectDir)engine\2d\textures;$(ProjectDir)engine\2d\posteffect;$(ProjectDir)engine\3d;$(ProjectDir)engine\3d\actor;$(ProjectDir)engine\3d\camera;$(ProjectDir)engine\3d\model;$(ProjectDir)engine\3d\object;$(ProjectDir)engine\audio;$(ProjectDir)engine\base;$(ProjectDir)engine\base\app;$(ProjectDir)engine\base\capture;$(ProjectDir)engine\base\directx;$(ProjectDir)engine\base\scene;$(ProjectDir)engine\base\utility;$(ProjectDir)engine\debug;$(ProjectDir)engine\ImGui;$(ProjectDir)engine\math;$(ProjectDir)engine\scene;$(ProjectDir)engine\level;$(ProjectDir)game;$(ProjectDir)game\title;$(ProjectDir)game\stage;$(ProjectDir)game\mirror;$(ProjectDir)externals\imgui;$(ProjectDir)externals\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -124,7 +124,7 @@
       <!-- Releaseも各objにDebug情報を保持し、共有PDB管理の不一致でコンパイルを止めないようにします。 -->
       <DebugInformationFormat>OldStyle</DebugInformationFormat>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)engine\2d;$(ProjectDir)engine\2d\particles;$(ProjectDir)engine\2d\sprites;$(ProjectDir)engine\2d\textures;$(ProjectDir)engine\2d\posteffect;$(ProjectDir)engine\3d;$(ProjectDir)engine\3d\actor;$(ProjectDir)engine\3d\camera;$(ProjectDir)engine\3d\model;$(ProjectDir)engine\3d\object;$(ProjectDir)engine\audio;$(ProjectDir)engine\base;$(ProjectDir)engine\base\app;$(ProjectDir)engine\base\capture;$(ProjectDir)engine\base\directx;$(ProjectDir)engine\base\scene;$(ProjectDir)engine\base\utility;$(ProjectDir)engine\debug;$(ProjectDir)engine\ImGui;$(ProjectDir)engine\math;$(ProjectDir)engine\scene;$(ProjectDir)engine\level;$(ProjectDir)game;$(ProjectDir)game\stage1;$(ProjectDir)game\mirror;$(ProjectDir)externals\imgui;$(ProjectDir)externals\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)engine\2d;$(ProjectDir)engine\2d\particles;$(ProjectDir)engine\2d\sprites;$(ProjectDir)engine\2d\textures;$(ProjectDir)engine\2d\posteffect;$(ProjectDir)engine\3d;$(ProjectDir)engine\3d\actor;$(ProjectDir)engine\3d\camera;$(ProjectDir)engine\3d\model;$(ProjectDir)engine\3d\object;$(ProjectDir)engine\audio;$(ProjectDir)engine\base;$(ProjectDir)engine\base\app;$(ProjectDir)engine\base\capture;$(ProjectDir)engine\base\directx;$(ProjectDir)engine\base\scene;$(ProjectDir)engine\base\utility;$(ProjectDir)engine\debug;$(ProjectDir)engine\ImGui;$(ProjectDir)engine\math;$(ProjectDir)engine\scene;$(ProjectDir)engine\level;$(ProjectDir)game;$(ProjectDir)game\title;$(ProjectDir)game\stage;$(ProjectDir)game\mirror;$(ProjectDir)externals\imgui;$(ProjectDir)externals\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -158,7 +158,7 @@
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <Optimization>Disabled</Optimization>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)engine\2d;$(ProjectDir)engine\2d\particles;$(ProjectDir)engine\2d\sprites;$(ProjectDir)engine\2d\textures;$(ProjectDir)engine\2d\posteffect;$(ProjectDir)engine\3d;$(ProjectDir)engine\3d\actor;$(ProjectDir)engine\3d\camera;$(ProjectDir)engine\3d\model;$(ProjectDir)engine\3d\object;$(ProjectDir)engine\audio;$(ProjectDir)engine\base;$(ProjectDir)engine\base\app;$(ProjectDir)engine\base\capture;$(ProjectDir)engine\base\directx;$(ProjectDir)engine\base\scene;$(ProjectDir)engine\base\utility;$(ProjectDir)engine\debug;$(ProjectDir)engine\ImGui;$(ProjectDir)engine\math;$(ProjectDir)engine\scene;$(ProjectDir)engine\level;$(ProjectDir)game;$(ProjectDir)game\stage1;$(ProjectDir)game\mirror;$(ProjectDir)externals\imgui;$(ProjectDir)externals\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)engine\2d;$(ProjectDir)engine\2d\particles;$(ProjectDir)engine\2d\sprites;$(ProjectDir)engine\2d\textures;$(ProjectDir)engine\2d\posteffect;$(ProjectDir)engine\3d;$(ProjectDir)engine\3d\actor;$(ProjectDir)engine\3d\camera;$(ProjectDir)engine\3d\model;$(ProjectDir)engine\3d\object;$(ProjectDir)engine\audio;$(ProjectDir)engine\base;$(ProjectDir)engine\base\app;$(ProjectDir)engine\base\capture;$(ProjectDir)engine\base\directx;$(ProjectDir)engine\base\scene;$(ProjectDir)engine\base\utility;$(ProjectDir)engine\debug;$(ProjectDir)engine\ImGui;$(ProjectDir)engine\math;$(ProjectDir)engine\scene;$(ProjectDir)engine\level;$(ProjectDir)game;$(ProjectDir)game\title;$(ProjectDir)game\stage;$(ProjectDir)game\mirror;$(ProjectDir)externals\imgui;$(ProjectDir)externals\assimp\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -221,11 +221,10 @@
     <ClCompile Include="engine\base\directx\DirectXCommonRenderPass.cpp" />
     <ClCompile Include="engine\base\directx\DirectXCommonResources.cpp" />
     <ClCompile Include="engine\base\app\Framework.cpp" />
-    <ClCompile Include="engine\base\app\Game.cpp" />
+    <ClCompile Include="game\Game.cpp" />
     <ClCompile Include="engine\base\app\Input.cpp" />
     <ClCompile Include="engine\base\utility\Logger.cpp" />
-	<ClCompile Include="engine\base\scene\SceneFactory.cpp" />
-	<ClCompile Include="engine\base\scene\GameSceneRegistry.cpp" />
+	<ClCompile Include="game\SceneFactory.cpp" />
 	<ClCompile Include="engine\base\scene\BaseScene.cpp" />
 	<ClCompile Include="engine\base\scene\SceneRenderPipeline.cpp" />
 	<ClCompile Include="engine\base\scene\SceneManager.cpp" />
@@ -242,7 +241,7 @@
 	<ClCompile Include="engine\ImGui\SceneEditorSpriteViewport.cpp" />
 	<ClCompile Include="engine\ImGui\SceneEditorViewportCamera.cpp" />
 	<ClCompile Include="engine\ImGui\SceneEditorShelfDrop.cpp" />
-	<ClCompile Include="engine\ImGui\TitleEditor.cpp" />
+	<ClCompile Include="game\title\TitleEditor.cpp" />
     <ClCompile Include="engine\level\FileHotReload.cpp" />
     <ClCompile Include="engine\level\LevelLoader.cpp" />
     <ClCompile Include="engine\level\MapChipField.cpp" />
@@ -252,12 +251,12 @@
     <ClCompile Include="engine\math\MyMath.cpp" />
     <ClCompile Include="engine\math\Collision.cpp" />
 	<ClCompile Include="engine\debug\DebugParticleEffects.cpp" />
-	<ClCompile Include="engine\debug\DebugAnimationPreview.cpp" />
-	<ClCompile Include="engine\debug\DebugAssetPreview.cpp" />
+	<ClCompile Include="engine\debug\preview\DebugAnimationPreview.cpp" />
+	<ClCompile Include="engine\debug\preview\DebugAssetPreview.cpp" />
 	<ClCompile Include="engine\debug\DebugCollisionOverlay.cpp" />
 	<ClCompile Include="engine\debug\DebugEcsInspector.cpp" />
 	<ClCompile Include="engine\debug\DebugInspectorTabs.cpp" />
-	<ClCompile Include="engine\debug\DebugModelShelf.cpp" />
+	<ClCompile Include="engine\debug\preview\DebugModelShelf.cpp" />
 	<ClCompile Include="engine\debug\DebugSceneEditor.cpp" />
 	<ClCompile Include="engine\debug\DebugEditViewport.cpp" />
 	<ClCompile Include="engine\debug\DebugEditOverlay.cpp" />
@@ -268,13 +267,13 @@
 		<ClCompile Include="engine\debug\DebugLevelRuntime.cpp" />
 		<ClCompile Include="engine\debug\DebugGameViewCameraController.cpp" />
 		<ClCompile Include="engine\debug\DebugViewportPlacement.cpp" />
-	<ClCompile Include="engine\debug\DebugTimePlaybackSmoke.cpp" />
-	<ClCompile Include="engine\debug\DebugUiSmoke.cpp" />
+	<ClCompile Include="engine\debug\smoke\DebugTimePlaybackSmoke.cpp" />
+	<ClCompile Include="engine\debug\smoke\DebugUiSmoke.cpp" />
     <ClCompile Include="engine\scene\DebugScene.cpp" />
 	<ClCompile Include="engine\scene\DebugSceneAutomation.cpp" />
 	<ClCompile Include="engine\scene\DebugSceneContexts.cpp" />
-    <ClCompile Include="engine\scene\TitleScene.cpp" />
-    <ClCompile Include="engine\scene\TitleObjectManager.cpp" />
+    <ClCompile Include="game\title\TitleScene.cpp" />
+    <ClCompile Include="game\title\TitleObjectManager.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
@@ -427,6 +426,7 @@
     <!-- Visual Studioが個別に追跡できるよう、game側もワイルドカードを使わず列挙します。 -->
     <ClCompile Include="game\GameSceneRegistration.cpp" />
 	<ClCompile Include="game\gameOver\GameOverScene.cpp" />
+	<ClCompile Include="game\gameOver\GameOverOverlay.cpp" />
 	<ClCompile Include="game\StartupRouteSmoke.cpp" />
 	<ClCompile Include="game\loading\LoadingScene.cpp" />
 	<ClCompile Include="game\stageSelect\StageSelectScene.cpp" />
@@ -437,34 +437,40 @@
     <ClCompile Include="game\mirror\Laser.cpp" />
     <ClCompile Include="game\mirror\LaserRenderer.cpp" />
     <ClCompile Include="game\mirror\PlanarReflectionTarget.cpp" />
-    <ClCompile Include="game\stage1\debug\Stage1GameplaySmoke.cpp" />
-    <ClCompile Include="game\stage1\debug\StagePuzzleDebugUi.cpp" />
-    <ClCompile Include="game\stage1\editor\ImGuiManagerStagePuzzle.cpp" />
-    <ClCompile Include="game\stage1\editor\StageEditor.cpp" />
-    <ClCompile Include="game\stage1\editor\StageEditViewport.cpp" />
-    <ClCompile Include="game\stage1\editor\StageLevelEditor.cpp" />
-    <ClCompile Include="game\stage1\Stage1.cpp" />
-    <ClCompile Include="game\stage1\Stage1EditorUi.cpp" />
-    <ClCompile Include="game\stage1\StageLighting.cpp" />
-	<ClCompile Include="game\stage1\StageLightWarning.cpp" />
-    <ClCompile Include="game\stage1\Stage1MapLoading.cpp" />
-    <ClCompile Include="game\stage1\StageMapChipFactory.cpp" />
-    <ClCompile Include="game\stage1\StageMapSelection.cpp" />
-    <ClCompile Include="game\stage1\StageMapFileMonitor.cpp" />
-    <ClCompile Include="game\stage1\Stage1MirrorGameplay.cpp" />
-    <ClCompile Include="game\stage1\StageCameraEvents.cpp" />
-    <ClCompile Include="game\stage1\StageCollisionWorld.cpp" />
-    <ClCompile Include="game\stage1\StageHazardLights.cpp" />
-    <ClCompile Include="game\stage1\StageLightPuzzle.cpp" />
-    <ClCompile Include="game\stage1\StageReflectionRenderer.cpp" />
-    <ClCompile Include="game\stage1\StageSceneRenderer.cpp" />
-    <ClCompile Include="game\stage1\StageStart.cpp" />
-    <ClCompile Include="game\stage1\StageTitleOverlay.cpp" />
-    <ClCompile Include="game\stage1\StagePauseOverlay.cpp" />
+    <ClCompile Include="game\stage\debug\Stage1GameplaySmoke.cpp" />
+    <ClCompile Include="game\stage\debug\StagePuzzleDebugUi.cpp" />
+    <ClCompile Include="game\stage\editor\ImGuiManagerStagePuzzle.cpp" />
+    <ClCompile Include="game\stage\editor\StageEditor.cpp" />
+    <ClCompile Include="game\stage\editor\StageEditViewport.cpp" />
+    <ClCompile Include="game\stage\editor\StageLevelEditor.cpp" />
+    <ClCompile Include="game\stage\Stage.cpp" />
+    <ClCompile Include="game\stage\StageBgmPlayback.cpp" />
+    <ClCompile Include="game\stage\StageGimmickFactory.cpp" />
+    <ClCompile Include="game\stage\StageEditorUi.cpp" />
+    <ClCompile Include="game\stage\StageLighting.cpp" />
+	<ClCompile Include="game\stage\StageLightDeath.cpp" />
+	<ClCompile Include="game\stage\StageLightWarning.cpp" />
+    <ClCompile Include="game\stage\StageMapLoading.cpp" />
+    <ClCompile Include="game\stage\StageMapChipFactory.cpp" />
+    <ClCompile Include="game\stage\StageMapSelection.cpp" />
+    <ClCompile Include="game\stage\StageMapFileMonitor.cpp" />
+    <ClCompile Include="game\stage\StageMapRepository.cpp" />
+    <ClCompile Include="game\stage\StageMirrorGameplay.cpp" />
+    <ClCompile Include="game\stage\StageCameraEvents.cpp" />
+    <ClCompile Include="game\stage\StageCollisionWorld.cpp" />
+    <ClCompile Include="game\stage\StageHazardLights.cpp" />
+    <ClCompile Include="game\stage\StageLightPuzzle.cpp" />
+    <ClCompile Include="game\stage\render\StageReflectionRenderer.cpp" />
+    <ClCompile Include="game\stage\render\StageSceneRenderer.cpp" />
+    <ClCompile Include="game\stage\render\StageRenderContext.cpp" />
+    <ClCompile Include="game\stage\StageStart.cpp" />
+    <ClCompile Include="game\stage\StageTitleOverlay.cpp" />
+    <ClCompile Include="game\stage\StagePauseOverlay.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="game\GameSceneRegistration.h" />
 	<ClInclude Include="game\gameOver\GameOverScene.h" />
+	<ClInclude Include="game\gameOver\GameOverOverlay.h" />
 	<ClInclude Include="game\StartupRouteSmoke.h" />
 	<ClInclude Include="game\loading\LoadingScene.h" />
 	<ClInclude Include="game\stageSelect\StageSelectScene.h" />
@@ -476,26 +482,31 @@
     <ClInclude Include="game\mirror\LaserRenderer.h" />
     <ClInclude Include="game\mirror\Mirror.h" />
     <ClInclude Include="game\mirror\PlanarReflectionTarget.h" />
-    <ClInclude Include="game\stage1\debug\Stage1GameplaySmoke.h" />
-    <ClInclude Include="game\stage1\debug\StagePuzzleDebugUi.h" />
-    <ClInclude Include="game\stage1\editor\StageEditor.h" />
-    <ClInclude Include="game\stage1\editor\StageEditViewport.h" />
-    <ClInclude Include="game\stage1\editor\StageLevelEditor.h" />
-    <ClInclude Include="game\stage1\Stage1.h" />
-    <ClInclude Include="game\stage1\StageMapChipFactory.h" />
-    <ClInclude Include="game\stage1\StageMapSelection.h" />
-    <ClInclude Include="game\stage1\StageMapFileMonitor.h" />
-    <ClInclude Include="game\stage1\StageCameraEvents.h" />
-    <ClInclude Include="game\stage1\StageCollisionWorld.h" />
-    <ClInclude Include="game\stage1\StageHazardLights.h" />
-    <ClInclude Include="game\stage1\StageLightPuzzle.h" />
-    <ClInclude Include="game\stage1\StageLighting.h" />
-	<ClInclude Include="game\stage1\StageLightWarning.h" />
-    <ClInclude Include="game\stage1\StageReflectionRenderer.h" />
-    <ClInclude Include="game\stage1\StageSceneRenderer.h" />
-    <ClInclude Include="game\stage1\StageStart.h" />
-    <ClInclude Include="game\stage1\StageTitleOverlay.h" />
-    <ClInclude Include="game\stage1\StagePauseOverlay.h" />
+    <ClInclude Include="game\stage\debug\Stage1GameplaySmoke.h" />
+    <ClInclude Include="game\stage\debug\StagePuzzleDebugUi.h" />
+    <ClInclude Include="game\stage\editor\StageEditor.h" />
+    <ClInclude Include="game\stage\editor\StageEditViewport.h" />
+    <ClInclude Include="game\stage\editor\StageLevelEditor.h" />
+    <ClInclude Include="game\stage\Stage.h" />
+    <ClInclude Include="game\stage\StageBgmPlayback.h" />
+    <ClInclude Include="game\stage\StageGimmickFactory.h" />
+    <ClInclude Include="game\stage\StageMapChipFactory.h" />
+    <ClInclude Include="game\stage\StageMapSelection.h" />
+    <ClInclude Include="game\stage\StageMapFileMonitor.h" />
+    <ClInclude Include="game\stage\StageMapRepository.h" />
+    <ClInclude Include="game\stage\StageCameraEvents.h" />
+    <ClInclude Include="game\stage\StageCollisionWorld.h" />
+    <ClInclude Include="game\stage\StageHazardLights.h" />
+    <ClInclude Include="game\stage\StageLightPuzzle.h" />
+    <ClInclude Include="game\stage\StageLighting.h" />
+	<ClInclude Include="game\stage\StageLightDeath.h" />
+	<ClInclude Include="game\stage\StageLightWarning.h" />
+    <ClInclude Include="game\stage\render\StageReflectionRenderer.h" />
+    <ClInclude Include="game\stage\render\StageSceneRenderer.h" />
+    <ClInclude Include="game\stage\render\StageRenderContext.h" />
+    <ClInclude Include="game\stage\StageStart.h" />
+    <ClInclude Include="game\stage\StageTitleOverlay.h" />
+    <ClInclude Include="game\stage\StagePauseOverlay.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="engine\2d\particles\ParticleEmitter.h" />
@@ -535,11 +546,10 @@
     <ClInclude Include="engine\base\utility\D3DResourceLeakChecker.h" />
     <ClInclude Include="engine\base\directx\DirectXCommon.h" />
     <ClInclude Include="engine\base\app\Framework.h" />
-    <ClInclude Include="engine\base\app\Game.h" />
+    <ClInclude Include="game\Game.h" />
     <ClInclude Include="engine\base\app\Input.h" />
     <ClInclude Include="engine\base\utility\Logger.h" />
-    <ClInclude Include="engine\base\scene\SceneFactory.h" />
-	<ClInclude Include="engine\base\scene\GameSceneRegistry.h" />
+    <ClInclude Include="game\SceneFactory.h" />
 	<ClInclude Include="engine\base\scene\SceneRenderPipeline.h" />
     <ClInclude Include="engine\base\scene\SceneManager.h" />
     <ClInclude Include="engine\base\directx\SrvManager.h" />
@@ -549,7 +559,7 @@
     <ClInclude Include="engine\ImGui\SceneEditor.h" />
 	<ClInclude Include="engine\ImGui\SceneEditorViewportMath.h" />
 	<ClInclude Include="engine\ImGui\SceneEditorShelfMessages.h" />
-	<ClInclude Include="engine\ImGui\TitleEditor.h" />
+	<ClInclude Include="game\title\TitleEditor.h" />
     <ClInclude Include="engine\level\FileHotReload.h" />
     <ClInclude Include="engine\level\LevelLoader.h" />
     <ClInclude Include="engine\level\MapChipField.h" />
@@ -565,12 +575,12 @@
     <ClInclude Include="engine\math\Vector3.h" />
     <ClInclude Include="engine\math\Vector4.h" />
 	<ClInclude Include="engine\debug\DebugParticleEffects.h" />
-	<ClInclude Include="engine\debug\DebugAnimationPreview.h" />
-	<ClInclude Include="engine\debug\DebugAssetPreview.h" />
+	<ClInclude Include="engine\debug\preview\DebugAnimationPreview.h" />
+	<ClInclude Include="engine\debug\preview\DebugAssetPreview.h" />
 	<ClInclude Include="engine\debug\DebugCollisionOverlay.h" />
 	<ClInclude Include="engine\debug\DebugEcsInspector.h" />
 	<ClInclude Include="engine\debug\DebugInspectorTabs.h" />
-	<ClInclude Include="engine\debug\DebugModelShelf.h" />
+	<ClInclude Include="engine\debug\preview\DebugModelShelf.h" />
 	<ClInclude Include="engine\debug\DebugSceneEditor.h" />
 	<ClInclude Include="engine\debug\DebugEditViewport.h" />
 	<ClInclude Include="engine\debug\DebugEditOverlay.h" />
@@ -581,11 +591,11 @@
 		<ClInclude Include="engine\debug\DebugLevelRuntime.h" />
 		<ClInclude Include="engine\debug\DebugGameViewCameraController.h" />
 		<ClInclude Include="engine\debug\DebugViewportPlacement.h" />
-	<ClInclude Include="engine\debug\DebugTimePlaybackSmoke.h" />
-	<ClInclude Include="engine\debug\DebugUiSmoke.h" />
+	<ClInclude Include="engine\debug\smoke\DebugTimePlaybackSmoke.h" />
+	<ClInclude Include="engine\debug\smoke\DebugUiSmoke.h" />
     <ClInclude Include="engine\scene\DebugScene.h" />
-    <ClInclude Include="engine\scene\TitleScene.h" />
-    <ClInclude Include="engine\scene\TitleObjectManager.h" />
+    <ClInclude Include="game\title\TitleScene.h" />
+    <ClInclude Include="game\title\TitleObjectManager.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
     <ClInclude Include="externals\imgui\imgui.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>

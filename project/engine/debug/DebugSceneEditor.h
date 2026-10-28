@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DebugModelShelf.h"
+#include "preview/DebugModelShelf.h"
 #include "Object3d.h"
 #include "SceneEditor.h"
 #include <functional>
@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-class Camera;
-class CameraManager;
+namespace Engine { class Camera; }
+namespace Engine { class CameraManager; }
 class DebugAssetPreview;
 class DebugEntityRegistry;
 class DebugParticleEffects;
@@ -17,8 +17,8 @@ class DebugSceneSelection;
 class DirectXCommon;
 class CaptureManager;
 class Object3d;
-class ParticleEmitter;
-class Sprite;
+namespace Engine { class ParticleEmitter; }
+namespace Engine { class Sprite; }
 
 // DebugSceneのInspector・Model Shelf・Edit Viewをまとめて表示する編集専用部品です。
 // モデル・Sprite・ECS・Previewの寿命はDebugSceneが所有し、このクラスは編集UIだけを担当します。
@@ -29,11 +29,11 @@ public:
 	{
 		// DebugSceneが所有する編集対象と、その描画共通設定です。
 		DirectXCommon* directXCommon = nullptr;
-		Camera* camera = nullptr;
-		CameraManager* cameraManager = nullptr;
+		Engine::Camera* camera = nullptr;
+		Engine::CameraManager* cameraManager = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
-		std::vector<std::unique_ptr<Sprite>>* sprites = nullptr;
+		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		Object3d::DirectionalLight* directionalLight = nullptr;
 		Object3d::PointLight* pointLight = nullptr;
 		Object3d::SpotLight* spotLight = nullptr;
@@ -47,9 +47,9 @@ public:
 		CaptureManager* captureManager = nullptr;
 		// Inspector内のParticle・Effect・Camera・ECSタブが使う値です。
 		Transform* emitterTransform = nullptr;
-		ParticleEmitter* emitterCircle = nullptr;
-		ParticleEmitter* emitterPlane = nullptr;
-		ParticleEmitter** activeEmitter = nullptr;
+		Engine::ParticleEmitter* emitterCircle = nullptr;
+		Engine::ParticleEmitter* emitterPlane = nullptr;
+		Engine::ParticleEmitter** activeEmitter = nullptr;
 		DebugParticleEffects* particleEffects = nullptr;
 		Vector3 particleEffectPosition{};
 		// 生成・削除・PreviewはDebugSceneの責任なので、必要な操作だけを受け取ります。

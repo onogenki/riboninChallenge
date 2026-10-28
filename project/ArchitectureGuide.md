@@ -12,10 +12,11 @@
 
 Title、Debug、Stage1が共通で使うSceneの土台です。全Sceneは`Initialize`、`Update`、`Draw`、`Finalize`を必ず実装します。
 `BaseScene`は共通の状態変数を持たず、Camera生成・登録を補助するだけです。
-`CameraManager`と`MainCamera`はTitle・Debug・Stage1がそれぞれ`private`で所有します。
-`Object3dCommon`と`SpriteCommon`は必要なSceneだけがManagerから借り、Scene終了時に共有本体を破棄しません。
+`Engine::CameraManager`と`MainCamera`はTitle・Debug・Stage1がそれぞれ`private`で所有します。ManagerはCameraを名前で登録しますが、Camera本体の所有権は受け取りません。
+`Object3dCommon`と`Engine::SpriteCommon`は必要なSceneだけがManagerから借り、Scene終了時に共有本体を破棄しません。
+`Engine::Sprite`は各画面が画像ごとに所有し、位置・色を更新した後、`SceneRenderPipeline`が共通Pipelineを設定して描画します。
 不要なDirectX、Object、Audioヘッダは含めず、各Sceneが必要なものだけを自分のヘッダで読み込みます。
-各Sceneが前方宣言した`CameraManager`や`Camera`を`unique_ptr`で安全に破棄できるよう、Sceneのコンストラクタとデストラクタはそれぞれのcpp側に置きます。
+各Sceneが前方宣言した`Engine::CameraManager`や`Camera`を`unique_ptr`で安全に破棄できるよう、Sceneのコンストラクタとデストラクタはそれぞれのcpp側に置きます。
 
 ヘッダでは`using namespace`を使いません。たとえば衝突用の箱は`MyMath::OBB`と明記し、
 そのヘッダを読み込む別のクラスへ名前空間の影響を漏らさないようにします。
@@ -26,8 +27,8 @@ Title、Debug、Stage1が共通で使うSceneの土台です。全Sceneは`Initi
 たとえば`StageLightPuzzle lightPuzzle_`は、Stage1が実体を持つため`StageLightPuzzle.h`が必要です。
 
 ポインタまたは参照だけで扱う型は、`class Player;`のように前方宣言できます。
-たとえば`std::unique_ptr<Player> player_`は、Playerの実体を使わない`Stage1.h`では前方宣言だけにし、
-`player_->Update()`のように実体を使う`Stage1.cpp`で`Player.h`を読み込みます。
+たとえば`std::unique_ptr<Player> player_`は、Playerの実体を使わない`Stage.h`では前方宣言だけにし、
+`player_->Update()`のように実体を使う`Stage.cpp`で`Player.h`を読み込みます。
 
 前方宣言した型を`std::unique_ptr`で**所有**する場合は、コンストラクタとデストラクタもcpp側へ置きます。
 `Enemy`は`std::unique_ptr<Object3d>`を持つため、`Enemy::Enemy()`と`Enemy::~Enemy()`を`Enemy.cpp`へ置き、
@@ -38,16 +39,19 @@ Object3dの完全な型を知る場所で生成・破棄します。
 
 `SceneFactory`
 
+`game/SceneFactory.cpp`は具体的なゲームSceneを生成し、`engine/base/scene/AbstractSceneFactory.h`はengineが必要とする生成窓口だけを定義します。
+`TITLE_ORIGINAL`の`TitleScene`・`TitleObjectManager`・`TitleEditor`は`game/title`にまとめ、各クラスの役割と呼出し順は変えません。
 `"TITLE"`、`"TITLE_ORIGINAL"`、`"DEBUG"`、`"STAGE_SELECT"`、`"STAGE1"`という名前から、対応するSceneを一体生成します。
 ゲームのScene追加は`game/GameSceneRegistration.cpp`の`RegisterGameScenes()`へ、名前と生成関数を登録します。
-その登録を`GameSceneRegistry`経由で`SceneFactory`へ渡すため、Stage追加だけでengine側へStageのヘッダを増やす必要はありません。
+`game/Game.cpp`の`Game::Initialize()`が共通資源を準備した後に`RegisterGameScenes()`を呼び、`SceneFactory`へ明示的に登録します。Stage追加だけでengine側へStageのヘッダを増やす必要はありません。
 現在の`"TITLE"`は提出用に`Stage(1, true)`を生成し、固定CameraのStage背景へTitle画像とENTER画像を重ねます。
 従来の12枚の画像から始まる`TitleScene`は`"TITLE_ORIGINAL"`で残し、通常起動では使用しません。
 `"STAGE_SELECT"`は共通の夜空と案内を表示する`StageSelectScene`、`"STAGE1"`はタイトル表示なしの`Stage(1)`を生成します。
 
-`SceneManager`
+`Engine::SceneManager`
 
 現在のSceneを所有し、切替時に`Finalize → Initialize`の順で呼びます。
+型を`Engine`名前空間へ置きますが、Factoryの所有は`Framework`、Sceneの所有と切替順は`SceneManager`のままです。ゲーム側は`Engine::SceneManager::GetInstance()`から切替を予約します。
 各Sceneは`SceneManager::ChangeScene()`で次のScene名を予約するだけで、古いSceneの解放を自分で行いません。
 `ChangeSceneWithLoading()`はFactoryの登録一覧から行き先を先に確認します。未登録名や`LOADING`自身なら白画面への切替を予約しません。有効な行き先では、従来どおりLoadingを一度描画してから`LoadingScene::Update()`が目的Sceneを予約します。切替待機期間は白画面を更新し、待機が終わっても目的Sceneを生成できない場合はログを残して終了コード1で止めます。
 `BaseScene::IsFinished()`は既存の照会APIですが、現在の`SceneManager`は読んでいません。従来の`TitleScene`もこの値で終了せず、入力時のScene切替予約を使います。
@@ -73,9 +77,11 @@ Object3dの完全な型を知る場所で生成・破棄します。
 - Level、Camera、3D Object用クラスを呼び出す。
 
 `Stage1`へ追加してよい処理は、「このStageだけの遊び」に関係するものです。
-`Stage1.h`は値として持つ部品だけを直接`#include`し、`unique_ptr`で所有するPlayerやMirrorなどは前方宣言します。
-実体を使う`Stage1.cpp`だけがそれらのヘッダを読み込むため、ほかのSceneへ不要な依存が広がりません。
-`Stage(1, true)`のTitle中は`game/stage1/StageTitleOverlay.cpp`の`StageTitleOverlay`が二枚のSpriteを生成・所有・更新し、Sceneは背景のStageと危険Lightの進行と描画順だけを決めます。Spriteの描画は`SceneRenderPipeline::DrawSprites()`へ渡します。Title専用Cameraを増やさず、同じ`mainCamera`を固定位置へ動かします。Title中はPlayer登場演出・Camera追従・BGMを進めず、セレクト後に生成する本編の`Stage(1)`で開始します。
+`Stage.h`は値として持つ部品だけを直接`#include`し、`unique_ptr`で所有するPlayerやMirrorなどは前方宣言します。
+実体を使う`Stage.cpp`だけがそれらのヘッダを読み込むため、ほかのSceneへ不要な依存が広がりません。
+`Stage(1, true)`のTitle中は`game/stage/StageTitleOverlay.cpp`の`StageTitleOverlay`が二枚のSpriteを生成・所有・更新し、Sceneは背景のStageと危険Lightの進行と描画順だけを決めます。Spriteの描画は`SceneRenderPipeline::DrawSprites()`へ渡します。Title専用Cameraを増やさず、同じ`mainCamera`を固定位置へ動かします。Title中はPlayer登場演出・Camera追従・BGMを進めず、セレクト後に生成する本編の`Stage(1)`で開始します。
+
+Debug画面の素材選択・モデル/Textureプレビューは`engine/debug/preview`、画面操作と時間再生の自動確認は`engine/debug/smoke`に置きます。`DebugScene`がこれらを所有・呼出し、移動したファイル自身の実行順は変えません。
 
 ### Stage1を読む順番
 
@@ -86,7 +92,8 @@ Object3dの完全な型を知る場所で生成・破棄します。
 3. `Draw()`：鏡用RenderTexture更新 → 通常Game View描画 → 共通Pipeline終了の順です。
 4. `Finalize()`：Stage1が所有するPlayer・Mirror・Runtime Objectを解放します。
 
-Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別の計算はPlayer、CameraController、StageLightPuzzle、StageSceneRendererのような部品へ置きます。
+Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別の計算はPlayer、`Engine::CameraController`、StageLightPuzzle、StageSceneRendererのような部品へ置きます。
+`Stage::InitializeStageGimmicks()`は床→鏡→Laser発射球→危険Light Renderer→SwitchとDoorの順番を決めます。床・発射球・Switch・Doorのモデル、初期位置・大きさ・画像は`StageGimmickFactory`が設定し、完成した通常Objectの寿命は`Object3dCollection`が持ちます。鏡は従来どおり`StageMirrorFactory`が生成し、Sceneが所有します。
 
 ### 初めて読む時の入口
 
@@ -110,11 +117,11 @@ Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別
 1. 処理の開始条件や更新順が別で、同時に読む必要がない。
 2. 必要な`#include`や扱うデータが明らかに別の責任になっている。
 
-たとえば`Stage1EditorUi.cpp`はEdit View専用で、本編更新を読む時には不要なので分けます。
+たとえば`StageEditorUi.cpp`はEdit View専用で、本編更新を読む時には不要なので分けます。
 一方、`Player::UpdateWithControl()`の入力→移動→重力→Collider→見た目同期は、一回の移動処理として順番に読む意味があるため、細かく分けません。
 
 分けた先の関数名またはファイル名だけで役割が分かることを目標にします。
-`UpdateHelper1()`のような名前では分けず、`UpdateStageCamera()`や`Stage1MapLoading.cpp`のように担当を名前へ書きます。
+`UpdateHelper1()`のような名前では分けず、`UpdateStageCamera()`や`StageMapLoading.cpp`のように担当を名前へ書きます。
 
 ### よく使う処理の早見表
 
@@ -127,7 +134,7 @@ Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別
 | Enemyを一体生成する（現在はSmokeだけで使用） | `enemyManager.Spawn(spawnData)` | EnemyManager |
 | モデル名と位置でEnemyを一体生成する（現在はSmokeだけで使用） | `enemyManager.Spawn("ghost.obj", position)` | EnemyManager |
 | Enemyをまとめて生成する（現在はSmokeだけで使用） | `enemyManager.SpawnAll(spawnDataList)` | EnemyManager |
-| 全3DモデルへCamera・Lightを反映する | `Object3dRenderContext::UpdateObjects()` | SceneのUpdate |
+| Stageの全3DモデルへCamera・Lightを反映する | `StageRenderContext::Prepare()` | StageのUpdateから呼ぶ描画準備 |
 | 3D一覧を描画する | `SceneRenderPipeline::DrawObjects()` | SceneのDraw |
 
 この表の「所有者」が、解放と状態変更を行う場所です。ほかのクラスは所有せず、参照またはContextで借ります。
@@ -140,12 +147,12 @@ Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別
 | 追加したいもの | 最初に置く場所 | 例 |
 | --- | --- | --- |
 | 画面を切り替える、Scene全体の開始・終了 | Scene | Title → Stage1の切替 |
-| JSON・CSVの読込、配置データ | Level | LevelLoader、StageMapRuntime |
+| JSON・CSVの読込と保存、配置データの所有 | Level | LevelLoader、StageMapRepository、StageMapRuntime |
 | モデル一体のTransform、Animation、GPU描画準備 | 3D Object | Object3d、Object3dFactory |
 | Playerだけの入力、重力、Jump、HP | Player | Player |
 | 追従、壁回避、演出、Camera Area | Camera | CameraController、StageStart、StageCameraEvents |
 | ボタン、Inspector、Shelf、編集画面 | UI | TitleEditor、DebugSceneEditor、StageEditor |
-| StageだけのPuzzle、危険Light、鏡反射 | Stage Gameplay部品 | StageLightPuzzle、StageHazardLights |
+| StageだけのPuzzle、危険Light、死亡演出、鏡反射 | Stage Gameplay部品 | StageLightPuzzle、StageHazardLights、StageLightDeath |
 
 たとえば「DoorをLaserで開く」はScene切替でもJSON読込でもないので、`StageLightPuzzle`が所有します。
 `Stage1`はDoorモデルとPuzzle部品を所有して、Updateの順番だけを決めます。
@@ -185,8 +192,8 @@ CSVファイル自体は任意です。`resources/maps/stage1.csv`がなけれ�
 
 JSON/CSVから渡された通常モデルを実行中の`Object3d`として管理します。
 
-モデル読込・`Object3d`初期化は`Object3dFactory`を使う生成関数へ依頼します。
-このクラス自身は`ModelManager`を直接呼ばないため、配置物の実行中データに専念できます。
+Stageが使う`Rebuild()`は`Object3dCommon`だけを借り、モデル読込・`Object3d`初期化を既存の`Object3dFactory`へ依頼します。
+従来の生成関数を受ける`Rebuild()`も残し、両経路が同じ仮一覧の採用処理を使います。一件でも失敗すれば前の配置を保持します。`ModelManager`は直接呼びません。
 
 - モデルの生成
 - BOX Colliderの保持
@@ -194,31 +201,35 @@ JSON/CSVから渡された通常モデルを実行中の`Object3d`として管�
 - 所有する配置物へのCamera・Light・行列更新と通常描画
 
 新しい普通の置物・床・壁を増やす時は、まずここで扱えるかを考えます。
-Stage1は`Object3dRenderContext`を一度作り、`StageMapRuntime::UpdateRenderObjects()`へ渡すだけです。
-そのため、Stage1がJSON配置物の一覧を直接ループして描画準備を行いません。
+Stageは`StageRenderContext::Prepare()`へ所有対象と現在のCamera・Lightを渡します。
+`StageRenderContext`が`Object3dRenderContext`を一度作り、Scene所有Object、`StageMapRuntime`、鏡、Player、SkyBoxを従来と同じ順で準備します。
+そのため、Stageが各3D Objectの描画準備を直接ループせず、JSON配置物の更新も`StageMapRuntime::UpdateRenderObjects()`へ任せます。
 鏡反射時も、`StageReflectionRenderer`が反射Cameraと描画順を決め、
 `StageMapRuntime::UpdateCameraForDraw()`と`Draw()`へ配置物だけの更新・描画を依頼します。
 
-`Stage1MapLoading.cpp`
+`StageMapRepository`と`StageMapLoading.cpp`
 
-`StageMapSelection`がStage ID 1〜5とJSON/CSVの対応、切替予約を持ちます。`StageMapFileMonitor`が選択中JSON/CSVの保存時刻を監視します。`Stage1MapLoading.cpp`には、再読込・JSON保存と、読込成功時だけ監視先とStage切替を確定する進行処理を置きます。
+`StageMapRepository`は選択中のJSONデータ、CSVマップチップ、ファイル変更監視を一組で所有します。内部の`StageMapSelection`がStage ID 1〜5とファイルの対応・切替予約、`StageMapFileMonitor`が保存時刻を管理します。JSON・CSVを両方読んだ後、`Stage::ApplyStageMapData()`が床・鏡・Cameraなどへ反映できた時だけ新データを採用します。失敗時は選択番号と読込データを元に戻します。
+Stage1〜5は別々のRendererを持つ構想ではなく、`game/stage`に置いた一つの`Stage` Sceneと`game/stage/render`に置いた`StageSceneRenderer`・`StageReflectionRenderer`・`StageRenderContext`を共用し、Stage IDごとのJSON/CSVで配置を変える設計です。現時点で実在するLevel JSONはstage1だけなので、stage2〜5を実際に描くには対応データを作る必要があります。
+`StageMapLoading.cpp`はRepositoryを呼び、読込成功後のPlayer開始位置、Puzzle・危険Lightの初期化、監視開始の順番を決めます。JSON保存もRepositoryに依頼し、StageEditorには結果だけを伝えます。
 JSONとCSVが同じフレームで保存された場合も、両方の更新時刻を確認してから再読込を一回だけ要求します。片方の変更を次フレームへ持ち越すと、同じStageを二回作り直すためです。
-読込後に実行中のObjectへ反映する判断は引き続き`Stage1::ApplyStageMapData()`が行います。
+読込後に実行中のObjectへ反映する判断は引き続き`Stage::ApplyStageMapData()`が行います。
 つまり、ファイルを読む責任と、読んだデータを本編の床・鏡・Cameraへ使う責任を、読み手が別々に追えます。
 CSVの読込と座標変換は`MapChipField`、番号ごとの処理選択は`MapChipRegistry`、Stage1専用ブロックの見た目とCollider値は`StageMapChipFactory`が担当します。
 
-`Stage1EditorUi.cpp`
+`StageEditorUi.cpp`
 
 Edit ViewのLevel編集UIと、鏡・Light Puzzle用のDebug UIを置く実装ファイルです。
-Object、Player、Mirror、Light Puzzleの所有者は引き続き`Stage1`で、UIはContextに借りたデータを表示・編集するだけです。
-本編の更新順を読みたい時は`Stage1.cpp`、Edit Viewを直したい時はこのファイルを開きます。
-`Reload Now`はStage1所有のLevelDataを入れ替えるため、そのフレームのUIは古いContextを使わず終了し、次フレームに新しい参照を受け取ります。
+Object、Player、Mirror、Light Puzzleの所有者は引き続き`Stage`で、UIはContextに借りたデータを表示・編集するだけです。
+固定鏡の編集後は、StageがPuzzleの基準角度を確定してから`StageEditor::SynchronizeFirstMirror()`へJSONの同期を依頼します。入れ子の`Mirror`探索と保存待ちの通知はEditorが担当します。
+本編の更新順を読みたい時は`Stage.cpp`、Edit Viewを直したい時はこのファイルを開きます。
+`Reload Now`はStage所有のLevelDataを入れ替えるため、そのフレームのUIは古いContextを使わず終了し、次フレームに新しい参照を受け取ります。
 
-`Stage1MirrorGameplay.cpp`
+`StageMirrorGameplay.cpp`
 
 Playerの入力を携帯Mirrorへ渡す処理、固定Mirror・鏡床・携帯Mirrorを反射対象として集める処理、危険LightをMirrorで反射する処理を置く実装ファイルです。
-DoorやSwitchの進行規則は`StageLightPuzzle`、いつMirror処理を呼ぶかは`Stage1::Update()`が担当します。
-持っている鏡の向きはCameraではなく`Player::GetFacingYaw()`から決めます。`Stage1::UpdateMirrorGameplay()`がこの角度を渡し、`CarryableMirror::Update()`が位置・見た目・反射面・Colliderを同じ角度へ追従させます。
+DoorやSwitchの進行規則は`StageLightPuzzle`、いつMirror処理を呼ぶかは`Stage::Update()`が担当します。
+持っている鏡の向きはCameraではなく`Player::GetFacingYaw()`から決めます。`Stage::UpdateMirrorGameplay()`がこの角度を渡し、`CarryableMirror::Update()`が位置・見た目・反射面・Colliderを同じ角度へ追従させます。
 
 ### 固定鏡の配置を変えたい時
 
@@ -230,7 +241,7 @@ DoorやSwitchの進行規則は`StageLightPuzzle`、いつMirror処理を呼ぶ�
 | JSONを読み、Mirrorタグを分類する | `LevelLoader` → `StageMapObjectIndex` |
 | 未所持の携帯鏡を作る | `StageMirrorFactory::CreateCarryableMirror()` |
 | 水平・両面反射の鏡床を作る | `StageMirrorFactory::CreateMirrorFloor()` |
-| 生成と編集反映を選び、鏡一覧を所有する | `Stage1::ApplyStageMapData()` |
+| 生成と編集反映を選び、鏡一覧を所有する | `Stage::ApplyStageMapData()` |
 | 配置データから鏡を生成する | `StageMirrorFactory::CreateFixedMirrors()` |
 | 既存の鏡へ位置・Y回転・幅・高さ・BOX設定を反映する | `StageMirrorFactory::ApplyFixedMirrorEdits()` |
 | モデル・反射Texture・Colliderを所有して同期する | `FixedMirror` |
@@ -257,10 +268,10 @@ if (!carryableMirror_) {
 }
 ```
 
-これは`Stage1::InitializeStageGimmicks()`内の初期値です。その後のJSON読込で携帯鏡の位置を上書きするので、
+これは`Stage::InitializeStageGimmicks()`内の初期値です。その後のJSON読込で携帯鏡の位置を上書きするので、
 実際の開始位置は`stage1.json`の`CarryableMirrorStart`を編集します。
 現在はPlayerStartより前方の`(20, -0.8, 30)`に置いています。持った後の距離はJSONではなく`CarryableMirror.h`の`HoldSettings`で調整します。
-鏡床の位置・幅・高さは`Stage1.h`の`mirrorFloorPosition_`／`mirrorFloorWidth_`／`mirrorFloorHeight_`です。
+鏡床の位置・幅・高さは`Stage.h`の`mirrorFloorPosition_`／`mirrorFloorWidth_`／`mirrorFloorHeight_`です。
 鏡床の水平化・Collider同期・両面反射設定は`CreateMirrorFloor()`にそろえ、Stage側で個別に設定し忘れない形にしています。
 Stage1では従来通り、携帯鏡の生成失敗は初期化中断、鏡床の失敗はその部品なしで続行します。
 
@@ -289,7 +300,7 @@ JSONで置いたキー・フィル・バックライトを先に残し、空い�
 `StageMapRuntime::UpdatePaths()`で移動した配置物のColliderを同期し、`StageCollisionWorld::Rebuild()`で一覧を作ってから`Player::Update()`へ渡します。順序を逆にするとPlayerが前フレームの壁位置で判定してしまいます。
 そのためStage1は、Player・Camera・Laserへ必要な一覧を渡すだけで、Colliderを作るループを書きません。
 
-ただし現在の床とDoorは、ほかの物体とは所有の形が異なります。`Stage1::InitializeStageGimmicks()`が作る床モデルは`Object3dCollection`が所有し、`StageCollisionWorld`が床のローカルBOX設定と現在のOBBを持ちます。`Stage1::ApplyFloorData()`がJSONの床TransformとBOX設定をそれぞれへ渡し、`Rebuild()`がモデルのTransformからOBBを作り直します。Doorモデルも`Object3dCollection`が所有しますが、開閉状態とDoorのOBBは`StageLightPuzzle`が持ち、`UpdatePuzzleVisuals()`で同時に更新します。`StageCollisionWorld`はDoorのOBBを借りて一覧へ加えます。床・Doorがそれぞれ`ObbCollider`を直接所有する構成には、まだなっていません。
+ただし現在の床とDoorは、ほかの物体とは所有の形が異なります。`Stage::InitializeStageGimmicks()`が作る床モデルは`Object3dCollection`が所有し、`StageCollisionWorld`が床のローカルBOX設定と現在のOBBを持ちます。`Stage::ApplyFloorData()`がJSONの床TransformとBOX設定をそれぞれへ渡し、`Rebuild()`がモデルのTransformからOBBを作り直します。Doorモデルも`Object3dCollection`が所有しますが、開閉状態とDoorのOBBは`StageLightPuzzle`が持ち、`UpdatePuzzleVisuals()`で同時に更新します。`StageCollisionWorld`はDoorのOBBを借りて一覧へ加えます。床・Doorがそれぞれ`ObbCollider`を直接所有する構成には、まだなっていません。
 
 ## Collider
 
@@ -379,6 +390,7 @@ const MyMath::OBB& mirrorObb = mirror.GetObb();
 | --- | --- | --- |
 | `Audio` | 読込済み音源、再生中Voice、XAudio2 | 共通基盤。通常は下の再生部品から使う |
 | `BgmPlayer` | 一曲分のVoiceIdとフェード状態。Audioは借りる | `Initialize`、`Play`、`Update`、`Stop` |
+| `StageBgmPlayback` | Stageの初回描画済み・再生開始済み状態と一曲分の`BgmPlayer` | `Initialize`、`MarkFrameDrawn`、`Update`、`Stop` |
 | `SoundEffectPlayer` | 効果音名とファイルの対応表。Audioは借りる | `Register("Jump", パス)`、`Play("Jump")` |
 | `AudioMixer` | BGM用とSE用の音量倍率 | `SetBgmVolume`、`SetSoundEffectVolume` |
 
@@ -410,7 +422,7 @@ soundEffects_.Clear();
 
 上は配置場所ごとの抜粋です。全行を一つの関数へ入れる例ではありません。
 `BgmPlayer::Play()`は呼んだ時に再生開始します。画面表示まで待つ機能はBgmPlayer自身にはありません。
-本編の例は`Stage1::UpdateStageBgm()`です。`Stage1::Draw()`を通った後のUpdateで、一度だけPlayします。
+本編では`Stage::Draw()`の末尾が`StageBgmPlayback::MarkFrameDrawn()`を呼び、その次の本編Updateで`StageBgmPlayback::Update()`が一度だけPlayを試みます。仮Title中は本編のUpdateへ入らないため、同じStageの描画済み状態でもBGMは始まりません。
 `Audio::LoadFile()`は再生せず事前読込だけを行えます。
 読込中にMedia Foundationの形式設定・サンプル変換・バッファ取得が失敗した場合や、デコード結果が空の場合は`false`を返し、共有音源一覧へ登録しません。`SoundEffectPlayer::Register()`と`BgmPlayer::Play()`はこの結果を確認してから次へ進みます。
 
@@ -454,6 +466,10 @@ JSONの`EVENT_TRIGGER`、`EVENT_CAMERA`、`CAMERA_AREA`を実行するクラス�
 Stage1は固定鏡・持てる鏡・床・壁の反射ルールをコールバックで渡し、
 受け取った線分は`StageLighting`がSpotLightへ変換します。通常CameraとMirror反射Cameraへの描画は、`StageHazardLights::Draw()`へ任せます。
 
+`StageLightDeath`
+
+危険Light接触後の回数、接触位置、一秒間のPlayer上昇・透明化を所有します。`Stage::Update()`は接触時に`Begin()`し、次フレームから`Update()`で消失を進めます。完了後の復帰位置・Camera・Game OverへのScene切替は`Stage::UpdateLightDeath()`が決めるため、この部品はSceneManagerを持ちません。
+
 `StageLightPuzzle`
 
 Charge Laser、Door Laser、二つのSwitch、大型Mirrorの回転、Doorの開閉とDoor Collider、二本のLaserの描画用Rendererを担当します。
@@ -475,7 +491,7 @@ Sceneは初期化・マップ反映・ギミック更新後の合成を呼ぶ順
 `StageSceneRenderer`
 
 通常Game Viewへ、部屋、JSON配置物、鏡、Player、Puzzle Laser、危険Lightを決まった順番で描画します。
-鏡面用Pipelineを使った後に通常Object用Pipelineへ戻す処理もここにあり、`Stage1::Draw()`は
+鏡面用Pipelineを使った後に通常Object用Pipelineへ戻す処理もここにあり、`Stage::Draw()`は
 「反射Textureを更新する → Game Viewを描く → 共通Pipelineを閉じる」という順番だけを読めます。
 
 新しい危険Lightの軌道を増やす時は、まず`StageHazardLights`へ追加します。
@@ -486,12 +502,12 @@ DoorやSwitchを開くStage固有のPuzzleルールはここへ混ぜず、`Stag
 Stage固有の床、Door、固定／携帯Mirror、JSON配置物から、PlayerとCameraが使う`solidObbs`を作ります。
 Lightが遮られる床・Door・壁だけは`lightBlockingObbs`へ分け、Mirrorは反射計算を優先するため含めません。
 
-`Stage1::UpdateStagePlayer`
+`Stage::UpdateStagePlayer`
 
 開始演出中、自動確認中、通常のGame View入力中のどれでPlayerを更新するかを決めます。
 この関数の戻り値がtrueの間は開始演出中なので、Mirror操作と通常Camera更新を止めます。
 
-`Stage1::UpdateStageCamera`
+`Stage::UpdateStageCamera`
 
 開始演出後は通常の追従Cameraを更新し、必要なら開始演出Cameraをその位置へ補間します。
 その後にEvent Cameraを更新し、Edit ViewではEvent Cameraを解除してMainCameraへ戻します。
@@ -544,9 +560,9 @@ Camera・Lightは生成時に個別設定せず、毎フレーム`Object3dRender
 
 エンジン層では、`Framework::Run()`が「Initialize → Update/Drawの反復 → Finalize」を固定し、ゲーム側の`Game`がScene登録・起動確認を含む`Initialize`と`Update`、Scene描画を行う`Draw`だけを上書きします。これはTemplate Methodです。`Game::Finalize()`は基底処理を呼ぶだけで独自の仕事がなかったため上書きせず、`Framework::Finalize()`を使います。どちらも基底クラスにvirtualデストラクタがあり、基底ポインタからの破棄に対応します。
 
-Scene単位の状態管理では、`SceneManager`が`unique_ptr<BaseScene>`で現在Sceneを所有し、仮想`Update()`・`Draw()`を呼び出します。次Sceneの予約後はGPU完了を待ち、旧Sceneの`Finalize()`と破棄、新Sceneの`Initialize()`の順で切り替えます。これはSceneを状態クラスとするState Patternです。ゲーム側の`LoadingScene`・`Stage1`と、エンジン側の`TitleScene`・`DebugScene`がそれぞれ必要な振る舞いだけを実装します。`Stage1`の仮Titleは同じSceneの開始モードであり、Enterのたびに別Sceneクラスへ分ける変更はしていません。
+Scene単位の状態管理では、`SceneManager`が`unique_ptr<BaseScene>`で現在Sceneを所有し、仮想`Update()`・`Draw()`を呼び出します。次Sceneの予約後はGPU完了を待ち、旧Sceneの`Finalize()`と破棄、新Sceneの`Initialize()`の順で切り替えます。これはSceneを状態クラスとするState Patternです。ゲーム側の`LoadingScene`・`Stage1`・`TitleScene`と、エンジン側の`DebugScene`がそれぞれ必要な振る舞いだけを実装します。`Stage1`の仮Titleは同じSceneの開始モードであり、Enterのたびに別Sceneクラスへ分ける変更はしていません。
 
-生成では、`AbstractSceneFactory::CreateScene()`を`SceneFactory`が上書きし、登録名に対応するSceneを作ります。`SceneFactory::RegisterScene()`は空の名前・生成関数を拒否し、切替時に呼べない関数が残らないようにします。ゲーム側の`GameSceneRegistration`がLoadingとStage1の生成関数を登録するため、エンジン側のFactory本体はゲーム固有の鏡パズルの型を知りません。これはFactory Methodと登録関数の組合せです。一体のモデルには別の`Object3dFactory`を使い、読込・GPU準備が終わったObjectだけをSceneへ渡します。後者は単純Factoryであり、前者と同じ名前のパターンとして混同しません。
+生成では、`AbstractSceneFactory::CreateScene()`を`SceneFactory`が上書きし、登録名に対応するSceneを作ります。`SceneFactory::RegisterScene()`は空の名前・生成関数を拒否し、切替時に呼べない関数が残らないようにします。既存APIを保つためFactoryの生成時に従来のTitleOriginalとDebugを登録し、`Game::Initialize()`が`RegisterGameScenes()`を呼んでLoading・Title・Stageなどを追加してから`SceneManager`へFactoryを渡します。これによりStageの型をエンジン側Factoryへ増やさず、静的初期化の実行順にも依存しません。これはFactory Methodと登録関数の組合せです。一体のモデルには別の`Object3dFactory`を使い、読込・GPU準備が終わったObjectだけをSceneへ渡します。後者は単純Factoryであり、前者と同じ名前のパターンとして混同しません。
 
 `Collider`の派生型は球と箱に共通する有効・Trigger状態を再利用しますが、基底ポインタ経由の仮想`Check()`はありません。したがって「ポリモーフィズムを使った箇所」とは数えません。球対箱の判定は現在の型別オーバーロードが責任を明示しており、実在しない共通動作を基底へ追加しません。また`TitleScene`の準備・演出の列挙型と`StageStart`の落下→Camera引継ぎは、現状では固定された短い進行です。Scene単位のState Patternとは区別し、Stateクラスを増やす場合は状態ごとの異なる処理と遷移が増えた時に判断します。
 
@@ -569,7 +585,7 @@ Sceneやゲーム物体が`std::make_unique<Object3d>()`、`Object3d::Initialize
 
 ### Modelの所有とAnimationの更新順
 
-`ModelManager::LoadModel()`がファイル名ごとに一つの`Model`を所有し、`Object3d`はそのポインタを借ります。
+`Engine::ModelManager::LoadModel()`がファイル名ごとに一つの`Engine::Model`を所有し、`Object3d`はそのポインタを借ります。`Engine::ModelCommon`はManagerが所有し、各Modelへ共通DirectX操作窓口を貸します。三クラスを同じ`Engine`名前空間に置いても、所有と初期化・解放の順番は変えません。
 `Model::Initialize()`はモデルファイル → Index Buffer → 頂点Buffer → 材質Buffer → 材質画像の順で準備します。三つのBuffer生成とMapをそれぞれ確認し、失敗した時はModel自身の途中GPU資源とCPU側のMap先を外して`false`を返します。`ModelManager::LoadModel()`は成功したModelだけを登録するため、描画側が未完成のBufferを受け取りません。成功時の材質初期値、画像、描画順は変えません。
 骨ありモデルの`Model::CreateSkinCluster()`はPalette・頂点Influence・出力頂点・計算情報の資源と四つのDescriptorを順に準備し、失敗時は取得済みDescriptorを返して`false`を返します。`Object3d::InitializeAnimation()`と`Object3dFactory::InitializeObject()`はその結果を伝えるため、通常モデルは従来どおり通し、骨ありモデルだけ未完成のまま渡しません。
 `Model::IsLoaded()`はGPU Buffer三つの有無だけを調べるため、画像を含めた読込成功は`Initialize()`の結果で判断します。
@@ -609,7 +625,7 @@ Engine座標はそのまま、Blender座標は読込時と逆にY/Zを入れ替�
 保存では、完成した`stage1.json.tmp`を同じフォルダ内で`stage1.json`へ置き換えます。失敗したら`.tmp`を消さず、Editorに二つのファイルを確認するよう表示します。読込は常に`.json`だけで、`.tmp`を勝手に本編へ反映しません。
 平行光と点光源は`StageLighting`が保持し、JSONのキー・フィル・バックライトは同じクラスの`stageSpotLights_`へ最大3灯だけ保持します。
 
-毎フレームの`Stage1::Update()`では、Mirror・Puzzle・危険Lightを更新した**後**に
+毎フレームの`Stage::Update()`では、Mirror・Puzzle・危険Lightを更新した**後**に
 `StageLighting::UpdateLaserSpotLights()`を呼びます。これにより、そのフレームの反射後の線分を照明に使えます。
 `StageLighting`の`spotLights_`を一度空にしてからJSONのSpotLightを先に入れ、残った枠へPuzzleと危険Lightの線分を順番に変換します。
 配列は最大16灯なので、線分が多い時は後から来た線分の照明を追加しません。Laser自体の線分描画とは別の処理です。
@@ -668,7 +684,7 @@ Debugのように通常モデルとAnimationモデルが混在する一覧だけ
 鏡の反射Textureのように「Cameraを一体ずつ切り替えて描く」特殊な処理は共通化せず、
 `StageReflectionRenderer`に残します。
 
-Stage1では、`CreateRuntimeObject()`がJSON配置物の生成だけをFactoryへ依頼します。
+Stage1では、`StageMapRuntime::Rebuild()`がJSON配置物の生成をFactoryへ依頼します。
 Camera・Light・行列更新は、Stage1のUpdate内で一回作る`Object3dRenderContext`が全Objectへまとめて適用します。
 「生成」と「毎フレームの描画準備」を混ぜないため、追加モデルも同じ経路で描画できます。
 
@@ -958,11 +974,11 @@ Stage1はJSON保存と、`ApplyStageMapData()`による実行中モデル・Coll
 
 ## 処理の順番
 
-1. `Stage1::Initialize`がJSONとCSVを読む。保存後の再読込と保存処理は`Stage1MapLoading.cpp`を読む。
+1. `Stage::Initialize`がJSONとCSVを読む。保存後の再読込と保存処理は`StageMapLoading.cpp`を読む。
 2. `StageMapRuntime`が通常モデルを作る。
 3. `StageCameraEvents`がEvent CameraとCamera Areaを作る。
-4. `Stage1::Update`がPlayer、ギミック、Cameraを更新する。
-5. `Stage1::Draw`が3DモデルとLaserを描画する。
+4. `Stage::Update`がPlayer、ギミック、Cameraを更新する。
+5. `Stage::Draw`が3DモデルとLaserを描画する。
 
 ## 自動確認
 
@@ -976,7 +992,7 @@ Stage1はJSON保存と、`ApplyStageMapData()`による実行中モデル・Coll
 | Title再起動 | `RIBONIN_CHALLENGE_START_SCENE=TITLE`、`RIBONIN_CHALLENGE_SCENE_STRESS_SCENE=TITLE`、`RIBONIN_CHALLENGE_SCENE_STRESS_RESTARTS=2` | Titleの初期化、描画、破棄を二回繰り返す |
 
 Stage1確認の成功ログには`SUCCESS`、`sphereColliderApi=1`、`enemyManager=1`、`hazardReflectionRoute=1`が出ます。
-`hazardReflectionRoute`は携帯鏡の表側へテスト専用の短い線分を向け、`Stage1::ReflectHazardLightSegments()`が本編の鏡一覧・遮蔽物を使って反射できるかを確認します。通常プレイの危険Lightや鏡の配置は変えません。
+`hazardReflectionRoute`は携帯鏡の表側へテスト専用の短い線分を向け、`Stage::ReflectHazardLightSegments()`が本編の鏡一覧・遮蔽物を使って反射できるかを確認します。通常プレイの危険Lightや鏡の配置は変えません。
 一方の`hazardReflection`は現行配置で動く危険Lightが実際に鏡へ当たったかを記録する観測値で、成功条件ではありません。`0`だけで反射処理の故障とは判断できず、鏡の反射像を画面で確認した証拠にもなりません。
 Title再起動確認は終了コード0で成功です。どの確認もゲーム本編のデータを保存・変更しません。
 
@@ -986,9 +1002,9 @@ Title再起動確認は終了コード0で成功です。どの確認もゲー�
 | --- | --- |
 | JSON/CSVを読む | LevelLoader / MapChipField |
 | Stage JSONの読込・保存入口 | LevelLoader::Load / LevelLoader::Save |
-| Stage1の外部ファイル監視・再読込・保存処理 | Stage1MapLoading |
-| Stage1のEdit View・Puzzle Debug UI | Stage1EditorUi |
-| Stage1の携帯Mirror操作・反射対象一覧・危険Light反射 | Stage1MirrorGameplay |
+| Stageの外部ファイル監視・再読込・保存処理 | StageMapLoading |
+| StageのEdit View・Puzzle Debug UI | StageEditorUi |
+| Stageの携帯Mirror操作・反射対象一覧・危険Light反射 | StageMirrorGameplay |
 | Stage全体の照明を所有し、Laser・危険LightをSpotLightへ変換 | StageLighting |
 | JSON/CSVから通常モデルを作る | StageMapRuntime |
 | 携帯鏡・鏡床を生成し、Levelの固定鏡データを生成・編集反映する | StageMirrorFactory |
@@ -1070,5 +1086,5 @@ GPUで更新する足跡粒子は別の`GPUParticle`が担当します。`DebugP
 `PostEffect`は自身のRoot Signature・効果別Pipeline・三つの定数Bufferをprivateで所有し、SceneやImGuiは公開された効果設定関数だけを呼びます。初期化は「Root Signature → Pipeline → BufferとMap → マスク画像二枚」の順で、失敗時はFrameworkがScene開始を止めます。`Framework::Finalize()`はSceneの終了後、TextureManagerの終了前に`PostEffect::Finalize()`を呼び、借りたSRV管理参照と自分のGPU資源を外します。マスク画像はTextureManagerが所有します。
 
 2D描画の`SpriteCommon`は全Sprite共通のRoot SignatureとGraphics Pipelineを所有し、個々の頂点・定数Buffer、位置・色・画像は`Sprite`がprivateで所有します。Sceneは`SpriteCommon::Initialize()`の成功を確認してからSpriteを作ります。`Sprite::Initialize()`は自身の四つのBuffer生成とMapの成否を調べ、完成した時だけ`true`を返します。失敗時は途中まで作った自身のGPU資源を外し、SceneやManagerはそのSpriteを描画一覧へ登録しません。`Sprite::SetTexture()`は画像の読込・登録が失敗した時に`false`を返し、既存Spriteの画像設定を保ちます。Loading → Title → Stage1やDebugへ移る際も各Sceneの開始時に共通設定を作り直し、SceneManagerは切替前にGPUの完了を待ちます。`DirectXCommon::CreateBufferResource()`は生成失敗で空を返し、各所有者が使用前に確認します。GPUメモリ不足やMap失敗を実機で強制した確認はまだありません。
-3D背景は`Object3dFactory::CreateSkyBox()`がDDSを読み込み、`SkyBox::Initialize()`に四つのBufferとMapを準備させてからSceneへ渡します。途中で失敗したSkyBoxはSceneへ登録しません。DDS画像の実体はTextureManager、頂点・Index・行列・MaterialのGPU BufferはSkyBox自身が所有します。Titleの3D準備、Stage1、Debugは同じFactoryを使い、元のDDS・頂点・描画順は変えません。
+3D背景は`Object3dFactory::CreateSkyBox()`がDDSを読み込み、`Engine::SkyBox::Initialize()`に四つのBufferとMapを準備させてからSceneへ渡します。途中で失敗したSkyBoxはSceneへ登録しません。DDS画像の実体はTextureManager、頂点・Index・行列・MaterialのGPU Bufferは`Engine::SkyBox`自身が所有します。Titleの3D準備、Stage1、Debugは同じFactoryを使い、元のDDS・頂点・描画順は変えません。
 共通の`ParticleManager::Initialize()`はRoot Signature → Graphics Pipeline → 標準の板頂点 → Material Bufferの順で準備します。各段階で失敗が分かったら例外を`Framework`へ伝え、次の資源とSceneを開始しません。`Framework::Finalize()`は`ParticleManager::Finalize()`を呼び、GroupのSRVを先に返してから、途中まで作成した共通GPU資源も解放します。GPUメモリ不足・Map失敗を実機で強制した確認はまだありません。

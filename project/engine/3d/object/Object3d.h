@@ -11,7 +11,7 @@
 class Object3dCommon;
 class Object3dGpuData;
 class Object3dFactory;
-class Camera;
+namespace Engine { class Camera; }
 
 // 一体分のTransform・Animation・Light描画データを所有し、頂点と材質は共有Modelから借ります。
 class Object3d
@@ -105,7 +105,7 @@ public:
 
 	void Update();
 	// Animation時間を進めず、指定Camera用の行列だけを描画直前に更新する
-	void UpdateCameraForDraw(Camera* drawCamera);
+	void UpdateCameraForDraw(Engine::Camera* drawCamera);
 
 	void Draw();
 	// 通常描画済みの壁より奥にある部分だけを、指定色の半透明シルエットとして重ねます。
@@ -118,7 +118,7 @@ public:
 	void SetParentWorldMatrix(const Matrix4x4& parentWorldMatrix);
 	void ClearParentWorldMatrix();
 
-	void PlayAnimation(const Model::Animation& animation);
+	void PlayAnimation(const Engine::Model::Animation& animation);
 	void SetAnimationPlaying(bool isPlaying) { isAnimating_ = isPlaying; }
 
 	//ループするかどうかの関数(falseで1ループのみ)
@@ -149,7 +149,7 @@ public:
 	float GetTransformPlaybackDuration() const { return transformPlayback_.GetDuration(); }
 
 	// 描画用のSkeletonを読み取り専用で返し、外部からJointの状態を変更させません。
-	const Model::Skeleton& GetSkeleton() const { return skeleton_; }
+	const Engine::Model::Skeleton& GetSkeleton() const { return skeleton_; }
 
 	// 位置・回転・拡大率をObject自身へ保存し、次のUpdateで描画行列へ反映します。
 	void SetScale(const Vector3& scale) { transform_.scale = scale; }
@@ -158,7 +158,7 @@ public:
 	// 編集済みの三要素をまとめて反映し、内部Transformの変更経路をObject3dに限定します。
 	void SetTransform(const Transform& newTransform) { transform_ = newTransform; }
 	// 描画時に借りるCameraだけを切り替え、Camera自体の所有権は移しません。
-	void SetCamera(Camera* camera) { camera_ = camera; }
+	void SetCamera(Engine::Camera* camera) { camera_ = camera; }
 
 	//構造体(color,direction,intensity)全部入ってるsetter
 	void SetDirectionalLight(const DirectionalLight& light);
@@ -188,9 +188,9 @@ public:
 	// このObjectが借りている共有Modelの環境反射率を読みます。
 	float GetEnvironmentCoefficient() const;
 	// 編集できるObjectからは、従来どおり共有Modelへの参照を貸します。
-	Model* GetModel() { return model_; }
+	Engine::Model* GetModel() { return model_; }
 	// 読み取り専用Objectからは共有Modelの材質や頂点を変更させません。
-	const Model* GetModel() const { return model_; }
+	const Engine::Model* GetModel() const { return model_; }
 	const std::string& GetModelName() const { return modelName_; }
 
 	//外部からアニメーションモデルかどうか判定
@@ -205,7 +205,7 @@ private:
 	friend class Object3dFactory;
 	// 一体分のGPU描画データが完成した時だけFactoryへ成功を返します。
 	bool Initialize(Object3dCommon* object3dCommon);
-	void SetModel(Model* model) { this->model_ = model; }
+	void SetModel(Engine::Model* model) { this->model_ = model; }
 	void SetModel(const std::string& filePath);
 	bool InitializeAnimation();
 
@@ -213,11 +213,11 @@ private:
 
 	Object3dCommon* object3dCommon_ = nullptr;
 
-	Model* model_ = nullptr;
+	Engine::Model* model_ = nullptr;
 	std::string modelName_;
 	uint32_t textureSrvIndexOverride_ = UINT32_MAX;
 
-	Camera* camera_ = nullptr;
+	Engine::Camera* camera_ = nullptr;
 
 	//3Dオブジェクト自身のトランスフォーム
 	Transform transform_{};
@@ -230,7 +230,7 @@ private:
 	float opacity_ = 1.0f;
 
 	//アニメーション
-	Model::Animation currentAnimation_;//アニメーション読み込み
+	Engine::Model::Animation currentAnimation_;//アニメーション読み込み
 	float animationTime_ = 0.0f;// アニメーションの再生時間を管理
 	bool isAnimating_ = false;
 	bool isLoop_ = true;//デフォルトはループ
@@ -238,8 +238,8 @@ private:
 	ReturnPlaybackState animationReturnState_;
 	TransformPlaybackController transformPlayback_;
 
-	Model::Skeleton skeleton_; // このオブジェクト専用の骨
+	Engine::Model::Skeleton skeleton_; // このオブジェクト専用の骨
 	bool isSkeletal_ = false;  // スケルトンを持っているかどうか
-	Model::SkinCluster skinCluster_;//骨に合わせて動く体
+	Engine::Model::SkinCluster skinCluster_;//骨に合わせて動く体
 };
 

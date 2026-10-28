@@ -3,13 +3,13 @@
 #include <memory>
 #include <vector>
 
-class Camera;
+namespace Engine { class Camera; }
 class DirectXCommon;
 class Object3d;
 class Object3dCommon;
-class SkyBox;
-class Sprite;
-class SpriteCommon;
+namespace Engine { class SkyBox; }
+namespace Engine { class Sprite; }
+namespace Engine { class SpriteCommon; }
 
 // DebugSceneの通常描画とPreview描画を切り替える、Debug専用の描画部品です。
 // モデルやSpriteを所有せず、Sceneが所有する描画対象だけを受け取ります。
@@ -20,15 +20,15 @@ public:
 	{
 		DirectXCommon* directXCommon = nullptr;
 		Object3dCommon* object3dCommon = nullptr;
-		SpriteCommon* spriteCommon = nullptr;
-		Camera* camera = nullptr;
+		Engine::SpriteCommon* spriteCommon = nullptr;
+		Engine::Camera* camera = nullptr;
 		Object3d* previewObject = nullptr;
-		Sprite* previewSprite = nullptr;
+		Engine::Sprite* previewSprite = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
 		Object3d* handWeapon = nullptr;
-		SkyBox* skyBox = nullptr;
-		std::vector<std::unique_ptr<Sprite>>* sprites = nullptr;
+		Engine::SkyBox* skyBox = nullptr;
+		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 	};
 
 	// 3D背景・Particle・Sprite・PostEffect・ImGuiの順でDebug Sceneを描画します。

@@ -5,6 +5,7 @@
 #include<algorithm>
 #include<cassert>
 #include <cstdint>
+#include <stdexcept>
 #include <thread>
 using namespace Logger;
 
@@ -16,8 +17,10 @@ using namespace Microsoft::WRL;
 // WinAppの画面サイズを保持し、依存順にGPU資源を作って描画開始に備えます。
 void DirectXCommon::Initialize(WinApp* winApp)
 {
-	//NULL検出
-	assert(winApp);
+	// WindowがなければサイズやHwndを読めず、GPU初期化を続けられません。
+	if (!winApp) {
+		throw std::invalid_argument("DirectXCommon: window is unavailable.");
+	}
 
 	//メンバ変数に記録
 	winApp_ = winApp;
@@ -64,11 +67,15 @@ void DirectXCommon::ResizeIfNeeded()
 	const HRESULT resizeResult = swapChain_->ResizeBuffers(
 		static_cast<UINT>(GetSwapChainResourcesNum()), width_, height_,
 		swapChainDesc_.Format, swapChainDesc_.Flags);
-	assert(SUCCEEDED(resizeResult));
+	if (FAILED(resizeResult)) {
+		throw std::runtime_error("DirectXCommon: SwapChain resize failed.");
+	}
 
 	for (UINT i = 0; i < GetSwapChainResourcesNum(); ++i) {
 		const HRESULT getBufferResult = swapChain_->GetBuffer(i, IID_PPV_ARGS(&swapChainResources_[i]));
-		assert(SUCCEEDED(getBufferResult));
+		if (FAILED(getBufferResult) || !swapChainResources_[i]) {
+			throw std::runtime_error("DirectXCommon: resized SwapChain buffer could not be acquired.");
+		}
 	}
 
 	CreateRenderTargetViews();
@@ -100,20 +107,30 @@ void DirectXCommon::CreateDevice()
 	//HRESULTはWindows系のエラーコードであり、
 	//関数が成功したかどうかをSUCCEEDEDマクロで判定できる
 	hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgiFactory_));
-	//初期化の根本的な部分でエラーが出た場合はプログラムが間違ってるか、
-	// どうにもできない場合が多いのでassertにしておく
-	assert(SUCCEEDED(hr));
+	// Factoryがない状態でAdapterを列挙すると失敗箇所が分からなくなるため、ここで止めます。
+	if (FAILED(hr) || !dxgiFactory_) {
+		throw std::runtime_error("DirectXCommon: DXGI factory creation failed.");
+	}
 
 	ComPtr < IDXGIAdapter4> useAdapter = nullptr;
 	//良い順にアダプタを頼む
-	for (UINT i = 0; dxgiFactory_->EnumAdapterByGpuPreference(
-		i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter)) !=
-		DXGI_ERROR_NOT_FOUND; ++i)
+	for (UINT i = 0; ; ++i)
 	{
+		useAdapter.Reset();
+		const HRESULT adapterResult = dxgiFactory_->EnumAdapterByGpuPreference(
+			i, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&useAdapter));
+		if (adapterResult == DXGI_ERROR_NOT_FOUND) {
+			break;
+		}
+		if (FAILED(adapterResult) || !useAdapter) {
+			throw std::runtime_error("DirectXCommon: GPU adapter enumeration failed.");
+		}
 		//アダプターの情報を取得する
 		DXGI_ADAPTER_DESC3 adapterDesc{};
 		hr = useAdapter->GetDesc3(&adapterDesc);
-		assert(SUCCEEDED(hr));//取得できないのは一大事
+		if (FAILED(hr)) {
+			throw std::runtime_error("DirectXCommon: GPU adapter description failed.");
+		}
 		//ソフトウェアアダプタでなければ採用
 		if (!(adapterDesc.Flags & DXGI_ADAPTER_FLAG3_SOFTWARE))
 		{
@@ -123,7 +140,9 @@ void DirectXCommon::CreateDevice()
 		}
 		useAdapter = nullptr;//ソフトウェアアダプタの場合は見なかったことにする
 	}
-	assert(useAdapter != nullptr);
+	if (!useAdapter) {
+		throw std::runtime_error("DirectXCommon: no hardware GPU adapter was found.");
+	}
 
 	//機能レベルとログ出力用の文字列
 	D3D_FEATURE_LEVEL featureLevels[] =
@@ -146,7 +165,9 @@ void DirectXCommon::CreateDevice()
 		}
 	}
 	//デバイスの生成がうまくいかなかったので起動できない
-	assert(device_ != nullptr);
+	if (!device_) {
+		throw std::runtime_error("DirectXCommon: Direct3D 12 device creation failed.");
+	}
 
 #ifdef _DEBUG
 	ComPtr<ID3D12InfoQueue> infoQueue = nullptr;
@@ -187,14 +208,18 @@ void DirectXCommon::CreateCommandObjects()
 			D3D12_COMMAND_LIST_TYPE_DIRECT,
 			IID_PPV_ARGS(commandAllocator.GetAddressOf())
 		);
-		assert(SUCCEEDED(hr));
+		if (FAILED(hr) || !commandAllocator) {
+			throw std::runtime_error("DirectXCommon: command allocator creation failed.");
+		}
 	}
 
 	D3D12_COMMAND_QUEUE_DESC commandQueueDesc{};
 	hr = device_->CreateCommandQueue(&commandQueueDesc,
 		IID_PPV_ARGS(&commandQueue_));
-	//コマンドキューの生成がうまくいかなかったので起動できない
-	assert(SUCCEEDED(hr));
+	// QueueがなければCommand Listを実行できないため、後続を作らず終了します。
+	if (FAILED(hr) || !commandQueue_) {
+		throw std::runtime_error("DirectXCommon: command queue creation failed.");
+	}
 
 	// Command ListはAllocatorとQueueを作った後に一度だけ生成する。
 	hr = device_->CreateCommandList(
@@ -203,7 +228,9 @@ void DirectXCommon::CreateCommandObjects()
 		commandAllocators_[frameIndex_].Get(),
 		nullptr,
 		IID_PPV_ARGS(&commandList_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !commandList_) {
+		throw std::runtime_error("DirectXCommon: command list creation failed.");
+	}
 }
 
 // 作成済みの実行キューとWinAppのウィンドウを結び、表示用の二枚の描画先を作ります。
@@ -223,12 +250,16 @@ void DirectXCommon::CreateSwapChain()
 	swapChainDesc_.Width = width_;
 	swapChainDesc_.Height = height_;
 	hr = dxgiFactory_->CreateSwapChainForHwnd(commandQueue_.Get(), winApp_->GetHwnd(), &swapChainDesc_, nullptr, nullptr, reinterpret_cast<IDXGISwapChain1**>(swapChain_.GetAddressOf()));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !swapChain_) {
+		throw std::runtime_error("DirectXCommon: SwapChain creation failed.");
+	}
 
 	// 設定した枚数だけBack Bufferを取得し、後続のRTV作成と配列の範囲を一致させます。
 	for (UINT index = 0; index < kSwapChainBufferCount; ++index) {
 		hr = swapChain_->GetBuffer(index, IID_PPV_ARGS(&swapChainResources_[index]));
-		assert(SUCCEEDED(hr));
+		if (FAILED(hr) || !swapChainResources_[index]) {
+			throw std::runtime_error("DirectXCommon: SwapChain buffer could not be acquired.");
+		}
 	}
 }
 
@@ -263,7 +294,9 @@ void DirectXCommon::CreateDepthStencilResource()
 		D3D12_RESOURCE_STATE_DEPTH_WRITE,
 		&depthClearValue,
 		IID_PPV_ARGS(&depthStencilResource_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !depthStencilResource_) {
+		throw std::runtime_error("DirectXCommon: depth stencil creation failed.");
+	}
 }
 
 // SwapChainとオフスクリーン描画先のRTVを、生成する枚数に合わせて確保します。
@@ -285,6 +318,10 @@ void DirectXCommon::CreateDescriptorHeaps()
 	srvDescriptorHeap_ = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
 	//DSV用のヒープでディスクリプタの数は1。DSVはShader内で触れるものではないので、ShaderVisibleはfalse
 	dsvDescriptorHeap_ = CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, false);
+	// 三種類のHeapがそろわなければ、後続のRTV・DSVを登録できません。
+	if (!rtvDescriptorHeap_ || !srvDescriptorHeap_ || !dsvDescriptorHeap_) {
+		throw std::runtime_error("DirectXCommon: required descriptor heap creation failed.");
+	}
 }
 
 // SwapChainと各オフスクリーンTextureへRTVを割り当て、描画先を使えるようにします。
@@ -305,7 +342,9 @@ void DirectXCommon::CreateRenderTargetViews()
 	// SwapChainが所有する二枚のBack BufferそれぞれへRTVを作成します。
 	for (UINT i = 0; i < kSwapChainBufferCount; ++i)
 	{
-		assert(swapChainResources_[i]);
+		if (!swapChainResources_[i]) {
+			throw std::runtime_error("DirectXCommon: SwapChain buffer is unavailable for RTV.");
+		}
 		device_->CreateRenderTargetView(
 			swapChainResources_[i].Get(),
 			&rtvDesc_,
@@ -324,6 +363,9 @@ void DirectXCommon::CreateRenderTargetViews()
 		height_,
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		renderTextureClearColor_);
+	if (!renderTextureResource_) {
+		throw std::runtime_error("DirectXCommon: Scene render texture could not be created.");
+	}
 
 	// RTVヒープの3個目にRenderTexture用RTVを生成する
 	renderTextureRtvHandle_ = handle;
@@ -339,6 +381,9 @@ void DirectXCommon::CreateRenderTargetViews()
 		height_,
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		renderTextureClearColor_);
+	if (!postEffectTextureResource_) {
+		throw std::runtime_error("DirectXCommon: post effect texture could not be created.");
+	}
 
 	postEffectTextureRtvHandle_ = handle;
 	device_->CreateRenderTargetView(
@@ -353,6 +398,9 @@ void DirectXCommon::CreateRenderTargetViews()
 		height_,
 		DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
 		renderTextureClearColor_);
+	if (!gaussianBlurTextureResource_) {
+		throw std::runtime_error("DirectXCommon: Gaussian blur texture could not be created.");
+	}
 
 	gaussianBlurTextureRtvHandle_ = handle;
 	device_->CreateRenderTargetView(
@@ -386,11 +434,15 @@ void DirectXCommon::CreateFence()
 {
 	// Fenceの成否を生成時だけ判定し、後続フレームに一時結果を残しません。
 	const HRESULT hr = device_->CreateFence(fenceValue_, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !fence_) {
+		throw std::runtime_error("DirectXCommon: GPU fence creation failed.");
+	}
 
 	fenceEvent_ = CreateEvent(NULL, FALSE, FALSE, NULL);
-	//FenceのSignalを待つためのイベントを作成する
-	assert(fenceEvent_ != nullptr);
+	// FenceのSignalを待つEventを作れなければ、GPU完了を安全に待てません。
+	if (!fenceEvent_) {
+		throw std::runtime_error("DirectXCommon: GPU fence event creation failed.");
+	}
 }
 
 // 現在の画面サイズにViewportを合わせ、描画範囲がResize後もずれないようにします。
@@ -425,28 +477,35 @@ void DirectXCommon::CreateDxcCompiler()
 	HRESULT hr = S_OK;
 	//DXCコンパイラの生成
 	hr = DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxcUtils_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !dxcUtils_) {
+		throw std::runtime_error("DirectXCommon: DXC utility creation failed.");
+	}
 	hr = DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&dxcCompiler_));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !dxcCompiler_) {
+		throw std::runtime_error("DirectXCommon: DXC compiler creation failed.");
+	}
 
 	hr = dxcUtils_->CreateDefaultIncludeHandler(&includeHandler_);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !includeHandler_) {
+		throw std::runtime_error("DirectXCommon: DXC include handler creation failed.");
+	}
 }
 
+// 起動時の時刻と一フレームの目標時間を保存し、描画後の待機基準をそろえます。
 void DirectXCommon::InitializeFixFPS()
 {
 	//現在時間を記録する
 	reference_ = std::chrono::steady_clock::now();
 
 	//1/60秒ぴったりの時間
-	kMinTime_ = std::chrono::microseconds(uint64_t(1000000.0f / 60.0f));
+	minFrameTime_ = std::chrono::microseconds(uint64_t(1000000.0f / 60.0f));
 }
 
 // 描画後に目標時刻まで待ち、次フレームで使う実経過時間を更新します。
 // 先にreturnしていた旧待機処理は実行されないため、この一経路だけを残します。
 void DirectXCommon::UpdateFixFPS()
 {
-	const std::chrono::steady_clock::time_point target = reference_ + kMinTime_;
+	const std::chrono::steady_clock::time_point target = reference_ + minFrameTime_;
 	const std::chrono::steady_clock::time_point currentTime = std::chrono::steady_clock::now();
 	if (currentTime < target) {
 		// Sleepの粒度で大きく遅れないよう、最後の1msだけ短く待つ。

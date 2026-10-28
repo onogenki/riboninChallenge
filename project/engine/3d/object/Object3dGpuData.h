@@ -5,7 +5,7 @@
 #include <vector>
 #include <wrl.h>
 
-class Camera;
+namespace Engine { class Camera; }
 class DirectXCommon;
 struct ID3D12GraphicsCommandList;
 struct ID3D12Resource;
@@ -18,7 +18,7 @@ public:
 	// 三つのConstant Bufferが完成した時だけ、Object3dへ成功を返します。
 	bool Initialize(DirectXCommon* dxCommon);
 	// World行列とCameraを使い、通常描画用の行列・Camera位置を更新します。
-	void UpdateTransform(const Matrix4x4& worldMatrix, const Camera* camera);
+	void UpdateTransform(const Matrix4x4& worldMatrix, const Engine::Camera* camera);
 	// 通常モデル描画で使う各Constant BufferをRoot Parameterへ設定します。
 	bool BindForObjectDraw(ID3D12GraphicsCommandList* commandList);
 	// 壁越しシルエット描画で使う行列と色をRoot Parameterへ設定します。

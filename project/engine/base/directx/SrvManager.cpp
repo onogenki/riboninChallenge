@@ -1,4 +1,5 @@
 #include "SrvManager.h"
+#include <stdexcept>
 
 // DirectXから共通Heapを作り、使用済み番号を残さず全枠を割当可能にします。
 void SrvManager::Initialize(DirectXCommon* dxCommon){
@@ -7,6 +8,10 @@ void SrvManager::Initialize(DirectXCommon* dxCommon){
 
 	//デスクリプタヒープの作成
 	descriptorHeap_ = directXCommon_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kMaxSRVCount, true);
+	// 空Heapのまま番号だけ配るとTexture登録で失敗するため、初期化をここで止めます。
+	if (!descriptorHeap_) {
+		throw std::runtime_error("SrvManager: descriptor heap creation failed.");
+	}
 	//デスクリプタ1個分のサイズを取得して記録
 	descriptorSize_ = directXCommon_->GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	freeList_ = {};

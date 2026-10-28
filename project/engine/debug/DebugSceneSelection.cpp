@@ -31,7 +31,7 @@ bool DebugSceneSelection::SelectObject(
 // 指定Spriteを選択し、対応するECS Entityも選択します。
 bool DebugSceneSelection::SelectSprite(
 	size_t index,
-	const std::vector<std::unique_ptr<Sprite>>& sprites,
+	const std::vector<std::unique_ptr<Engine::Sprite>>& sprites,
 	DebugEntityRegistry& entityRegistry)
 {
 	if (index >= sprites.size() || !sprites[index]) {

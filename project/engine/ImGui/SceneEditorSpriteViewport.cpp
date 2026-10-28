@@ -89,7 +89,7 @@ void SceneEditor::DrawSpriteViewportEditor(SpriteViewportState& state, const Spr
 	const bool toolbarHovered = ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows);
 	ImGui::End();
 
-	Sprite* selectedSprite = state.selectedIndex >= 0
+	Engine::Sprite* selectedSprite = state.selectedIndex >= 0
 		? options.sprites[state.selectedIndex].sprite
 		: nullptr;
 	bool gizmoHovered = false;
@@ -262,7 +262,7 @@ void SceneEditor::DrawSpriteViewportEditor(SpriteViewportState& state, const Spr
 		};
 		int selectedIndex = -1;
 		for (int index = static_cast<int>(options.sprites.size()) - 1; index >= 0; --index) {
-			Sprite* sprite = options.sprites[index].sprite;
+			Engine::Sprite* sprite = options.sprites[index].sprite;
 			if (!sprite) {
 				continue;
 			}

@@ -1,6 +1,7 @@
 #include "StageMapRuntime.h"
 
 #include "Object3dRenderContext.h"
+#include "Object3dFactory.h"
 
 #include <algorithm>
 #include <cmath>
@@ -99,6 +100,23 @@ namespace
 	}
 }
 
+// Factoryへの生成依頼を既存APIに渡し、配置物の採用手順を一つに保ちます。
+bool StageMapRuntime::Rebuild(
+	const std::vector<const LevelLoader::ObjectData*>& objectDataList,
+	Object3dCommon* object3dCommon)
+{
+	if (!object3dCommon) {
+		return false;
+	}
+	return Rebuild(
+		objectDataList,
+		[object3dCommon](const std::string& modelName)
+		{
+			return Object3dFactory::Create(object3dCommon, modelName);
+		});
+}
+
+// 生成関数を使って全件を仮一覧へ作り、一つでも失敗したら旧一覧を変更しません。
 bool StageMapRuntime::Rebuild(
 	const std::vector<const LevelLoader::ObjectData*>& objectDataList,
 	const CreateObjectFunction& createObject)
@@ -113,8 +131,7 @@ bool StageMapRuntime::Rebuild(
 		RuntimeObject runtimeObject{};
 		runtimeObject.sourceName = objectData->name;
 		runtimeObject.tag = objectData->tag;
-		// Factoryを使うCreateObjectFunctionがモデル読込とObject3d初期化をまとめて行います。
-		// Runtimeは生成結果だけを見るため、ModelManagerへ直接依存しません。
+		// 生成が完成したObjectだけを所有し、失敗時の半端な一覧を採用しません。
 		runtimeObject.visual = createObject(objectData->fileName);
 		if (!runtimeObject.visual) {
 			return false;
@@ -206,7 +223,7 @@ void StageMapRuntime::UpdateRenderObjects(const Object3dRenderContext& renderCon
 }
 
 // 一枚のMirror反射Cameraまたは通常Cameraの行列を、所有する配置物全てへ反映します。
-void StageMapRuntime::UpdateCameraForDraw(Camera* camera)
+void StageMapRuntime::UpdateCameraForDraw(Engine::Camera* camera)
 {
 	for (RuntimeObject& runtimeObject : objects_) {
 		if (runtimeObject.visual) {

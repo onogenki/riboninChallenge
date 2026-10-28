@@ -9,7 +9,10 @@
 #include "Vector4.h"
 #include "Matrix4x4.h"
 
-class Camera;
+namespace Engine { class Camera; }
+
+namespace Engine
+{
 
 // Compute Shaderで粒子を更新し、描画用バッファとEmitter設定を管理します。
 class GPUParticle
@@ -46,7 +49,7 @@ public:
 	// deltaTime秒だけEmitterを進め、発生とGPU上の粒子更新をこの順に行います。
 	void Update(float deltaTime);
 	// 指定Cameraと固定画像の準備がそろった時だけ粒子を描きます。
-	void Draw(const Camera* camera);
+	void Draw(const Engine::Camera* camera);
 	// emitterIndex番の発生位置をワールド座標で指定します。範囲外の番号は無視します。
 	void SetEmitterTranslate(uint32_t emitterIndex, const Vector3& translate);
 	// emitterIndex番の発生を有効・無効にします。範囲外の番号は無視します。
@@ -196,3 +199,5 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12CommandSignature> drawCommandSignature_;
 };
+
+} // namespace Engine

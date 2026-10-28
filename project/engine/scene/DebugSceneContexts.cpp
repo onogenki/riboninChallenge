@@ -27,7 +27,7 @@ DebugSceneContent::Context DebugScene::MakeContentContext()
 	context.registerModel = [this](Object3d* object, const std::string& sourceFile, bool isAnimated) {
 		entityRegistry_.RegisterModel(object, sourceFile, isAnimated);
 	};
-	context.registerSprite = [this](Sprite* sprite, const std::string& sourceFile) {
+	context.registerSprite = [this](Engine::Sprite* sprite, const std::string& sourceFile) {
 		entityRegistry_.RegisterSprite(sprite, sourceFile);
 	};
 	context.selectObject = [this](bool isAnimation, size_t index) {

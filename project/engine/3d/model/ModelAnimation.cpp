@@ -8,6 +8,9 @@
 
 using namespace MyMath;
 
+namespace Engine
+{
+
 // Skeletonの構築、Animationファイル読込、Keyframe補間と適用をまとめる。
 // モデルの頂点読込・GPU描画とは分け、Animationだけを追えるようにする。
 namespace {
@@ -203,4 +206,6 @@ void Model::ApplyAnimation(Skeleton& skeleton, const Animation& animation, float
 			}
 		}
 	}
+}
+
 }

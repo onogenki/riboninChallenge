@@ -40,7 +40,7 @@ namespace
 // Object3dの頂点をワールド座標へ変換し、Debug表示用のAABBを作ります。
 bool DebugCollisionOverlay::BuildWorldAabb(const Object3d& object, MyMath::AABB& outAabb)
 {
-	const Model* model = object.GetModel();
+	const Engine::Model* model = object.GetModel();
 	if (!model || model->GetModelData().vertices.empty()) {
 		return false;
 	}
@@ -61,7 +61,7 @@ bool DebugCollisionOverlay::BuildWorldAabb(const Object3d& object, MyMath::AABB&
 		std::numeric_limits<float>::lowest(),
 	};
 
-	for (const Model::VertexData& vertex : model->GetModelData().vertices) {
+	for (const Engine::Model::VertexData& vertex : model->GetModelData().vertices) {
 		const Vector3 localPosition{ vertex.position.x, vertex.position.y, vertex.position.z };
 		const Vector3 worldPosition = TransformPoint(localPosition, worldMatrix);
 		minPoint.x = (std::min)(minPoint.x, worldPosition.x);

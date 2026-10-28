@@ -3,9 +3,9 @@
 #include "BaseScene.h"
 #include <memory>
 
-class CameraManager;
-class Camera;
-class SkyBox;
+namespace Engine { class CameraManager; }
+namespace Engine { class Camera; }
+namespace Engine { class SkyBox; }
 class StageSelectOverlay;
 
 // 夜空と操作案内を表示し、EnterでStage1・BackspaceでTitleへ進む選択画面です。
@@ -21,9 +21,9 @@ public:
 	bool IsReadyForTransition() const override { return isReady_; }
 
 private:
-	std::unique_ptr<CameraManager> cameraManager_;
-	std::unique_ptr<Camera> mainCamera_;
-	std::unique_ptr<SkyBox> skyBox_;
+	std::unique_ptr<Engine::CameraManager> cameraManager_;
+	std::unique_ptr<Engine::Camera> mainCamera_;
+	std::unique_ptr<Engine::SkyBox> skyBox_;
 	std::unique_ptr<StageSelectOverlay> overlay_;
 	bool isReady_ = false;
 };

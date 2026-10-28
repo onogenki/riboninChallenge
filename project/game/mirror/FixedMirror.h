@@ -29,7 +29,7 @@ public:
 		uint32_t reflectionTextureSize = 512);
 
 	// 通常Cameraを鏡面の反対側へ移し、反射Cameraを更新します。
-	void UpdateReflectionCamera(const Camera& sourceCamera, const Vector3& sourceForward);
+	void UpdateReflectionCamera(const Engine::Camera& sourceCamera, const Vector3& sourceForward);
 	// Mirrorの中心・大きさ・角度を、見た目と当たり判定へ反映します。
 	void SyncVisualAndCollider();
 	// モデルとColliderの中心や厚みが異なる場合に、ローカル座標の形を設定します。
@@ -40,13 +40,13 @@ public:
 	// 専用Textureを板へ貼り、鏡面を描画します。
 	void DrawSurface();
 	// Cameraが鏡の表側にいる時だけ、反射Textureを表示します。
-	void DrawSurface(const Camera& camera);
+	void DrawSurface(const Engine::Camera& camera);
 
 	Object3d& GetObject() { return object_; }
 	const Object3d& GetObject() const { return object_; }
 	const Mirror& GetMirror() const { return mirror_; }
-	Camera& GetReflectionCamera() { return reflectionCamera_; }
-	const Camera& GetReflectionCamera() const { return reflectionCamera_; }
+	Engine::Camera& GetReflectionCamera() { return reflectionCamera_; }
+	const Engine::Camera& GetReflectionCamera() const { return reflectionCamera_; }
 	// Playerなどが鏡のColliderへ判定を依頼する時に使います。
 	const ObbCollider& GetCollider() const { return collider_; }
 	// 床・壁一覧やLaser遮蔽へ渡す、鏡のOBB形状データを返します。
@@ -65,7 +65,7 @@ public:
 private:
 	Object3d object_;
 	Mirror mirror_;
-	Camera reflectionCamera_;
+	Engine::Camera reflectionCamera_;
 	PlanarReflectionTarget reflectionTarget_;
 	// 見た目の板と同じTransformを受け取る、鏡専用のOBB Colliderです。
 	ObbCollider collider_{};

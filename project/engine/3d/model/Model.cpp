@@ -13,6 +13,9 @@
 
 using namespace MyMath;
 
+namespace Engine
+{
+
 Model::Node Model::ReadNode(aiNode* node)
 {
 	Node result;
@@ -410,4 +413,6 @@ bool Model::LoadModelFile(const std::string& directoryPath, const std::string& f
 		}
 	}
 	return !modelData_.vertices.empty() && !modelData_.indices.empty() && !modelData_.meshes.empty();
+}
+
 }

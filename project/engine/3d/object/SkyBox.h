@@ -8,8 +8,11 @@
 #include "Vector3.h"
 
 class DirectXCommon;
-class Camera;
+namespace Engine { class Camera; }
 class Object3dCommon;
+
+namespace Engine
+{
 
 // キューブマップを背景として描画し、Cameraの向きに合わせて見える面を更新します。
 class SkyBox {
@@ -34,7 +37,7 @@ public:
     };
 
     // 四つのGPU Bufferを準備できた場合だけ、Factoryへ成功を返します。
-    bool Initialize(DirectXCommon* dxCommon, Camera* camera);
+    bool Initialize(DirectXCommon* dxCommon, Engine::Camera* camera);
     void Update();
     void Draw();
     void SetTexture(const std::string& filePath) { texture_ = filePath; }//キューブマップのDDSのパスを指定
@@ -45,7 +48,7 @@ private:
     void ResetResources();
 
     DirectXCommon* dxCommon_ = nullptr;
-    Camera* camera_ = nullptr;
+    Engine::Camera* camera_ = nullptr;
     Object3dCommon* object3dCommon_ = nullptr;
 
     // SkyBox専用の頂点・インデックスリソース
@@ -61,3 +64,5 @@ private:
 
     std::string texture_;
 };
+
+}

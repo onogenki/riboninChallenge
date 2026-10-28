@@ -11,13 +11,13 @@ BaseScene::~BaseScene() = default;
 
 // Scene自身の所有先へMainCameraを生成し、Managerへ登録して最初の有効Cameraにします。
 void BaseScene::InitializeMainCamera(
-	std::unique_ptr<CameraManager>& cameraManager,
-	std::unique_ptr<Camera>& mainCamera,
+	std::unique_ptr<Engine::CameraManager>& cameraManager,
+	std::unique_ptr<Engine::Camera>& mainCamera,
 	const Vector3& translate,
 	const Vector3& rotate)
 {
-	cameraManager = std::make_unique<CameraManager>();
-	mainCamera = std::make_unique<Camera>();
+	cameraManager = std::make_unique<Engine::CameraManager>();
+	mainCamera = std::make_unique<Engine::Camera>();
 	mainCamera->SetRotate(rotate);
 	mainCamera->SetTranslate(translate);
 	cameraManager->AddCamera("MainCamera", mainCamera.get());

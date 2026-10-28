@@ -104,6 +104,7 @@ void ImGuiManager::End()
 }
 
 #ifdef USE_IMGUI
+// SceneごとのDockSpaceを組み立て、Game ViewとDebugへの切替を同じ入力枠で扱います。
 void ImGuiManager::BeginDockSpace(const char* sceneName)
 {
 	gameViewDrawList_ = nullptr;
@@ -417,7 +418,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 					PostEffect::GetInstance()->SetRandomNoiseIntensity(randomNoiseIntensity);
 				}
 			}
-			ParticleManager* particleManager = ParticleManager::GetInstance();
+			Engine::ParticleManager* particleManager = Engine::ParticleManager::GetInstance();
 			bool particlesReturning = particleManager->IsReturning();
 			if (ImGui::Checkbox("Particle return##TopTools", &particlesReturning)) {
 				particleManager->SetReturning(particlesReturning);
@@ -437,9 +438,9 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 			ImGui::TextUnformatted("Edit View Model Shelf");
 			ImGui::Separator();
 			ImGui::TextWrapped("This scene has not registered a resource shelf yet.");
-			if (SceneManager::GetInstance()->GetCurrentSceneName() != "DEBUG") {
+			if (Engine::SceneManager::GetInstance()->GetCurrentSceneName() != "DEBUG") {
 				if (ImGui::Button("Go to Debug")) {
-					SceneManager::GetInstance()->ChangeScene("DEBUG");
+					Engine::SceneManager::GetInstance()->ChangeScene("DEBUG");
 				}
 			}
 			ImGui::SameLine();
@@ -573,13 +574,14 @@ void ImGuiManager::RuntimeMonitorWindow(const char* sceneName)
 	ImGui::End();
 }
 
+// 現在Scene名と切替先を表示し、UIからの変更要求だけをManagerへ渡します。
 void ImGuiManager::SceneWindow(const char* sceneName)
 {
 	if (!ImGui::Begin("Scene", &showSceneWindow_)) {
 		ImGui::End();
 		return;
 	}
-	SceneManager* sceneManager = SceneManager::GetInstance();
+	Engine::SceneManager* sceneManager = Engine::SceneManager::GetInstance();
 	const std::string& currentScene = sceneManager->GetCurrentSceneName();
 	const char* currentLabel = currentScene.empty() ? sceneName : currentScene.c_str();
 
@@ -606,7 +608,7 @@ void ImGuiManager::SceneWindow(const char* sceneName)
 		sceneManager->RestartCurrentScene();
 	}
 	if (ImGui::Button("Reload Loaded Model / Texture")) {
-		ModelManager::GetInstance()->ReloadAllLoadedModels();
+		Engine::ModelManager::GetInstance()->ReloadAllLoadedModels();
 		TextureManager::GetInstance()->ReloadAllLoadedTextures();
 	}
 	ImGui::TextDisabled("Reload keeps the current Scene and replaces loaded model / PNG / DDS data.");

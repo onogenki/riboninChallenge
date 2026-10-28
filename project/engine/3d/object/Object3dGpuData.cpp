@@ -52,7 +52,7 @@ void Object3dGpuData::ResetResources()
 }
 
 // World行列とCameraを使い、通常描画用の行列・Camera位置を更新します。
-void Object3dGpuData::UpdateTransform(const Matrix4x4& worldMatrix, const Camera* camera)
+void Object3dGpuData::UpdateTransform(const Matrix4x4& worldMatrix, const Engine::Camera* camera)
 {
 	if (!transformationMatrixData_) {
 		return;

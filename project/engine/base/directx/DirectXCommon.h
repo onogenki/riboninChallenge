@@ -17,7 +17,13 @@ class DirectXCommon
 {
 public:
 
+	// @brief Windowの現在サイズを使い、Device・描画先・同期資源を依存順に準備します。
+	// @param winApp 初期化済みのWindowです。所有権は移しません。
+	// @throws std::invalid_argument Windowが渡されなかった時です。
+	// @throws std::runtime_error 必須のDirectX資源を生成できなかった時です。
 	void Initialize(WinApp* winApp);
+	// @brief Windowサイズが変わった時だけGPU完了を待ち、描画先を作り直します。
+	// @throws std::runtime_error SwapChainや必須描画先の再生成に失敗した時です。
 	void ResizeIfNeeded();
 
 	//描画前処理
@@ -40,6 +46,11 @@ public:
 	DirectXCommon& operator=(const DirectXCommon&) = delete;
 
 
+	// @brief 指定した用途のDescriptor Heapを作り、所有権を呼出し元へ渡します。
+	// @param heapType RTV・DSV・SRVなど、登録するDescriptorの種類です。
+	// @param numDescriptors 必要な枠数です。0なら作成しません。
+	// @param shaderVisible Shaderから参照するHeapだけtrueにします。
+	// @return 生成したHeapです。Device未準備や生成失敗時は空です。
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE heapType, UINT numDescriptors, bool shaderVisible);
 
 	//SRVの指定番号のCPUデスクリプタハンドルを取得する
@@ -56,23 +67,43 @@ public:
 		//Compilerに使用するProfile
 		const wchar_t* profile);
 
-	//テクスチャリソースの生成
+	// @brief 読込済み画像の情報からGPU上のTextureを転送待ち状態で作ります。
+	// @param metadata 画像の幅・高さ・Format・Mip数です。
+	// @return 生成したTextureです。Device未準備や生成失敗時は空です。
 	Microsoft::WRL::ComPtr<ID3D12Resource>CreateTextureResource(const DirectX::TexMetadata& metadata);
 
-	// オフスクリーン描画の描画先として使うRenderTextureを生成する
+	// @brief オフスクリーン描画先を作り、RTV登録は呼出し元に任せます。
+	// @param width 描画先の横画素数です。0なら作成しません。
+	// @param height 描画先の縦画素数です。0なら作成しません。
+	// @param format RTVとSRVで使うTexture Formatです。
+	// @param clearColor 描画先のClear最適化に使うRGBAです。
+	// @return 生成したTextureです。Device未準備や生成失敗時は空です。
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateRenderTextureResource(
 		uint32_t width, uint32_t height, DXGI_FORMAT format, const Vector4& clearColor);
 
-	// SrvManagerの初期化後にRenderTextureを読み取るためのSRVを生成する
+	// @brief SrvManagerの初期化後に、三つの描画先と深度Textureの計四つのSRVを登録します。
+	// @param srvManager 番号とHeapを管理する初期化済みのManagerです。所有しません。
+	// @throws std::runtime_error 必須TextureやSRV枠が不足した時です。
 	void CreateRenderTextureSRV(class SrvManager* srvManager);
 
-	//CPUのMap/memcpyだけを行う
+	// @brief 画像の各行をGPU転送用BufferへCPU側で詰めます。
+	// @param texture 転送先のTextureです。所有しません。
+	// @param mipImages 全Mip・配列面の元画素です。
+	// @param device 転送先と同じDeviceです。所有しません。
+	// @return GPUコピー完了まで保持する中間Bufferです。入力・確保・Map失敗時は空です。
 	[[nodiscard]]
 	Microsoft::WRL::ComPtr<ID3D12Resource> WriteToIntermediateResource(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const DirectX::ScratchImage& mipImages, ID3D12Device* device);
-	//GPUのCopyTextureRegionだけを行う
+	// @brief 全サブリソースのコピー命令と、Shaderから読む状態への遷移を記録します。
+	// @param texture コピー先のTextureです。初期状態はCOPY_DESTを想定します。
+	// @param intermediateResource CPUが画素を詰めた中間Bufferです。GPU完了まで生存させます。
+	// @param numSubresources コピーするMip・配列面の総数です。
+	// @param device Textureと同じDeviceです。所有しません。
+	// @param commandList コピー命令を記録する開いたListです。所有しません。
 	void RecordTextureCopyCommand(const Microsoft::WRL::ComPtr<ID3D12Resource>& texture, const Microsoft::WRL::ComPtr<ID3D12Resource>& intermediateResource, size_t numSubresources, ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 
-	// Upload Bufferを生成し、失敗時は空を返して呼び出し元に中止を判断させる。
+	// @brief CPUが書き込めるUpload Bufferを作ります。
+	// @param sizeInBytes 必要なバイト数です。0なら作成しません。
+	// @return 生成したBufferです。Device未準備や生成失敗時は空です。
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(size_t sizeInBytes);
 
 	//getter
@@ -243,7 +274,7 @@ private:
 
 	//記録時間(FPS固定用)
 	std::chrono::steady_clock::time_point reference_{};
-	std::chrono::microseconds kMinTime_{};
+	std::chrono::microseconds minFrameTime_{};
 	float deltaTime_ = 1.0f / 60.0f;
 
 	uint32_t width_ = WinApp::kClientWidth; // 幅・高さをメンバに

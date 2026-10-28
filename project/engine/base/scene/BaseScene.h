@@ -3,9 +3,8 @@
 #include <memory>
 
 // 前方宣言により、全Sceneが不要な描画・Audioヘッダを読み込まないようにします。
-class SceneManager;
-class CameraManager;
-class Camera;
+namespace Engine { class CameraManager; }
+namespace Engine { class Camera; }
 
 // SceneManagerが扱うScene共通の開始・更新・描画・終了の呼び出し口です。
 // Cameraの所有は各Sceneに置き、共通の初期化だけをここで補助します。
@@ -33,8 +32,8 @@ public:
 protected:
 	// Sceneが所有するCameraへ生成結果を渡し、指定位置・回転で最初の有効Cameraにします。
 	void InitializeMainCamera(
-		std::unique_ptr<CameraManager>& cameraManager,
-		std::unique_ptr<Camera>& mainCamera,
+		std::unique_ptr<Engine::CameraManager>& cameraManager,
+		std::unique_ptr<Engine::Camera>& mainCamera,
 		const Vector3& translate,
 		const Vector3& rotate = {});
 

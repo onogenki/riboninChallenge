@@ -2,7 +2,7 @@
 
 #include "Camera.h"
 #include "CameraManager.h"
-#include "DebugAssetPreview.h"
+#include "preview/DebugAssetPreview.h"
 #include "DebugCollisionOverlay.h"
 #include "DebugEditOverlay.h"
 #include "DebugEditViewport.h"

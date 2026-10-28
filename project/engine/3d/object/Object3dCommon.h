@@ -27,7 +27,7 @@ public:
 	// GPU資源作成に使う、所有権のないDirectX操作窓口を返します。
 	DirectXCommon* GetDxCommon() const { return dxCommon_; }
 	// Sceneが設定した既定Cameraへの、所有権のないポインタを返します。
-	Camera* GetDefaultCamera() const { return defaultCamera_; }
+	Engine::Camera* GetDefaultCamera() const { return defaultCamera_; }
 	// 環境反射に使用するTextureのパスを、変更せず参照できる形で返します。
 	const std::string& GetEnvironmentTexturePath() const { return environmentTexturePath_; }
 
@@ -43,7 +43,7 @@ public:
 	void SetMirrorDrawSetting();
 
 	// Scene所有のCameraを既定値として借ります。Cameraの寿命はScene側が管理します。
-	void SetDefaultCamera(Camera* camera) { this->defaultCamera_ = camera; }
+	void SetDefaultCamera(Engine::Camera* camera) { this->defaultCamera_ = camera; }
 	// 環境反射用Textureのパスを保存します。空文字ならObject3dは環境反射を指定しません。
 	void SetEnvironmentTexturePath(const std::string& path) {
 		environmentTexturePath_ = path;
@@ -63,7 +63,7 @@ private:
 
 	DirectXCommon* dxCommon_ = nullptr;
 
-	Camera* defaultCamera_ = nullptr;
+	Engine::Camera* defaultCamera_ = nullptr;
 
 	std::string environmentTexturePath_ = "";
 

@@ -44,7 +44,7 @@ namespace {
 void ImGuiManager::DrawObbCollisionDebug(
 	const MyMath::OBB& obb,
 	const MyMath::Sphere& sphere,
-	const Camera* camera,
+	const Engine::Camera* camera,
 	bool isColliding)
 {
 #ifdef USE_IMGUI
@@ -119,7 +119,7 @@ void ImGuiManager::DrawObbCollisionDebug(
 void ImGuiManager::DrawControlPointPathDebug(
 	const Vector3& basePosition,
 	const std::vector<Vector3>& controlPoints,
-	const Camera* camera)
+	const Engine::Camera* camera)
 {
 #ifdef USE_IMGUI
 	if (!camera || controlPoints.empty()) {
@@ -188,7 +188,7 @@ void ImGuiManager::DrawControlPointPathDebug(
 #if RIBONIN_CHALLENGE_HAS_LASER_DEBUG
 void ImGuiManager::DrawLaserDebug(
 	const std::vector<LaserSegment>& segments,
-	const Camera* camera)
+	const Engine::Camera* camera)
 {
 #ifdef USE_IMGUI
 	if (!camera || segments.empty()) {
@@ -243,7 +243,7 @@ void ImGuiManager::DrawLaserDebug(
 // Playerの球Colliderを表示する。物体接触中は青、Laser接触中は優先して黄色にする。
 void ImGuiManager::DrawPlayerCollisionDebug(
 	const MyMath::Sphere& sphere,
-	const Camera* camera,
+	const Engine::Camera* camera,
 	bool isObjectColliding,
 	bool isLaserHit)
 {
@@ -341,7 +341,7 @@ bool ImGuiManager::IsSkeletonDebugDrawEnabled() const
 
 // アニメーション済みのJoint座標を、Game View上の線と点へ変換して描画します。
 void ImGuiManager::SkeletonDebugDraw(
-	const Model::Skeleton& skeleton,
+	const Engine::Model::Skeleton& skeleton,
 	const Matrix4x4& worldMatrix,
 	const Matrix4x4& viewProjectionMatrix)
 {
@@ -376,7 +376,7 @@ void ImGuiManager::SkeletonDebugDraw(
 		imageMin,
 		ImVec2(imageMin.x + imageSize.x, imageMin.y + imageSize.y),
 		true);
-	for (const Model::Joint& joint : skeleton.joints) {
+	for (const Engine::Model::Joint& joint : skeleton.joints) {
 		if (!joint.parent.has_value()) {
 			continue;
 		}
@@ -385,7 +385,7 @@ void ImGuiManager::SkeletonDebugDraw(
 			continue;
 		}
 
-		const Model::Joint& parentJoint = skeleton.joints[parentIndex];
+		const Engine::Model::Joint& parentJoint = skeleton.joints[parentIndex];
 		const Vector3 jointPosition{
 			joint.skeletonSpaceMatrix.m[3][0],
 			joint.skeletonSpaceMatrix.m[3][1],
@@ -408,7 +408,7 @@ void ImGuiManager::SkeletonDebugDraw(
 		}
 	}
 
-	for (const Model::Joint& joint : skeleton.joints) {
+	for (const Engine::Model::Joint& joint : skeleton.joints) {
 		const Vector3 jointPosition{
 			joint.skeletonSpaceMatrix.m[3][0],
 			joint.skeletonSpaceMatrix.m[3][1],

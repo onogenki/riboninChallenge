@@ -19,7 +19,7 @@
 #include "externals/imgui/imgui_impl_win32.h"
 #endif
 
-class Sprite;
+namespace Engine { class Sprite; }
 struct Transform;
 class Mirror;
 struct LaserSegment;
@@ -67,7 +67,7 @@ public:
 	// 共通デバッグウィンドウ
 	void DemoWindow();
 	void FPSWindow();
-	int SpriteWindow(const std::vector<std::unique_ptr<Sprite>>& sprites, bool embedded = false, int forcedSpriteIndex = -1);
+	int SpriteWindow(const std::vector<std::unique_ptr<Engine::Sprite>>& sprites, bool embedded = false, int forcedSpriteIndex = -1);
 	void ModelWindow(
 		std::vector<std::unique_ptr<Object3d>>& normalObjects,
 		std::vector<std::unique_ptr<Object3d>>& animationObjects,
@@ -80,7 +80,7 @@ public:
 		int forcedNormalObjectIndex = -1,
 		int forcedAnimationObjectIndex = -1,
 		const std::function<void(bool animationObject, size_t index)>& onObjectRemoved = {});
-	void CameraWindow(CameraManager* cameraManager, bool embedded = false);
+	void CameraWindow(Engine::CameraManager* cameraManager, bool embedded = false);
 	std::string ParticleWindow(Transform& emitterTransform, bool embedded = false);
 	// レベルファイルの再読込と、マップ内オブジェクトの編集UIを表示します。
 	LevelEditorResult LevelHotReloadWindow(
@@ -97,7 +97,7 @@ public:
 	bool MirrorDebugWindow(
 		Mirror& mirror,
 		float& mirrorYaw,
-		const Camera& reflectionCamera,
+		const Engine::Camera& reflectionCamera,
 		bool hasReflectionCapture);
 	// 反射Laserの発射位置・方向と、Switch・Doorの進行状態を表示します。
 	// 発射位置または方向が変更されたフレームだけtrueを返します。
@@ -118,22 +118,22 @@ public:
 		bool isDoorSwitchReceivingLight,
 		float doorOpenAmount);
 	//OBBをゲーム画面へワイヤー表示し、衝突中は赤、非衝突時は青で描画する
-	void DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::Sphere& sphere, const Camera* camera, bool isColliding);
+	void DrawObbCollisionDebug(const MyMath::OBB& obb, const MyMath::Sphere& sphere, const Engine::Camera* camera, bool isColliding);
 	// Playerの球Colliderを表示する。物体接触中は青、Laser接触中は優先して黄色にする。
 	void DrawPlayerCollisionDebug(
 		const MyMath::Sphere& sphere,
-		const Camera* camera,
+		const Engine::Camera* camera,
 		bool isObjectColliding,
 		bool isLaserHit);
 	// 制御点をGame Viewへ線と番号で重ねて表示します。
 	void DrawControlPointPathDebug(
 		const Vector3& basePosition,
 		const std::vector<Vector3>& controlPoints,
-		const Camera* camera);
+		const Engine::Camera* camera);
 	// レーザー経路をGame Viewへ赤い線として重ねて表示します。
 	void DrawLaserDebug(
 		const std::vector<LaserSegment>& segments,
-		const Camera* camera);
+		const Engine::Camera* camera);
 	bool IsSkeletonDebugDrawEnabled() const;
 	bool IsMouseOverGameView(float mouseScreenX, float mouseScreenY) const;
 	bool GetGameViewRect(float& x, float& y, float& width, float& height) const;
@@ -146,7 +146,7 @@ public:
 
 	// Game View上へスケルトンを重ねて描画する
 	void SkeletonDebugDraw(
-		const Model::Skeleton& skeleton,
+		const Engine::Model::Skeleton& skeleton,
 		const Matrix4x4& worldMatrix,
 		const Matrix4x4& viewProjectionMatrix);
 

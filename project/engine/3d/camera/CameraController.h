@@ -3,8 +3,10 @@
 #include "MyMath.h"
 #include <vector>
 
-class Camera;
+namespace Engine { class Camera; }
 
+namespace Engine
+{
 // 狭い通路やボス部屋など、場所ごとに変更するCameraの基本設定
 struct CameraAreaSettings
 {
@@ -18,10 +20,10 @@ class CameraController
 {
 public:
 	// 操作する Camera と、最初に追いかける対象の位置を登録する
-	void Initialize(Camera* camera, const Vector3& targetPosition);
+	void Initialize(Engine::Camera* camera, const Vector3& targetPosition);
 	// Camera配置済みのイベント視点を、指定した周回値から手動Cameraとして開始する
 	void Initialize(
-		Camera* camera,
+		Engine::Camera* camera,
 		const Vector3& targetPosition,
 		float distance,
 		float orbitYaw,
@@ -119,7 +121,7 @@ private:
 	float MoveTowardsAngle(float current, float target, float maxDelta) const;
 
 	// 実際に移動させる共通 Camera。本クラスは所有しない
-	Camera* camera_ = nullptr;
+	Engine::Camera* camera_ = nullptr;
 	// Camera が見続ける中心点
 	Vector3 focus_{};
 	// Focusより少し遅れてCameraが見る、視線専用の注視点
@@ -191,3 +193,4 @@ private:
 	float cameraCollisionRadius_ = 0.3f;
 	float cameraCollisionMargin_ = 0.1f;
 };
+}

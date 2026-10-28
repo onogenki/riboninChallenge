@@ -17,6 +17,9 @@
 
 struct aiNode;
 
+namespace Engine
+{
+
 // モデルファイルから頂点・材質・骨とGPU資源を作り、Object3dへ描画データを貸します。
 class Model
 {
@@ -318,3 +321,5 @@ private:
 	void ResetGpuResources();
 
 };
+
+}

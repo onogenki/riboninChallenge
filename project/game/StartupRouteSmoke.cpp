@@ -19,7 +19,7 @@ void StartupRouteSmoke::Update()
 		return;
 	}
 
-	SceneManager* sceneManager = SceneManager::GetInstance();
+	Engine::SceneManager* sceneManager = Engine::SceneManager::GetInstance();
 	const std::string& sceneName = sceneManager->GetCurrentSceneName();
 	if (sceneName != currentSceneName_) {
 		currentSceneName_ = sceneName;
@@ -65,7 +65,7 @@ void StartupRouteSmoke::AfterDraw()
 	if (!enabled_ || finished_) {
 		return;
 	}
-	const std::string& sceneName = SceneManager::GetInstance()->GetCurrentSceneName();
+	const std::string& sceneName = Engine::SceneManager::GetInstance()->GetCurrentSceneName();
 	if (sceneName == "LOADING" && loadingVisitCount_ == 1) {
 		++firstLoadingDrawCount_;
 	} else if (sceneName == "LOADING" && loadingVisitCount_ == 2) {

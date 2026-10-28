@@ -152,7 +152,7 @@ void Object3d::RecordTransformEdit(const Transform& before, float elapsedSeconds
 }
 
 // Animation時間を進めず、反射Cameraなど指定Camera用のWVPだけを更新します。
-void Object3d::UpdateCameraForDraw(Camera* drawCamera)
+void Object3d::UpdateCameraForDraw(Engine::Camera* drawCamera)
 {
 	if (!drawCamera) {
 		return;
@@ -261,7 +261,7 @@ void Object3d::DrawMirror(
 void Object3d::SetModel(const std::string& filePath)
 {
 	// モデルマネージャからモデルを検索してセットする
-	model_ = ModelManager::GetInstance()->FindModel(filePath);
+	model_ = Engine::ModelManager::GetInstance()->FindModel(filePath);
 	modelName_ = filePath;
 }
 
@@ -360,7 +360,7 @@ bool Object3d::InitializeAnimation()
 	if (!model_) {
 		return false;
 	}
-	const Model::ModelData& modelData = model_->GetModelData();
+	const Engine::Model::ModelData& modelData = model_->GetModelData();
 	ReleaseSkinClusterDescriptors();
 	if (modelData.skinClusterData.empty()) {
 		skeleton_ = {};
@@ -432,7 +432,7 @@ void Object3d::ReleaseSkinClusterDescriptors()
 }
 
 // 指定AnimationをこのObjectへ設定し、再生時間を先頭へ戻します。
-void Object3d::PlayAnimation(const Model::Animation& animation)
+void Object3d::PlayAnimation(const Engine::Model::Animation& animation)
 {
 	currentAnimation_ = animation;
 	animationTime_ = 0.0f;

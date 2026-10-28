@@ -109,6 +109,11 @@ Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> DirectXCommon::CreateDescriptorHe
 	UINT numDescriptors,
 	bool shaderVisible)
 {
+	// Deviceや枠数が未準備なら、assert無効の構成でも空Heapを後続へ渡しません。
+	if (!device_ || numDescriptors == 0) {
+		Log("DirectXCommon: descriptor heap requires a device and nonzero count.");
+		return nullptr;
+	}
 	Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> descriptorHeap = nullptr;
 	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc{};
 	descriptorHeapDesc.Type = heapType;
@@ -116,7 +121,10 @@ Microsoft::WRL::ComPtr < ID3D12DescriptorHeap> DirectXCommon::CreateDescriptorHe
 	descriptorHeapDesc.Flags = shaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	
 	HRESULT hr = device_->CreateDescriptorHeap(&descriptorHeapDesc, IID_PPV_ARGS(&descriptorHeap));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !descriptorHeap) {
+		Log("DirectXCommon: descriptor heap creation failed.");
+		return nullptr;
+	}
 
 	return descriptorHeap;
 
@@ -179,6 +187,11 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateTextureResource(cons
 Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateRenderTextureResource(
 	uint32_t width, uint32_t height, DXGI_FORMAT format, const Vector4& clearColor)
 {
+	// サイズとDeviceの失敗を呼出し元へ返し、空TextureでRTVを作らせません。
+	if (!device_ || width == 0 || height == 0) {
+		Log("DirectXCommon: render texture requires a device and nonzero size.");
+		return nullptr;
+	}
 	// RenderTextureとして使う2Dテクスチャの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
 	resourceDesc.Width = width;// テクスチャの幅
@@ -211,7 +224,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateRenderTextureResourc
 		D3D12_RESOURCE_STATE_RENDER_TARGET,// 生成直後から描画先として使う
 		&clearValue,// 最適化するクリア色
 		IID_PPV_ARGS(&resource));
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr) || !resource) {
+		Log("DirectXCommon: render texture creation failed.");
+		return nullptr;
+	}
 
 	// 作成したRenderTextureを呼び出し元へ返す
 	return resource;
@@ -219,11 +235,19 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateRenderTextureResourc
 
 void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
 {
-	assert(srvManager);
-	assert(renderTextureResource_);
-	assert(postEffectTextureResource_);
-	assert(gaussianBlurTextureResource_);
-	assert(depthStencilResource_);
+	// 四つの資源と未使用枠を登録前に確かめ、失敗時に範囲外のHandleを作りません。
+	if (!srvManager || !renderTextureResource_ || !postEffectTextureResource_ ||
+		!gaussianBlurTextureResource_ || !depthStencilResource_) {
+		throw std::runtime_error("DirectXCommon: render texture SRV inputs are unavailable.");
+	}
+	const uint32_t requiredIndices =
+		(renderTextureSrvIndex_ == UINT32_MAX ? 1u : 0u) +
+		(postEffectTextureSrvIndex_ == UINT32_MAX ? 1u : 0u) +
+		(gaussianBlurTextureSrvIndex_ == UINT32_MAX ? 1u : 0u) +
+		(depthStencilSrvIndex_ == UINT32_MAX ? 1u : 0u);
+	if (!srvManager->CanAllocate(requiredIndices)) {
+		throw std::runtime_error("DirectXCommon: not enough descriptor slots for render texture SRVs.");
+	}
 
 	// RenderTextureの描画結果をShaderから読めるよう、SRVの場所を1個確保する
 	if (renderTextureSrvIndex_ == UINT32_MAX) {

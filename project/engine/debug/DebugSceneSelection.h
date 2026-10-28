@@ -6,7 +6,7 @@
 
 class DebugEntityRegistry;
 class Object3d;
-class Sprite;
+namespace Engine { class Sprite; }
 
 // DebugSceneのInspector・Edit Viewで使う選択状態だけを管理する部品です。
 // ObjectとSpriteの寿命は所有せず、Sceneから渡された一覧の番号だけを保持します。
@@ -38,7 +38,7 @@ public:
 	// 指定Spriteを選択し、対応するECS Entityも選択します。範囲外ならfalseです。
 	bool SelectSprite(
 		size_t index,
-		const std::vector<std::unique_ptr<Sprite>>& sprites,
+		const std::vector<std::unique_ptr<Engine::Sprite>>& sprites,
 		DebugEntityRegistry& entityRegistry);
 	// 3Dモデルの選択だけを解除します。
 	void ClearObjectSelection();

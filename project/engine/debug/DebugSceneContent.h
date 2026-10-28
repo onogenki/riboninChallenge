@@ -9,11 +9,11 @@
 #include <string>
 #include <vector>
 
-class Camera;
+namespace Engine { class Camera; }
 class DirectXCommon;
 class Object3dCommon;
-class Sprite;
-class SpriteCommon;
+namespace Engine { class Sprite; }
+namespace Engine { class SpriteCommon; }
 
 // DebugSceneへモデル・Textureを追加する共通処理です。
 // ObjectとSpriteの寿命はDebugSceneが所有し、この部品は生成と追加の順番だけを担当します。
@@ -23,19 +23,19 @@ public:
 	struct Context
 	{
 		Object3dCommon* object3dCommon = nullptr;
-		SpriteCommon* spriteCommon = nullptr;
+		Engine::SpriteCommon* spriteCommon = nullptr;
 		DirectXCommon* directXCommon = nullptr;
-		Camera* camera = nullptr;
+		Engine::Camera* camera = nullptr;
 		const std::vector<SceneEditor::ShelfEntry>* modelLibrary = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
 		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
-		std::vector<std::unique_ptr<Sprite>>* sprites = nullptr;
+		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		size_t baseNormalObjectCount = 0;
 		size_t baseAnimationObjectCount = 0;
 		size_t baseSpriteCount = 0;
 		// Sceneが所有するECSと選択状態へ、追加・削除を通知する窓口です。
 		std::function<void(Object3d*, const std::string&, bool)> registerModel;
-		std::function<void(Sprite*, const std::string&)> registerSprite;
+		std::function<void(Engine::Sprite*, const std::string&)> registerSprite;
 		std::function<void(bool, size_t)> selectObject;
 		std::function<void(size_t)> selectSprite;
 		std::function<void()> updateEcsWorld;

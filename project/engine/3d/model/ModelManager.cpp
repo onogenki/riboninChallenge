@@ -2,6 +2,9 @@
 
 #include <filesystem>
 
+namespace Engine
+{
+
 // 所有者を関数内の静的変数に限定し、呼び出し元には従来どおりポインタを貸します。
 ModelManager* ModelManager::GetInstance()
 {
@@ -140,4 +143,6 @@ ModelManager::~ModelManager()
 {
 	// 通常終了以外でも、Modelから共通部への参照が有効な順で片付けます。
 	Finalize();
+}
+
 }

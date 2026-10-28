@@ -27,7 +27,7 @@ bool DebugViewportPlacement::TransformCoord(
 
 // Game ViewのMouse位置から、Y=0の仮想床へ置く3D座標を作ります。
 bool DebugViewportPlacement::TryGetWorldPosition(
-	Camera* camera,
+	Engine::Camera* camera,
 	float screenX,
 	float screenY,
 	Vector3& outPosition)

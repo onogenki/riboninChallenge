@@ -14,7 +14,7 @@
 bool DebugParticleEffects::InitializeResources()
 {
 	TextureManager* textureManager = TextureManager::GetInstance();
-	GPUParticle* gpuParticle = GPUParticle::GetInstance();
+	Engine::GPUParticle* gpuParticle = Engine::GPUParticle::GetInstance();
 	if (!textureManager->LoadTexture("Resources/debug/uvChecker.png") ||
 		!textureManager->LoadTexture("Resources/debug/circle.png")) {
 		return false;
@@ -25,7 +25,7 @@ bool DebugParticleEffects::InitializeResources()
 		return false;
 	}
 
-	ParticleManager* particleManager = ParticleManager::GetInstance();
+	Engine::ParticleManager* particleManager = Engine::ParticleManager::GetInstance();
 	// 各生成結果をその場で確認し、種類名の別リストを持たないようにします。
 	if (!particleManager->CreateParticleGroup("Circle", "Resources/debug/circle.png") ||
 		!particleManager->CreateParticleGroup("Plane", "Resources/debug/uvChecker.png") ||
@@ -39,10 +39,10 @@ bool DebugParticleEffects::InitializeResources()
 		return false;
 	}
 
-	gpuParticle->SetEmitterType(0, GPUParticle::EmitterType::Mix);
-	gpuParticle->SetEmitterParticleType(0, GPUParticle::ParticleType::Trail);
-	gpuParticle->SetEmitterType(1, GPUParticle::EmitterType::Mix);
-	gpuParticle->SetEmitterParticleType(1, GPUParticle::ParticleType::Trail);
+	gpuParticle->SetEmitterType(0, Engine::GPUParticle::EmitterType::Mix);
+	gpuParticle->SetEmitterParticleType(0, Engine::GPUParticle::ParticleType::Trail);
+	gpuParticle->SetEmitterType(1, Engine::GPUParticle::EmitterType::Mix);
+	gpuParticle->SetEmitterParticleType(1, Engine::GPUParticle::ParticleType::Trail);
 	return true;
 }
 
@@ -50,7 +50,7 @@ bool DebugParticleEffects::InitializeResources()
 void DebugParticleEffects::DrawImGui(const Vector3& effectPosition, bool embedded)
 {
 #ifdef USE_IMGUI
-	ParticleManager* particleManager = ParticleManager::GetInstance();
+	Engine::ParticleManager* particleManager = Engine::ParticleManager::GetInstance();
 	if (!embedded) {
 		ImGui::Begin("Particle Effects");
 	}
@@ -115,7 +115,7 @@ void DebugParticleEffects::UpdateFrame(const Vector3& effectPosition, float delt
 // 有効なParticleを指定位置へ発生させ、Cylinder設定変更時だけ作り直します。
 void DebugParticleEffects::Update(const Vector3& effectPosition, float deltaTime)
 {
-	ParticleManager* particleManager = ParticleManager::GetInstance();
+	Engine::ParticleManager* particleManager = Engine::ParticleManager::GetInstance();
 	if (cylinderEffect_.enabled != isCylinderVisible_ || refreshCylinder_) {
 		particleManager->ClearParticles("Cylinder");
 		if (cylinderEffect_.enabled) {
@@ -168,7 +168,7 @@ void DebugParticleEffects::ToggleCylinder(const Vector3& effectPosition)
 // キー操作用にHitとRingを一度だけ同じ位置へ発生させます。
 void DebugParticleEffects::EmitHitAndRing(const Vector3& effectPosition)
 {
-	ParticleManager* particleManager = ParticleManager::GetInstance();
+	Engine::ParticleManager* particleManager = Engine::ParticleManager::GetInstance();
 	particleManager->EmitHitEffect("Hit", static_cast<uint32_t>(hitEffect_.emitCount), effectPosition, hitEffect_.scale);
 	particleManager->EmitRingEffect("Ring", static_cast<uint32_t>(ringEffect_.emitCount), effectPosition, ringEffect_.scale);
 }
@@ -188,7 +188,7 @@ void DebugParticleEffects::HandleShortcutInput(const Vector3& effectPosition)
 // 全種類のParticleを消し、ImGui上の有効状態も初期状態へ戻します。
 void DebugParticleEffects::Clear()
 {
-	ParticleManager* particleManager = ParticleManager::GetInstance();
+	Engine::ParticleManager* particleManager = Engine::ParticleManager::GetInstance();
 	for (const char* groupName : {
 		"Hit", "Ring", "Cylinder", "PillarSparkle", "LightCore", "LightRain", "LightSpiral" }) {
 		particleManager->ClearParticles(groupName);

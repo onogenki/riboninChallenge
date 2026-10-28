@@ -10,6 +10,9 @@
 
 using namespace MyMath;
 
+namespace Engine
+{
+
 // シングルトンインスタンスの取得
 ParticleManager* ParticleManager::GetInstance() {
     static ParticleManager instance;
@@ -729,7 +732,7 @@ void ParticleManager::WriteParticleGpuData(const Particle& particle, ParticleGro
 // Camera確認後に風・粒子の動き・見た目・描画用データを元の順番で更新します。
 void ParticleManager::Update() {
     if (!cameraManager_)return;
-    Camera* activeCamera = cameraManager_->GetActiveCamera();
+    Engine::Camera* activeCamera = cameraManager_->GetActiveCamera();
     if (!activeCamera)return;
 
     const bool returning = returnState_.IsReturning();
@@ -792,3 +795,5 @@ void ParticleManager::Draw() {
         commandList->DrawInstanced(group.vertexCount, group.instanceCount, 0, 0);
     }
 }
+
+} // namespace Engine

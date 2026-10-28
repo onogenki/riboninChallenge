@@ -9,8 +9,11 @@
 
 using namespace MyMath;
 
+namespace Engine
+{
+
 // 頂点・Index・行列・Materialを従来の順に作り、未完成の背景をSceneへ渡しません。
-bool SkyBox::Initialize(DirectXCommon* dxCommon, Camera* camera) {
+bool SkyBox::Initialize(DirectXCommon* dxCommon, Engine::Camera* camera) {
     ResetResources();
     if (!dxCommon || !camera || !dxCommon->GetDevice()) {
         Logger::Log("SkyBox initialization failed: DirectX device or Camera is unavailable.");
@@ -211,4 +214,6 @@ void SkyBox::Draw() {
     commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
     commandList->IASetIndexBuffer(&indexBufferView_);
     commandList->DrawIndexedInstanced(36, 1, 0, 0, 0);
+}
+
 }

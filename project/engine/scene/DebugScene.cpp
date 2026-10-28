@@ -17,7 +17,7 @@
 #include "Input.h"
 #include "Logger.h"
 #include"SceneManager.h"
-#include "../debug/DebugAnimationPreview.h"
+#include "../debug/preview/DebugAnimationPreview.h"
 #include "../debug/DebugCollisionOverlay.h"
 #include "../debug/DebugSceneRenderer.h"
 #include "../debug/DebugViewportPlacement.h"
@@ -75,12 +75,12 @@ bool DebugScene::InitializeRenderSystems()
 	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
 	PostEffect::GetInstance()->SetGrayscale(false);
 	PostEffect::GetInstance()->SetSepia(false);
-	ParticleManager::GetInstance()->ClearAllGroups();
+	Engine::ParticleManager::GetInstance()->ClearAllGroups();
 
 	// 3Dと2Dの共通描画部は、Sceneへ入る時に同じDirectX環境で初期化します。
 	object3dCommon_ = Object3dCommon::GetInstance();
 	object3dCommon_->Initialize(dxCommon);
-	spriteCommon_ = SpriteCommon::GetInstance();
+	spriteCommon_ = Engine::SpriteCommon::GetInstance();
 	return spriteCommon_->Initialize(dxCommon);
 }
 
@@ -89,10 +89,10 @@ void DebugScene::InitializeCameras()
 {
 	// MainCameraは通常のGame Viewへ使います。
 	InitializeMainCamera(cameraManager_, mainCamera_, { 0.0f, 0.0f, -10.0f });
-	ParticleManager::GetInstance()->SetCameraManager(cameraManager_.get());
+	Engine::ParticleManager::GetInstance()->SetCameraManager(cameraManager_.get());
 
 	// 上から確認する補助Cameraも同じManagerへ登録します。
-	upCamera_ = std::make_unique<Camera>();
+	upCamera_ = std::make_unique<Engine::Camera>();
 	upCamera_->SetRotate({ 0.785f,0.0f,0.0f });
 	upCamera_->SetTranslate({ 0.0f,5.0f,-5.0f });
 	cameraManager_->AddCamera("UpCamera", upCamera_.get());
@@ -178,7 +178,7 @@ bool DebugScene::InitializeInitialContent()
 	
 	for (uint32_t i = 0; i < 1; ++i)
 	{
-		auto sprite = std::make_unique<Sprite>();
+		auto sprite = std::make_unique<Engine::Sprite>();
 		if (!sprite->Initialize(spriteCommon_, "Resources/debug/monsterBall.png")) {
 			return false;
 		}
@@ -229,9 +229,9 @@ void DebugScene::InitializeLightsAndEmitters()
 	emitterTransform_ = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	//Circleパーティクル
-	emitterCircle_ = std::make_unique<ParticleEmitter>("Circle", emitterTransform_, 1, 0.1f,false);
+	emitterCircle_ = std::make_unique<Engine::ParticleEmitter>("Circle", emitterTransform_, 1, 0.1f,false);
 	//四角形のパーティクル（風に吹かれる方）
-	emitterPlane_ = std::make_unique<ParticleEmitter>("Plane", emitterTransform_, 1, 0.3f,true);
+	emitterPlane_ = std::make_unique<Engine::ParticleEmitter>("Plane", emitterTransform_, 1, 0.3f,true);
 
 	//最初はCircleにする
 	activeEmitter_ = emitterCircle_.get();
@@ -272,7 +272,7 @@ bool DebugScene::EnterModelPreview(const std::string& fileName)
 		return false;
 	}
 
-	Camera* activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
+	Engine::Camera* activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	// モデルごとの中心と半径はShelfのスキャン結果から受け取り、プレビュー部品へ渡します。
 	Vector3 previewCenter{};
 	float previewRadius = 1.0f;
@@ -330,7 +330,7 @@ void DebugScene::Update()
 	// 編集欄のBackSpaceと混同しないよう、Game View操作中だけTitleへ戻ります。
 	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
 		Input::GetInstance()->TriggerKey(DIK_BACK)) {
-		SceneManager::GetInstance()->ChangeSceneWithLoading("TITLE");
+		Engine::SceneManager::GetInstance()->ChangeSceneWithLoading("TITLE");
 	}
 }
 
@@ -348,7 +348,7 @@ void DebugScene::UpdateSceneContent()
 	if (activeEmitter_) {
 		activeEmitter_->Update();
 	}
-	ParticleManager::GetInstance()->Update();
+	Engine::ParticleManager::GetInstance()->Update();
 
 	// DirectionalLightは全Object3dで共有するため、一度だけ安全な単位方向へそろえます。
 	Object3dRenderContext::NormalizeDirectionalLight(directionalLight_);
@@ -442,8 +442,8 @@ void DebugScene::Finalize()
 	DirectXCommon::GetInstance()->WaitForGPU();
 
 	// 中途半端に生き残っている粒子が原因のアクセス違反を防ぐ
-	ParticleManager::GetInstance()->SetCameraManager(nullptr);
-	ParticleManager::GetInstance()->ClearAllGroups();
+	Engine::ParticleManager::GetInstance()->SetCameraManager(nullptr);
+	Engine::ParticleManager::GetInstance()->ClearAllGroups();
 
 	activeEmitter_ = nullptr;
 	objectPlane_ = nullptr;

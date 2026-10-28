@@ -27,7 +27,7 @@
       <WarningLevel>Level4</WarningLevel>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\engine\level;$(ProjectDir)..\engine\math;$(ProjectDir)..\game\stage1;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\engine\level;$(ProjectDir)..\engine\math;$(ProjectDir)..\game\stage;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions Condition="'$(Configuration)'=='Debug'">_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)'!='Debug'">NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Optimization Condition="'$(Configuration)'=='Debug'">Disabled</Optimization>
@@ -42,17 +42,17 @@
     <ClCompile Include="..\engine\level\MapChipRegistry.cpp" />
     <ClCompile Include="..\engine\level\StageMapObjectIndex.cpp" />
     <ClCompile Include="..\engine\level\FileHotReload.cpp" />
-    <ClCompile Include="..\game\stage1\StageMapChipFactory.cpp" />
-    <ClCompile Include="..\game\stage1\StageMapFileMonitor.cpp" />
-    <ClCompile Include="..\game\stage1\StageMapSelection.cpp" />
+    <ClCompile Include="..\game\stage\StageMapChipFactory.cpp" />
+    <ClCompile Include="..\game\stage\StageMapFileMonitor.cpp" />
+    <ClCompile Include="..\game\stage\StageMapSelection.cpp" />
     <ClInclude Include="..\engine\level\LevelLoader.h" />
     <ClInclude Include="..\engine\level\MapChipField.h" />
     <ClInclude Include="..\engine\level\MapChipRegistry.h" />
     <ClInclude Include="..\engine\level\StageMapObjectIndex.h" />
     <ClInclude Include="..\engine\level\FileHotReload.h" />
-    <ClInclude Include="..\game\stage1\StageMapChipFactory.h" />
-    <ClInclude Include="..\game\stage1\StageMapFileMonitor.h" />
-    <ClInclude Include="..\game\stage1\StageMapSelection.h" />
+    <ClInclude Include="..\game\stage\StageMapChipFactory.h" />
+    <ClInclude Include="..\game\stage\StageMapFileMonitor.h" />
+    <ClInclude Include="..\game\stage\StageMapSelection.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

@@ -20,7 +20,7 @@ void LoadingScene::Initialize()
 	PostEffect::GetInstance()->SetGrayscale(false);
 	PostEffect::GetInstance()->SetSepia(false);
 	hasRequestedNextScene_ = false;
-	nextSceneName_ = SceneManager::GetInstance()->TakeLoadingDestinationSceneName();
+	nextSceneName_ = Engine::SceneManager::GetInstance()->TakeLoadingDestinationSceneName();
 	if (nextSceneName_.empty()) {
 		nextSceneName_ = "TITLE";
 	}
@@ -37,12 +37,12 @@ bool LoadingScene::InitializeLoadingSprite()
 		Logger::Log(std::string("LoadingScene initialization failed: white texture could not be loaded: ") + texturePath);
 		return false;
 	}
-	spriteCommon = SpriteCommon::GetInstance();
+	spriteCommon = Engine::SpriteCommon::GetInstance();
 	if (!spriteCommon->Initialize(DirectXCommon::GetInstance())) {
 		return false;
 	}
 
-	auto loadingSprite = std::make_unique<Sprite>();
+	auto loadingSprite = std::make_unique<Engine::Sprite>();
 	if (!loadingSprite->Initialize(spriteCommon, texturePath)) {
 		Logger::Log("LoadingScene initialization failed: white Sprite could not be prepared.");
 		return false;
@@ -66,7 +66,7 @@ void LoadingScene::Update()
 	if (!loadingSprite_) {
 		return;
 	}
-	SceneManager* sceneManager = SceneManager::GetInstance();
+	Engine::SceneManager* sceneManager = Engine::SceneManager::GetInstance();
 	// 切替待機中は予約できないため、Loadingを描画しながら次の受付フレームを待ちます。
 	if (!hasRequestedNextScene_ && !sceneManager->HasPendingScene()) {
 		// 通常起動はTitleへ、本編開始ではSceneManagerが指定したStage1などへ進みます。

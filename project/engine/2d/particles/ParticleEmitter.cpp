@@ -1,6 +1,9 @@
 #include "ParticleEmitter.h"
 #include "ParticleManager.h"
 
+namespace Engine
+{
+
 namespace {
 // 既存の60FPS基準の発生間隔を保ち、フレーム時間の扱いを変えません。
 constexpr float kEmitterUpdateStep = 1.0f / 60.0f;
@@ -15,7 +18,7 @@ ParticleEmitter::ParticleEmitter(const std::string& name, const Transform& trans
 // 逆再生を除くフレームで発生時刻を進め、超過分は次回へ持ち越します。
 void ParticleEmitter::Update()
 {
-	if (ParticleManager::GetInstance()->IsReturning()) {
+	if (Engine::ParticleManager::GetInstance()->IsReturning()) {
 		return;
 	}
     // 時刻を進める
@@ -36,5 +39,7 @@ void ParticleEmitter::Update()
 void ParticleEmitter::Emit()
 {
     // 設定値に従ってParticleManagerのEmitを呼び出す
-    ParticleManager::GetInstance()->Emit(name_, transform_.translate, count_, receivesWind_, transform_.scale.x);
+    Engine::ParticleManager::GetInstance()->Emit(name_, transform_.translate, count_, receivesWind_, transform_.scale.x);
 }
+
+} // namespace Engine

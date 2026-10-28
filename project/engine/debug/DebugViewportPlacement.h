@@ -4,7 +4,7 @@
 #include "Vector3.h"
 #include "Matrix4x4.h"
 
-class Camera;
+namespace Engine { class Camera; }
 class DirectXCommon;
 
 // DebugのGame View上のMouse座標を、3Dモデル用またはSprite用の配置座標へ変換する部品です。
@@ -13,7 +13,7 @@ class DebugViewportPlacement
 public:
 	// Game ViewのMouse位置から、Y=0の仮想床へ置く3D座標を作ります。
 	static bool TryGetWorldPosition(
-		Camera* camera,
+		Engine::Camera* camera,
 		float screenX,
 		float screenY,
 		Vector3& outPosition);
