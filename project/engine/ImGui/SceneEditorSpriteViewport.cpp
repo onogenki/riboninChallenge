@@ -28,8 +28,8 @@ void SceneEditor::DrawSpriteViewportEditor(SpriteViewportState& state, const Spr
 	if (!ImGuiManager::GetInstance()->GetGameViewRect(rectX, rectY, rectWidth, rectHeight)) {
 		return;
 	}
-	const float clientWidth = static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth());
-	const float clientHeight = static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight());
+	const float clientWidth = static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientWidth());
+	const float clientHeight = static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientHeight());
 	if (clientWidth <= 0.0f || clientHeight <= 0.0f) {
 		return;
 	}

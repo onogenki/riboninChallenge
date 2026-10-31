@@ -22,7 +22,7 @@ void DebugGameViewCameraController::Update(
 		return;
 	}
 
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	const Vector2 mouseScreen = input->GetMouseScreen();
 	const bool isMouseOverGameView = ImGuiManager::GetInstance()->IsMouseOverGameView(
 		mouseScreen.x,

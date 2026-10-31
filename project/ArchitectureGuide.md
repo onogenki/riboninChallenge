@@ -57,7 +57,7 @@ Object3dの完全な型を知る場所で生成・破棄します。
 `BaseScene::IsFinished()`は既存の照会APIですが、現在の`SceneManager`は読んでいません。従来の`TitleScene`もこの値で終了せず、入力時のScene切替予約を使います。
 
 通常起動は`Game::Initialize()`が`LOADING`を予約し、白い`LoadingScene`が`TITLE`を予約します。未登録の開始Scene名が指定された場合、`SceneManager::ChangeScene()`の失敗を`Game`が受けて終了コード1で止めます。Sceneのない更新・描画ループには進みません。
-その前に`Framework::Initialize()`がPostEffect・Model・Particleなどの共通資源を依存順に準備します。`DirectXCommon::CompileShader()`はShader読込・コンパイル・結果取得の失敗を例外で伝えます。必須画像やShaderが欠けた場合、`Framework`は後続の初期化を止め、終了コード1を記録します。`Game`はSceneを予約せず、`Framework::Run()`はUpdate/Drawへ入らず、生成済みの共通資源を解放します。AudioとImGuiは初期化済みの場合だけ終了処理を呼びます。
+その前に`Framework::Initialize()`がWindow、PostEffect・Model・Particleなどの共通資源を依存順に準備します。`WinApp::Initialize()`はCOM・Window Class・Handleがそろった時だけ成功を返し、失敗時はDirectXとInputへ進みません。`DirectXCommon::CompileShader()`はShader読込・コンパイル・結果取得の失敗を例外で伝えます。必須画像やShaderが欠けた場合、`Framework`は後続の初期化を止め、終了コード1を記録します。`Game`はSceneを予約せず、`Framework::Run()`はUpdate/Drawへ入らず、生成済みの共通資源を解放します。AudioとImGuiは初期化済みの場合だけ終了処理を呼びます。
 現在の`TITLE`では、`Stage::Update()`がGame View内のEnterを検出すると、白フェード付きで`STAGE_SELECT`を予約します。セレクト画面のEnterは`STAGE1`へ、Stage1でTabのポーズ中にBackspaceを押すと`STAGE_SELECT`へ戻ります。
 `SceneManager::ChangeSceneWithFade()`は現在の画面を徐々に白く覆い、共通Loadingで次のSceneの準備を待ち、行き先の最初の描画後に白を薄くします。白くなる時間は固定ですが、読込完了を時間で決めません。
 `StartupRouteSmoke`はテスト時だけ`TITLE`→`STAGE_SELECT`→`STAGE1`のフェードを直接予約し、最初のLoadingと二回の遷移中Loading、各Sceneの描画回数を確認します。
@@ -109,6 +109,20 @@ Sceneは「部品を所有し、呼ぶ順番を決める」場所です。個別
 `Object3dFactory`で生成し、Sceneが所有するCollectionまたはManagerへ登録できるかを確認します。
 「当たり判定を追加したい」と思った時は、PlayerやEnemyへ`CheckCollision()`を追加するのではなく、
 まず既存の`SphereCollider`または`ObbCollider`を所有できるかを確認します。
+
+### Colliderの判定方法
+
+`Player`と`Enemy`は球の`SphereCollider`を所有し、`Player::CheckCollision()`などから相手の球や箱へ判定を依頼します。`SphereCollider::Check(const ObbCollider&)`のように、相手の型に応じたオーバーロードを選ぶ仕組みです。これはコンパイル時に呼び先が決まる仕組みで、基底`Collider`を介した仮想関数による判定ではありません。
+
+`Collider`は有効・Triggerの状態を共通で保持し、基底経由でも安全に破棄できるvirtualデストラクタを持ちます。現在の`StageCollisionWorld`は形状不明の`Collider*`をまとめて判定せず、Player用などのOBB一覧を作ります。形状不明のColliderを同じ一覧で扱う必要が生じた場合は、球と箱の組み合わせごとに判定先を決める方法や、呼び出す側による法線の向きを含めて設計します。
+
+### PlayerとPauseの状態
+
+Sceneの切替では`SceneManager`が`BaseScene`の仮想関数を呼び、各Sceneが必要な遷移を要求します。Playerの移動は別の仕組みで、`Player::UpdateWithControl()`が入力、移動、ジャンプ、重力、Colliderによる押し戻しを順に行います。
+
+`isGrounded_`は接地判定の結果で、`isMirrorGuardMode_`は鏡を構えているかを表します。接地中でも空中でも構えられるため、二つは同時に成立できます。現在は一つの排他的なStateにせず、それぞれの条件を共通の移動処理で使います。今後、攻撃や被弾などで更新処理や遷移が複雑になれば、独立した状態の組み合わせも含めてStateクラスを検討します。
+
+Pauseは`Stage::UpdatePauseState()`がプレイ中・停止中・遷移中の三状態を管理します。停止や解除のフレームでは本編更新を待ち、描画準備とImGuiのBegin/Endを行う順序を保ちます。
 
 ### 関数・ファイルを分ける基準
 
@@ -763,7 +777,7 @@ DebugSceneが所有するCamera・Object・Spriteの責任は変えず、開始�
 自動確認だけは`DebugSceneAutomation.cpp`へ分けています。環境変数の判定、UI Smoke、時間再生 Smoke、Debug Particleの確認更新を調べる時だけ、そのファイルを開きます。
 Scene所有データを各Debug部品へ渡すContextの組み立ては`DebugSceneContexts.cpp`です。
 
-`CaptureManager`
+`Engine::CaptureManager`
 
 通常画面とDebug画面で使うスクリーンショット、動画録画、リプレイ保存を担当します。
 `DebugScene`は保存形式やAVIハンドルを持たず、自動確認の一枚保存だけを共通Managerへ依頼します。

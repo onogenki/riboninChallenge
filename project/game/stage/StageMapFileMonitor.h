@@ -17,6 +17,6 @@ public:
 	const std::string& GetJsonFilePath() const { return jsonFile_.GetFilePath(); }
 
 private:
-	FileHotReload jsonFile_;
-	FileHotReload mapChipFile_;
+	Engine::FileHotReload jsonFile_;
+	Engine::FileHotReload mapChipFile_;
 };

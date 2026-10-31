@@ -22,7 +22,7 @@ public:
 		// Stage1が所有するJSONデータ・Camera・表示Objectです。StageEditViewportは所有しません。
 		LevelLoader::LevelData* levelData = nullptr;
 		Engine::Camera* camera = nullptr;
-		Object3d* floor = nullptr;
+		Engine::Object3d* floor = nullptr;
 		// 持てる鏡はStage1が所有します。EditorはJSONの配置を確認・編集するためだけに参照します。
 		CarryableMirror* carryableMirror = nullptr;
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;

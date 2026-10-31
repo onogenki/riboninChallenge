@@ -14,6 +14,8 @@ using namespace Logger;
 #pragma comment(lib, "dxcompiler.lib")
 using namespace Microsoft::WRL;
 
+namespace Engine
+{
 // WinAppの画面サイズを保持し、依存順にGPU資源を作って描画開始に備えます。
 void DirectXCommon::Initialize(WinApp* winApp)
 {
@@ -83,7 +85,7 @@ void DirectXCommon::ResizeIfNeeded()
 	CreateDepthStencilView();
 	ConfigureViewport();
 	ConfigureScissorRect();
-	CreateRenderTextureSRV(SrvManager::GetInstance());
+	CreateRenderTextureSRV(Engine::SrvManager::GetInstance());
 	isRenderTextureShaderResource_ = false;
 	isPostEffectTextureShaderResource_ = false;
 	isGaussianBlurTextureShaderResource_ = false;
@@ -525,15 +527,22 @@ void DirectXCommon::UpdateFixFPS()
 
 
 // キューに送った命令の完了をFenceで待ち、転送資源などを安全に再利用します。
+// GPU待ちの登録に失敗した時は、未完了の資源を解放・再利用しないよう中断します。
 void DirectXCommon::WaitForGPU() {
 	// 1. フェンス値を加算してシグナルを送る
 	signaledFenceValue_++;
-	commandQueue_->Signal(fence_.Get(), signaledFenceValue_);
+	if (FAILED(commandQueue_->Signal(fence_.Get(), signaledFenceValue_))) {
+		throw std::runtime_error("DirectXCommon: GPU wait fence Signal failed.");
+	}
 
 	// 2. GPUがその値に到達するまで待機する
 	if (fence_->GetCompletedValue() < signaledFenceValue_) {
-		fence_->SetEventOnCompletion(signaledFenceValue_, fenceEvent_);
-		WaitForSingleObject(fenceEvent_, INFINITE);
+		if (FAILED(fence_->SetEventOnCompletion(signaledFenceValue_, fenceEvent_))) {
+			throw std::runtime_error("DirectXCommon: GPU wait fence event setup failed.");
+		}
+		if (WaitForSingleObject(fenceEvent_, INFINITE) != WAIT_OBJECT_0) {
+			throw std::runtime_error("DirectXCommon: GPU wait fence wait failed.");
+		}
 	}
 	for (UINT64& frameFenceValue : frameFenceValues_) {
 		frameFenceValue = signaledFenceValue_;
@@ -545,4 +554,5 @@ DirectXCommon::~DirectXCommon() {
 	if (fenceEvent_) {
 		CloseHandle(fenceEvent_);
 	}
+}
 }

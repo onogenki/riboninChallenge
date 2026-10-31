@@ -6,7 +6,7 @@
 #include "Object3d.h"
 #include <string>
 
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
 
 // Playerが拾って運べる、小型のレーザー反射用Mirrorです。
 class CarryableMirror
@@ -29,7 +29,7 @@ public:
 	// ModelとColliderの初期化に成功した時だけtrueを返します。
 	// falseならStageは鏡なしで続行せず、原因を初期化時に止められます。
 	bool Initialize(
-		Object3dCommon* object3dCommon,
+		Engine::Object3dCommon* object3dCommon,
 		const std::string& modelName,
 		const Vector3& startPosition,
 		float width,
@@ -45,8 +45,8 @@ public:
 		bool isRightMouseHeld = false,
 		float verticalAimInput = 0.0f);
 
-	Object3d& GetObject() { return object_; }
-	const Object3d& GetObject() const { return object_; }
+	Engine::Object3d& GetObject() { return object_; }
+	const Engine::Object3d& GetObject() const { return object_; }
 	const Mirror& GetMirror() const { return mirror_; }
 	// Playerなどが持てる鏡のColliderへ判定を依頼する時に使います。
 	const ObbCollider& GetCollider() const { return collider_; }
@@ -61,7 +61,7 @@ public:
 private:
 	void ApplyTransform(const Vector3& position, float pitch, float yaw);
 
-	Object3d object_;
+	Engine::Object3d object_;
 	Mirror mirror_;
 	// 持つ・置くのどちらでも、Object3dのTransformに追従するOBB Colliderです。
 	ObbCollider collider_{};

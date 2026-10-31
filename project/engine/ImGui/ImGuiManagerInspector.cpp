@@ -197,11 +197,11 @@ int ImGuiManager::SpriteWindow(const std::vector<std::unique_ptr<Engine::Sprite>
 }
 
 void ImGuiManager::ModelWindow(
-	std::vector<std::unique_ptr<Object3d>>& normalObjects,
-	std::vector<std::unique_ptr<Object3d>>& animationObjects,
-	Object3d::DirectionalLight& light,
-	Object3d::PointLight& pointLight,
-	Object3d::SpotLight& spotLight,
+	std::vector<std::unique_ptr<Engine::Object3d>>& normalObjects,
+	std::vector<std::unique_ptr<Engine::Object3d>>& animationObjects,
+	Engine::Object3d::DirectionalLight& light,
+	Engine::Object3d::PointLight& pointLight,
+	Engine::Object3d::SpotLight& spotLight,
 	bool embedded,
 	size_t protectedNormalObjectCount,
 	size_t protectedAnimationObjectCount,
@@ -252,7 +252,7 @@ void ImGuiManager::ModelWindow(
 		selectedAnimationIndex = forcedAnimationObjectIndex;
 	}
 
-	auto drawObjectEditor = [this, &onObjectRemoved](const char* label, std::vector<std::unique_ptr<Object3d>>& objects, int& selectedIndex, size_t protectedObjectCount, bool animationObject) {
+	auto drawObjectEditor = [this, &onObjectRemoved](const char* label, std::vector<std::unique_ptr<Engine::Object3d>>& objects, int& selectedIndex, size_t protectedObjectCount, bool animationObject) {
 		if (objects.empty()) {
 			ImGui::TextDisabled("No %s objects.", label);
 			return;
@@ -261,7 +261,7 @@ void ImGuiManager::ModelWindow(
 			selectedIndex = 0;
 		}
 
-		auto makeObjectLabel = [label](const Object3d* object, int index) {
+		auto makeObjectLabel = [label](const Engine::Object3d* object, int index) {
 			const std::string modelName = object ? object->GetModelName() : std::string();
 			if (!modelName.empty()) {
 				return std::string(label) + " " + std::to_string(index) + " : " + modelName;
@@ -280,7 +280,7 @@ void ImGuiManager::ModelWindow(
 			ImGui::EndCombo();
 		}
 
-		Object3d* targetObject = objects[selectedIndex].get();
+		Engine::Object3d* targetObject = objects[selectedIndex].get();
 		ImGui::PushID(targetObject);
 		if (!targetObject->GetModelName().empty()) {
 			ImGui::Text("Model File: %s", targetObject->GetModelName().c_str());

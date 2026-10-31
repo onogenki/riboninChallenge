@@ -5,6 +5,8 @@
 #include <cstdint>
 #include<queue>
 
+namespace Engine
+{
 // SRV・UAV用ディスクリプタ番号を割り当て、解放後の番号を再利用します。
 class SrvManager
 {
@@ -17,11 +19,14 @@ public:
 		return &instance;
 	}
 
-	//初期化
-	void Initialize(DirectXCommon* dxCommon);
+	// @brief DirectX初期化後に共有Descriptor Heapを作り、全番号を割当可能にします。
+	// @param dxCommon 初期化済みのDirectX操作窓口です。このクラスは所有しません。
+	// Device未準備やHeap作成失敗では例外を投げ、未完成のHeapを使いません。
+	void Initialize(Engine::DirectXCommon* dxCommon);
 
 	uint32_t Allocate();
 	void Free(uint32_t index);//解放用の関数
+	// このHeap内の枠に一致するHandleだけを解放し、範囲外や未割当なら何もしません。
 	void Free(D3D12_CPU_DESCRIPTOR_HANDLE handle);
 	bool CanAllocate() const;//空きがあるか確認する関数
 
@@ -58,7 +63,7 @@ private:
 	SrvManager& operator=(const SrvManager&) = delete;
 
 
-	DirectXCommon* directXCommon_ = nullptr;
+	Engine::DirectXCommon* directXCommon_ = nullptr;
 
 	//最大SRV数(最大テクスチャ枚数)
 	static constexpr uint32_t kMaxSRVCount = 512;
@@ -74,4 +79,5 @@ private:
 	std::array<bool, kMaxSRVCount> allocated_{};
 
 };
+} // namespace Engine
 

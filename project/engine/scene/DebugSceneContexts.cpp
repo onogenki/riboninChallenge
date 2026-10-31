@@ -15,7 +15,7 @@ DebugSceneContent::Context DebugScene::MakeContentContext()
 	DebugSceneContent::Context context{};
 	context.object3dCommon = object3dCommon_;
 	context.spriteCommon = spriteCommon_;
-	context.directXCommon = DirectXCommon::GetInstance();
+	context.directXCommon = Engine::DirectXCommon::GetInstance();
 	context.camera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	context.modelLibrary = &debugSceneEditor_.GetEntries();
 	context.normalObjects = &normalObjects_;
@@ -24,7 +24,7 @@ DebugSceneContent::Context DebugScene::MakeContentContext()
 	context.baseNormalObjectCount = levelRuntime_.GetProtectedNormalObjectCount();
 	context.baseAnimationObjectCount = baseAnimationObjectCount_;
 	context.baseSpriteCount = baseSpriteCount_;
-	context.registerModel = [this](Object3d* object, const std::string& sourceFile, bool isAnimated) {
+	context.registerModel = [this](Engine::Object3d* object, const std::string& sourceFile, bool isAnimated) {
 		entityRegistry_.RegisterModel(object, sourceFile, isAnimated);
 	};
 	context.registerSprite = [this](Engine::Sprite* sprite, const std::string& sourceFile) {
@@ -52,7 +52,7 @@ DebugSceneContent::Context DebugScene::MakeContentContext()
 DebugSceneEditor::Context DebugScene::MakeEditorContext()
 {
 	DebugSceneEditor::Context context{};
-	context.directXCommon = DirectXCommon::GetInstance();
+	context.directXCommon = Engine::DirectXCommon::GetInstance();
 	context.camera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	context.cameraManager = cameraManager_.get();
 	context.normalObjects = &normalObjects_;
@@ -67,7 +67,7 @@ DebugSceneEditor::Context DebugScene::MakeEditorContext()
 	context.selection = &selection_;
 	context.entityRegistry = &entityRegistry_;
 	context.assetPreview = &assetPreview_;
-	context.captureManager = CaptureManager::GetInstance();
+	context.captureManager = Engine::CaptureManager::GetInstance();
 	context.emitterTransform = &emitterTransform_;
 	context.emitterCircle = emitterCircle_.get();
 	context.emitterPlane = emitterPlane_.get();
@@ -93,7 +93,7 @@ DebugSceneEditor::Context DebugScene::MakeEditorContext()
 	context.addTextureAtDropPosition = [this](const std::string& textureFilePath, float screenX, float screenY) {
 		Vector2 spritePosition{};
 		return DebugViewportPlacement::TryGetSpritePosition(
-			DirectXCommon::GetInstance(),
+			Engine::DirectXCommon::GetInstance(),
 			screenX,
 			screenY,
 			spritePosition)
@@ -215,10 +215,10 @@ DebugUiSmoke::Context DebugScene::MakeUiSmokeContext()
 	{
 		DebugSceneContent::ClearAdded(MakeContentContext());
 	};
-	context.buildWorldAabb = [](const Object3d& object, MyMath::AABB& outAabb)
+	context.buildWorldAabb = [](const Engine::Object3d& object, MyMath::AABB& outAabb)
 	{
 		return DebugCollisionOverlay::BuildWorldAabb(object, outAabb);
 	};
-	context.captureManager = CaptureManager::GetInstance();
+	context.captureManager = Engine::CaptureManager::GetInstance();
 	return context;
 }

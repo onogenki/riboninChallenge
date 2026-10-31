@@ -90,13 +90,13 @@ void TitleScene::Initialize()
 // DirectX・Camera・Object3d共通設定を、TitleScene用に初期化します。
 void TitleScene::InitializeRenderSystems()
 {
-	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
 	PostEffect::GetInstance()->SetGrayscale(false);
 	PostEffect::GetInstance()->SetSepia(false);
 
 	// Title専用のCameraManagerを作り、ほかのSceneのCamera状態を持ち込まないようにします。
 	InitializeMainCamera(cameraManager_, mainCamera_, kCameraStart);
-	object3dCommon_ = Object3dCommon::GetInstance();
+	object3dCommon_ = Engine::Object3dCommon::GetInstance();
 	object3dCommon_->Initialize(dxCommon);
 	object3dCommon_->SetDefaultCamera(cameraManager_->GetActiveCamera());
 }
@@ -132,7 +132,7 @@ void TitleScene::InitializeDefaultLighting()
 bool TitleScene::InitializeTitleSprites()
 {
 	spriteCommon_ = Engine::SpriteCommon::GetInstance();
-	if (!titleObjects_.InitializeSprites(spriteCommon_, DirectXCommon::GetInstance())) {
+	if (!titleObjects_.InitializeSprites(spriteCommon_, Engine::DirectXCommon::GetInstance())) {
 		return false;
 	}
 	titleEditor_.SelectSprite(1);
@@ -199,8 +199,8 @@ void TitleScene::StartTitleNoise()
 // Titleを選んだ時だけ、DDSとGPU Bufferが完成したSkyBoxをFactoryから受け取ります。
 bool TitleScene::InitializeSkyBoxAndEditorResources()
 {
-	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	skyBox_ = Object3dFactory::CreateSkyBox(
+	Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
+	skyBox_ = Engine::Object3dFactory::CreateSkyBox(
 		dxCommon, cameraManager_->GetActiveCamera(), "Resources/backGround/skybox-night-cube.dds");
 	if (!skyBox_) {
 		return false;
@@ -234,7 +234,7 @@ void TitleScene::Update()
 // 導入演出を進め、Camera更新後に描画対象を準備します。
 void TitleScene::UpdateSceneContent()
 {
-	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
+	const float deltaTime = Engine::DirectXCommon::GetInstance()->GetDeltaTime();
 	UpdateTitlePresentation(deltaTime);
 	if (isInitialized_) {
 		// Cameraを先に更新し、RenderContextが完成済みの3D対象だけを準備します。
@@ -388,7 +388,7 @@ void TitleScene::UpdateSceneTransition(bool isGameViewActive)
 		return;
 	}
 
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	// Debug用UIがある構成だけ、SpaceまたはPadの1ボタンでDebug Sceneを開きます。
 #ifdef USE_IMGUI
 	if (input->TriggerKey(DIK_SPACE) || input->IsPadButtonPressed(0, 1))
@@ -409,10 +409,10 @@ void TitleScene::Draw()
 {
 	// 共通PipelineがRenderTextureへの描画開始を行い、Titleは描画対象だけを並べます。
 	const Vector4 whiteClearColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-	SceneRenderPipeline::Begin(DirectXCommon::GetInstance(), &whiteClearColor);
+	SceneRenderPipeline::Begin(Engine::DirectXCommon::GetInstance(), &whiteClearColor);
 	if (!isSpriteReady_) {
 		// 失敗はログへ記録済みです。未生成の描画物を使わず、このFrameを閉じます。
-		SceneRenderPipeline::End(DirectXCommon::GetInstance(), nullptr, false);
+		SceneRenderPipeline::End(Engine::DirectXCommon::GetInstance(), nullptr, false);
 		return;
 	}
 
@@ -433,7 +433,7 @@ void TitleScene::Draw()
 
 	// ImGuiのBegin/Endが未実行の準備中はDrawも省き、未生成DrawDataを渡しません。
 	SceneRenderPipeline::End(
-		DirectXCommon::GetInstance(),
+		Engine::DirectXCommon::GetInstance(),
 		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr,
 		isInitialized_);
 	hasDrawnTitleSprite_ = true;
@@ -448,7 +448,7 @@ void TitleScene::Finalize()
 	// Titleを途中で離れた場合も、次のSceneへノイズを持ち越しません。
 	PostEffect::GetInstance()->SetRandomNoise(false);
 	//GPUの完了待ち
-	DirectXCommon::GetInstance()->WaitForGPU();
+	Engine::DirectXCommon::GetInstance()->WaitForGPU();
 	titleObjects_.Finalize();
 	skyBox_.reset();
 	titleEditor_.Finalize();

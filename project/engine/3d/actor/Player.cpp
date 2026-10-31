@@ -12,13 +12,13 @@ using namespace MyMath;
 
 // Playerのモデルと球Colliderを同じ開始位置へ作り、成功したかを呼び出し元へ返します。
 bool Player::Initialize(
-	Object3dCommon* object3dCommon,
+	Engine::Object3dCommon* object3dCommon,
 	const std::string& modelName,
 	const Vector3& startPosition,
 	float radius)
 {
 	// 値として所有する球モデルも、Factoryの共通初期化経路を使います。
-	if (!Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
+	if (!Engine::Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
 		return false;
 	}
 
@@ -53,7 +53,7 @@ void Player::Update(
 Player::ControlInput Player::ReadControlInput()
 {
 	ControlInput controlInput{};
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	if (input->PushKey(DIK_W)) {
 		controlInput.forward += 1.0f;
 	}

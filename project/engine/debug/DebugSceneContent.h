@@ -10,8 +10,8 @@
 #include <vector>
 
 namespace Engine { class Camera; }
-class DirectXCommon;
-class Object3dCommon;
+namespace Engine { class DirectXCommon; }
+namespace Engine { class Object3dCommon; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
 
@@ -22,19 +22,19 @@ class DebugSceneContent
 public:
 	struct Context
 	{
-		Object3dCommon* object3dCommon = nullptr;
+		Engine::Object3dCommon* object3dCommon = nullptr;
 		Engine::SpriteCommon* spriteCommon = nullptr;
-		DirectXCommon* directXCommon = nullptr;
+		Engine::DirectXCommon* directXCommon = nullptr;
 		Engine::Camera* camera = nullptr;
 		const std::vector<SceneEditor::ShelfEntry>* modelLibrary = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
 		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		size_t baseNormalObjectCount = 0;
 		size_t baseAnimationObjectCount = 0;
 		size_t baseSpriteCount = 0;
 		// Sceneが所有するECSと選択状態へ、追加・削除を通知する窓口です。
-		std::function<void(Object3d*, const std::string&, bool)> registerModel;
+		std::function<void(Engine::Object3d*, const std::string&, bool)> registerModel;
 		std::function<void(Engine::Sprite*, const std::string&)> registerSprite;
 		std::function<void(bool, size_t)> selectObject;
 		std::function<void(size_t)> selectSprite;
@@ -45,7 +45,7 @@ public:
 
 	// 棚の情報を使ってObject3dを生成し、必要なAnimationだけを設定します。
 	// Camera・Light・行列更新は、毎フレームObject3dRenderContextがまとめて行います。
-	static std::unique_ptr<Object3d> CreateObject(
+	static std::unique_ptr<Engine::Object3d> CreateObject(
 		const Context& context,
 		const std::string& fileName,
 		bool playAnimation);

@@ -4,6 +4,8 @@
 #include <vector>
 
 
+namespace Engine
+{
 // 平面鏡へ反射Textureを渡す結合位置を作り、失敗時は鏡Pipelineへ進みません。
 void Object3dCommon::CreateMirrorRootSignature()
 {
@@ -124,4 +126,5 @@ void Object3dCommon::CreateMirrorGraphicsPipeline()
 		throw std::runtime_error("Object3dCommon: mirror graphics pipeline creation failed");
 	}
 }
+} // namespace Engine
 

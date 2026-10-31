@@ -1,7 +1,7 @@
 #include "StageBgmPlayback.h"
 
 // Audioの初期化はFrameworkに任せ、Stageの再生開始条件だけを新しくします。
-void StageBgmPlayback::Initialize(Audio* audio)
+void StageBgmPlayback::Initialize(Engine::Audio* audio)
 {
 	hasDrawnFrame_ = false;
 	hasStarted_ = false;

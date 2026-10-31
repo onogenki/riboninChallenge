@@ -8,11 +8,13 @@
 #include <array>
 #include <memory>
 
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
 class Object3dGpuData;
-class Object3dFactory;
 namespace Engine { class Camera; }
 
+namespace Engine
+{
+class Object3dFactory;
 // 一体分のTransform・Animation・Light描画データを所有し、頂点と材質は共有Modelから借ります。
 class Object3d
 {
@@ -179,6 +181,8 @@ public:
 	// 読込成功時だけこのObjectのTextureを上書きし、失敗時は以前の設定を保ってfalseを返します。
 	bool SetTextureOverride(const std::string& texturePath);
 	void ClearTextureOverride() { textureSrvIndexOverride_ = UINT32_MAX; }
+	// 同じModelを使う全ObjectのTextureを意図的に変更します。個体だけならSetTextureOverrideを使います。
+	void SetSharedModelTexture(const std::string& texturePath);
 
 	// 描画と当たり判定が同じ値を読めるよう、Transformの各要素を読み取り専用で返します。
 	const Vector3& GetScale()const { return transform_.scale; }
@@ -187,9 +191,7 @@ public:
 	const DirectionalLight& GetDirectionalLight() const;
 	// このObjectが借りている共有Modelの環境反射率を読みます。
 	float GetEnvironmentCoefficient() const;
-	// 編集できるObjectからは、従来どおり共有Modelへの参照を貸します。
-	Engine::Model* GetModel() { return model_; }
-	// 読み取り専用Objectからは共有Modelの材質や頂点を変更させません。
+	// 共有Modelの材質や頂点を外部から任意に変更させず、読み取りだけを許します。
 	const Engine::Model* GetModel() const { return model_; }
 	const std::string& GetModelName() const { return modelName_; }
 
@@ -204,14 +206,14 @@ private:
 	// Sceneやゲーム物体はFactoryから受け取った後に、位置・Light・Animation再生だけを設定します。
 	friend class Object3dFactory;
 	// 一体分のGPU描画データが完成した時だけFactoryへ成功を返します。
-	bool Initialize(Object3dCommon* object3dCommon);
+	bool Initialize(Engine::Object3dCommon* object3dCommon);
 	void SetModel(Engine::Model* model) { this->model_ = model; }
 	void SetModel(const std::string& filePath);
 	bool InitializeAnimation();
 
 	void ReleaseSkinClusterDescriptors();
 
-	Object3dCommon* object3dCommon_ = nullptr;
+	Engine::Object3dCommon* object3dCommon_ = nullptr;
 
 	Engine::Model* model_ = nullptr;
 	std::string modelName_;
@@ -242,4 +244,5 @@ private:
 	bool isSkeletal_ = false;  // スケルトンを持っているかどうか
 	Engine::Model::SkinCluster skinCluster_;//骨に合わせて動く体
 };
+} // namespace Engine
 

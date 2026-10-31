@@ -38,7 +38,7 @@ namespace
 }
 
 // Object3dの頂点をワールド座標へ変換し、Debug表示用のAABBを作ります。
-bool DebugCollisionOverlay::BuildWorldAabb(const Object3d& object, MyMath::AABB& outAabb)
+bool DebugCollisionOverlay::BuildWorldAabb(const Engine::Object3d& object, MyMath::AABB& outAabb)
 {
 	const Engine::Model* model = object.GetModel();
 	if (!model || model->GetModelData().vertices.empty()) {
@@ -94,7 +94,7 @@ void DebugCollisionOverlay::Draw(const Context& context)
 	}
 
 	std::vector<CollisionDebugBox> boxes;
-	auto appendObject = [&](const Object3d* object)
+	auto appendObject = [&](const Engine::Object3d* object)
 	{
 		if (!object) {
 			return;

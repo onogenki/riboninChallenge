@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cstring>
 
+namespace Engine
+{
 // 直近30秒のリプレイ用リングバッファと、圧縮・動画保存ワーカーをまとめる。
 // 通常録画とは別の寿命と非同期処理を持つため、専用ファイルで管理する。
 void CaptureManager::UpdateReplayBuffer(
@@ -321,4 +323,5 @@ void CaptureManager::FinishReplaySaveIfReady()
 		? "Saved replay: " + lastReplayPath_.string()
 		: "Replay save failed.";
 }
+} // namespace Engine
 

@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 
+namespace Engine {
+
 // BgmPlayerは共通Audioを借りるだけで、Audioの初期化や終了処理は行いません。
 void BgmPlayer::Initialize(Audio* audio)
 {
@@ -129,3 +131,5 @@ void BgmPlayer::ApplyMixedVolume()
 			currentVolume_ * AudioMixer::GetInstance()->GetBgmVolume());
 	}
 }
+
+} // namespace Engine

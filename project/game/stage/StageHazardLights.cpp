@@ -9,12 +9,28 @@
 
 using namespace MyMath;
 
+namespace
+{
+	// 横Lightは手前で停止し、奥へ移動・停止してから同じ時間で戻ります。
+	constexpr float kHorizontalCycleSeconds = 10.0f;
+	constexpr float kHorizontalForwardStartSeconds = 3.0f;
+	constexpr float kHorizontalForwardEndSeconds = 5.0f;
+	constexpr float kHorizontalReturnStartSeconds = 8.0f;
+	constexpr float kHorizontalTravelSeconds = 2.0f;
+	// 下Lightは周期の先頭で点灯し、次の点灯前に床へ予告を出します。
+	constexpr float kBottomCycleSeconds = 15.0f;
+	constexpr float kBottomActiveEndSeconds = 5.0f;
+	constexpr float kBottomWarningStartSeconds = 12.0f;
+	// 軌道Lightは一周期の前半で広がり、後半で閉じます。
+	constexpr float kOrbitCycleSeconds = 4.0f;
+}
+
 StageHazardLights::StageHazardLights() = default;
 
 StageHazardLights::~StageHazardLights() = default;
 
 // 各危険LightのRendererを作り、見えない光の判定だけが残らないよう失敗を返します。
-bool StageHazardLights::Initialize(DirectXCommon* directXCommon)
+bool StageHazardLights::Initialize(Engine::DirectXCommon* directXCommon)
 {
 	Reset();
 	const auto createRenderer = [directXCommon](
@@ -88,14 +104,14 @@ void StageHazardLights::Update(
 	}};
 
 	// 2. 三秒停止してから奥・手前へ往復する横一直線のLightです。
-	const float horizontalCycleTime = std::fmod(time_, 10.0f);
+	const float horizontalCycleTime = std::fmod(time_, kHorizontalCycleSeconds);
 	float horizontalMoveProgress = 0.0f;
-	if (horizontalCycleTime >= 3.0f && horizontalCycleTime < 5.0f) {
-		horizontalMoveProgress = easeInOutSine((horizontalCycleTime - 3.0f) / 2.0f);
-	} else if (horizontalCycleTime >= 5.0f && horizontalCycleTime < 8.0f) {
+	if (horizontalCycleTime >= kHorizontalForwardStartSeconds && horizontalCycleTime < kHorizontalForwardEndSeconds) {
+		horizontalMoveProgress = easeInOutSine((horizontalCycleTime - kHorizontalForwardStartSeconds) / kHorizontalTravelSeconds);
+	} else if (horizontalCycleTime >= kHorizontalForwardEndSeconds && horizontalCycleTime < kHorizontalReturnStartSeconds) {
 		horizontalMoveProgress = 1.0f;
-	} else if (horizontalCycleTime >= 8.0f) {
-		horizontalMoveProgress = 1.0f - easeInOutSine((horizontalCycleTime - 8.0f) / 2.0f);
+	} else if (horizontalCycleTime >= kHorizontalReturnStartSeconds) {
+		horizontalMoveProgress = 1.0f - easeInOutSine((horizontalCycleTime - kHorizontalReturnStartSeconds) / kHorizontalTravelSeconds);
 	}
 	const Vector3 horizontalStart = Lerp(horizontalMoveNearStart_, horizontalMoveFarStart_, horizontalMoveProgress);
 	horizontalMoveSegments_ = {{
@@ -106,9 +122,9 @@ void StageHazardLights::Update(
 	}};
 
 	// 3. 下から出るLightは五秒表示・十秒停止、出現三秒前だけ床を赤く予告します。
-	const float bottomPulseCycleTime = std::fmod(time_, 15.0f);
-	const bool isBottomPulseActive = bottomPulseCycleTime < 5.0f;
-	const bool isBottomPulseWarning = bottomPulseCycleTime >= 12.0f;
+	const float bottomPulseCycleTime = std::fmod(time_, kBottomCycleSeconds);
+	const bool isBottomPulseActive = bottomPulseCycleTime < kBottomActiveEndSeconds;
+	const bool isBottomPulseWarning = bottomPulseCycleTime >= kBottomWarningStartSeconds;
 	bottomPulseSegments_.clear();
 	bottomPulseWarningSegments_.clear();
 	if (isBottomPulseActive) {
@@ -124,7 +140,7 @@ void StageHazardLights::Update(
 	}
 
 	// 4. 三本の上向きLightを回転しながら広げたり閉じたりさせます。
-	const float orbitCycleProgress = std::fmod(time_, 4.0f) / 4.0f;
+	const float orbitCycleProgress = std::fmod(time_, kOrbitCycleSeconds) / kOrbitCycleSeconds;
 	const bool isOrbitClosing = orbitCycleProgress >= 0.5f;
 	const float orbitRadiusProgress = isOrbitClosing
 		? 1.0f - easeInSine((orbitCycleProgress - 0.5f) * 2.0f)

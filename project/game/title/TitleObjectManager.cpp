@@ -19,20 +19,20 @@ TitleObjectManager::~TitleObjectManager() = default;
 
 // 従来の一括初期化経路では、モデルとSpriteの両方を準備します。
 bool TitleObjectManager::Initialize(
-	Object3dCommon* object3dCommon,
+	Engine::Object3dCommon* object3dCommon,
 	Engine::SpriteCommon* spriteCommon,
-	DirectXCommon* directXCommon)
+	Engine::DirectXCommon* directXCommon)
 {
 	return InitializeModel(object3dCommon) && InitializeSprites(spriteCommon, directXCommon);
 }
 
 // 導入映像の板と視点を下げた後の仮床を作り、Editorの初期配置件数を記録します。
-bool TitleObjectManager::InitializeModel(Object3dCommon* object3dCommon)
+bool TitleObjectManager::InitializeModel(Engine::Object3dCommon* object3dCommon)
 {
-	auto monitorScreen = Object3dFactory::Create(object3dCommon, "debug/plane.obj");
-	auto floor = Object3dFactory::Create(object3dCommon, "debug/plane.obj");
+	auto monitorScreen = Engine::Object3dFactory::Create(object3dCommon, "debug/plane.obj");
+	auto floor = Engine::Object3dFactory::Create(object3dCommon, "debug/plane.obj");
 	if (!monitorScreen || !floor ||
-		!TextureManager::GetInstance()->LoadTexture("Resources/debug/grass.png")) {
+		!Engine::TextureManager::GetInstance()->LoadTexture("Resources/debug/grass.png")) {
 		return false;
 	}
 	// Spriteを隠した後も同じ絵が見えるよう、正面に仮の監視画面を置きます。
@@ -54,7 +54,7 @@ bool TitleObjectManager::InitializeModel(Object3dCommon* object3dCommon)
 }
 
 // 白背景を下、仮画像を上の順で作り、モデルの準備前から描画できるようにします。
-bool TitleObjectManager::InitializeSprites(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
+bool TitleObjectManager::InitializeSprites(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon)
 {
 	if (!spriteCommon || !directXCommon) {
 		return false;
@@ -63,8 +63,8 @@ bool TitleObjectManager::InitializeSprites(Engine::SpriteCommon* spriteCommon, D
 		return false;
 	}
 	// どちらかの画像が欠けた場合は、半端なSpriteを一覧へ追加しません。
-	if (!TextureManager::GetInstance()->LoadTexture("Resources/debug/white.png") ||
-		!TextureManager::GetInstance()->LoadTexture("Resources/Title/2dTitle/2DTitle1.png")) {
+	if (!Engine::TextureManager::GetInstance()->LoadTexture("Resources/debug/white.png") ||
+		!Engine::TextureManager::GetInstance()->LoadTexture("Resources/Title/2dTitle/2DTitle1.png")) {
 		return false;
 	}
 	auto backgroundSprite = std::make_unique<Engine::Sprite>();
@@ -93,7 +93,7 @@ void TitleObjectManager::ResizeTitleSprites()
 	if (sprites_.size() < 2) {
 		return;
 	}
-	const DirectXCommon* directXCommon = DirectXCommon::GetInstance();
+	const Engine::DirectXCommon* directXCommon = Engine::DirectXCommon::GetInstance();
 	const Vector2 screenSize{
 		static_cast<float>(directXCommon->GetClientWidth()),
 		static_cast<float>(directXCommon->GetClientHeight()),
@@ -127,7 +127,7 @@ bool TitleObjectManager::SetTitleFrame(std::size_t frameIndex)
 	}
 
 	const std::string texturePath = kFramePaths[frameIndex];
-	if (!TextureManager::GetInstance()->LoadTexture(texturePath))
+	if (!Engine::TextureManager::GetInstance()->LoadTexture(texturePath))
 	{
 		return false;
 	}
@@ -144,9 +144,9 @@ bool TitleObjectManager::SetTitleFrame(std::size_t frameIndex)
 }
 
 // Shelfから選ばれたモデルを作り、通常モデルまたはAnimationモデルの一覧へ追加します。
-bool TitleObjectManager::AddModel(Object3dCommon* object3dCommon, const std::string& fileName)
+bool TitleObjectManager::AddModel(Engine::Object3dCommon* object3dCommon, const std::string& fileName)
 {
-	auto object = Object3dFactory::Create(object3dCommon, fileName, true);
+	auto object = Engine::Object3dFactory::Create(object3dCommon, fileName, true);
 	if (!object) {
 		return false;
 	}
@@ -155,7 +155,7 @@ bool TitleObjectManager::AddModel(Object3dCommon* object3dCommon, const std::str
 	object->SetTranslate({ -2.0f + offset, 0.0f, 6.0f });
 	object->SetScale({ 1.0f, 1.0f, 1.0f });
 	if (object->IsSkeletal()) {
-		Object3dFactory::LoadAndPlayAnimation(*object, fileName);
+		Engine::Object3dFactory::LoadAndPlayAnimation(*object, fileName);
 		animationObjects_.push_back(std::move(object));
 	} else {
 		normalObjects_.push_back(std::move(object));
@@ -167,10 +167,10 @@ bool TitleObjectManager::AddModel(Object3dCommon* object3dCommon, const std::str
 bool TitleObjectManager::AddTexture(Engine::SpriteCommon* spriteCommon, const std::string& textureFilePath)
 {
 	// 寸法取得前に読込結果を確認し、欠損画像でGetMetaDataを呼ばないようにします。
-	if (!spriteCommon || !TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+	if (!spriteCommon || !Engine::TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
 		return false;
 	}
-	const auto& metadata = TextureManager::GetInstance()->GetMetaData(textureFilePath);
+	const auto& metadata = Engine::TextureManager::GetInstance()->GetMetaData(textureFilePath);
 	Vector2 size{ static_cast<float>(metadata.width), static_cast<float>(metadata.height) };
 	const float largestSide = (std::max)(size.x, size.y);
 	if (largestSide > 180.0f) {
@@ -186,7 +186,7 @@ bool TitleObjectManager::AddTexture(
 	const Vector2& position, const Vector2& size)
 {
 	// 直接配置の経路でも同じ読込確認を行い、失敗した画像を一覧に残しません。
-	if (!spriteCommon || !TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+	if (!spriteCommon || !Engine::TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
 		return false;
 	}
 	auto sprite = std::make_unique<Engine::Sprite>();

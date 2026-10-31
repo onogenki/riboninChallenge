@@ -47,7 +47,7 @@ void StageReflectionRenderer::DrawOne(Context& context, size_t& reflectionUpdate
 		context.object3dCommon->SetCommonDrawSetting();
 
 		// 鏡面同士の無限反射は行わず、通常Object・JSON配置物・Playerだけを描画します。
-		for (const std::unique_ptr<Object3d>& object : *context.sceneObjects) {
+		for (const std::unique_ptr<Engine::Object3d>& object : *context.sceneObjects) {
 			if (!object) {
 				continue;
 			}
@@ -81,7 +81,7 @@ void StageReflectionRenderer::RestoreMainCameraMatrices(const Context& context)
 		return;
 	}
 
-	for (const std::unique_ptr<Object3d>& object : *context.sceneObjects) {
+	for (const std::unique_ptr<Engine::Object3d>& object : *context.sceneObjects) {
 		if (object) {
 			object->UpdateCameraForDraw(context.activeCamera);
 		}

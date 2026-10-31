@@ -8,7 +8,7 @@
 #include <string>
 
 // 描画資源を順に作り、失敗時は未完成のBufferやShaderを使用させません。
-void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
+void PostEffect::Initialize(Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager)
 {
 	// 画面効果の初期値を明示し、演出側から調整する値と区別します。
 	constexpr float kDefaultDissolveThreshold = 0.5f;
@@ -50,24 +50,24 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	randomNoiseData_->intensity = 1.0f;
 
 	const std::string dissolveMaskFilePath = "Resources/debug/noise0.png";
-	const bool isLoaded = TextureManager::GetInstance()->LoadTexture(dissolveMaskFilePath);
+	const bool isLoaded = Engine::TextureManager::GetInstance()->LoadTexture(dissolveMaskFilePath);
 	// 読み込み失敗時に無効なSRV番号を使わないよう、原因の画像名を記録して初期化を止めます。
 	if (!isLoaded) {
 		const std::string message = "PostEffect: dissolve mask load failed: " + dissolveMaskFilePath;
 		Logger::Log(message);
 		throw std::runtime_error(message);
 	}
-	dissolveMaskSrvIndex_ = TextureManager::GetInstance()->GetSrvIndex(dissolveMaskFilePath);
+	dissolveMaskSrvIndex_ = Engine::TextureManager::GetInstance()->GetSrvIndex(dissolveMaskFilePath);
 
 	const std::string dissolveMaskNoise1FilePath = "Resources/debug/noise1.png";
-	const bool isNoise1Loaded = TextureManager::GetInstance()->LoadTexture(dissolveMaskNoise1FilePath);
+	const bool isNoise1Loaded = Engine::TextureManager::GetInstance()->LoadTexture(dissolveMaskNoise1FilePath);
 	// 2枚目も同じ順序で確認し、未登録の画像を取得しないようにします。
 	if (!isNoise1Loaded) {
 		const std::string message = "PostEffect: dissolve mask load failed: " + dissolveMaskNoise1FilePath;
 		Logger::Log(message);
 		throw std::runtime_error(message);
 	}
-	dissolveMaskNoise1SrvIndex_ = TextureManager::GetInstance()->GetSrvIndex(dissolveMaskNoise1FilePath);
+	dissolveMaskNoise1SrvIndex_ = Engine::TextureManager::GetInstance()->GetSrvIndex(dissolveMaskNoise1FilePath);
 }
 
 // Textureの実体はTextureManagerに任せ、PostEffectが所有するBufferとPipelineだけを解放します。
@@ -83,8 +83,8 @@ void PostEffect::Finalize()
 		pipelineState.Reset();
 	}
 	rootSignature_.Reset();
-	dissolveMaskSrvIndex_ = SrvManager::kInvalidSrvIndex;
-	dissolveMaskNoise1SrvIndex_ = SrvManager::kInvalidSrvIndex;
+	dissolveMaskSrvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	dissolveMaskNoise1SrvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
 	srvManager_ = nullptr;
 	dxCommon_ = nullptr;
 }

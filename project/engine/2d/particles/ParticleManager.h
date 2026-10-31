@@ -40,7 +40,7 @@ public:
     static ParticleManager* GetInstance();
 
     // 初期化済みのDirectXとSRV管理を借り、粒子専用の描画資源を作ります。
-    void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+    void Initialize(Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager);
     // Cameraの更新後に呼び、風・粒子・描画用データをこの順で1フレーム進めます。
     void Update();
     // Update済みの各グループだけを、現在のCamera用データで描画します。
@@ -221,8 +221,8 @@ private:
 
 
     // メンバ変数に記録するポインタ
-    DirectXCommon* dxCommon_ = nullptr;
-    SrvManager* srvManager_ = nullptr;
+    Engine::DirectXCommon* dxCommon_ = nullptr;
+    Engine::SrvManager* srvManager_ = nullptr;
     CameraManager* cameraManager_ = nullptr;
 
     //グループを複数持てるように

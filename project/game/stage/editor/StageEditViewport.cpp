@@ -18,7 +18,7 @@ void StageEditViewport::Draw(const Context& context)
 	SceneEditor::ViewportOptions options{};
 	options.camera = context.camera;
 	std::vector<std::string> sourceNames;
-	const auto addObject = [&](const std::string& sourceName, Object3d* object)
+	const auto addObject = [&](const std::string& sourceName, Engine::Object3d* object)
 	{
 		if (!object) {
 			return;

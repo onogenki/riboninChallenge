@@ -10,13 +10,13 @@
 #include <wrl.h>
 
 namespace Engine { class Camera; }
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 
 // Laserが計算した線分を、ゲーム本体の3D空間へ描画します。
 class LaserRenderer
 {
 public:
-	bool Initialize(DirectXCommon* dxCommon, size_t maximumSegmentCount = 32);
+	bool Initialize(Engine::DirectXCommon* dxCommon, size_t maximumSegmentCount = 32);
 	void Draw(const std::vector<LaserSegment>& segments, const Engine::Camera& camera);
 	// 3D空間における光線の幅を設定する。
 	void SetBeamWidth(float width) { beamWidth_ = width; }
@@ -61,7 +61,7 @@ private:
 	bool CreateRootSignature();
 	bool CreateGraphicsPipeline();
 
-	DirectXCommon* dxCommon_ = nullptr;
+	Engine::DirectXCommon* dxCommon_ = nullptr;
 	size_t maximumSegmentCount_ = 32;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState_;

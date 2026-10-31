@@ -12,6 +12,10 @@
 #include<chrono>
 #include "Vector4.h"
 
+namespace Engine { class SrvManager; }
+
+namespace Engine
+{
 // DirectX 12の初期化、描画先の切替、GPUへの転送とフレーム終了を管理します。
 class DirectXCommon
 {
@@ -84,7 +88,7 @@ public:
 	// @brief SrvManagerの初期化後に、三つの描画先と深度Textureの計四つのSRVを登録します。
 	// @param srvManager 番号とHeapを管理する初期化済みのManagerです。所有しません。
 	// @throws std::runtime_error 必須TextureやSRV枠が不足した時です。
-	void CreateRenderTextureSRV(class SrvManager* srvManager);
+	void CreateRenderTextureSRV(Engine::SrvManager* srvManager);
 
 	// @brief 画像の各行をGPU転送用BufferへCPU側で詰めます。
 	// @param texture 転送先のTextureです。所有しません。
@@ -135,7 +139,7 @@ public:
 	//GPU待ち関数
 	void WaitForGPU();
 	// @brief 描画先を同期的に読み戻します。GPU待ちが入るため連続撮影には使いません。
-	// @param pixels 成功時にRGBA順の画素を受け取る出力先です。
+	// @param pixels 成功時にBGRA順の画素を受け取る出力先です。
 	// @param outWidth 成功時に画像の幅を受け取る出力先です。
 	// @param outHeight 成功時に画像の高さを受け取る出力先です。
 	// @param usePostEffectTexture trueならポストエフェクト後、falseならScene描画先を読みます。
@@ -146,7 +150,7 @@ public:
 	// @return 空きスロットとGPU資源を確保して予約できた時だけtrueです。
 	bool QueueGameTextureCapture(bool usePostEffectTexture);
 	// @brief GPUが完了した最古の撮影予約から画素を取り出します。
-	// @param pixels 成功時にRGBA順の画素を受け取る出力先です。
+	// @param pixels 成功時にBGRA順の画素を受け取る出力先です。
 	// @param outWidth 成功時に画像の幅を受け取る出力先です。
 	// @param outHeight 成功時に画像の高さを受け取る出力先です。
 	// @return 未完了ならfalseです。予約を消費した時はtrueで、取得失敗なら画素は空です。
@@ -282,3 +286,4 @@ private:
 
 
 };
+}

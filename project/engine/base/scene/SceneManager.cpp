@@ -44,13 +44,13 @@ bool SceneManager::ApplyPendingSceneChange()
 	}
 
 	isChangingScene_ = true;
-	DirectXCommon::GetInstance()->WaitForGPU();
+	Engine::DirectXCommon::GetInstance()->WaitForGPU();
 	// 旧SceneがGPU資源を使い終えた後に、Scene固有の所有物を解放します。
 	if (scene_) {
 		scene_->Finalize();
 		scene_.reset();
 	}
-	DirectXCommon::GetInstance()->WaitForGPU();
+	Engine::DirectXCommon::GetInstance()->WaitForGPU();
 
 	// Factoryが生成済みの次Sceneを現在Sceneへ移し、初期化を一度だけ行います。
 	scene_ = std::move(nextScene_);
@@ -144,7 +144,7 @@ bool SceneManager::ChangeSceneWithFade(const std::string& sceneName)
 void SceneManager::UpdateFade()
 {
 	constexpr float kFadeSeconds = 0.35f;
-	const float step = std::clamp(DirectXCommon::GetInstance()->GetDeltaTime() / kFadeSeconds, 0.0f, 1.0f);
+	const float step = std::clamp(Engine::DirectXCommon::GetInstance()->GetDeltaTime() / kFadeSeconds, 0.0f, 1.0f);
 	if (fadePhase_ == FadePhase::kFadeIn) {
 		fadeAlpha_ = (std::min)(1.0f, fadeAlpha_ + step);
 		if (fadeAlpha_ >= 1.0f && ChangeSceneWithLoading(fadeDestination_)) {
@@ -170,12 +170,12 @@ bool SceneManager::PrepareFadeSprite()
 		return true;
 	}
 	constexpr const char* kWhiteTexture = "resources/debug/white.png";
-	if (!TextureManager::GetInstance()->LoadTexture(kWhiteTexture)) {
+	if (!Engine::TextureManager::GetInstance()->LoadTexture(kWhiteTexture)) {
 		Logger::Log("Fade initialization failed: white texture could not be loaded.");
 		return false;
 	}
 	Engine::SpriteCommon* common = Engine::SpriteCommon::GetInstance();
-	if (!common->GetDxCommon() && !common->Initialize(DirectXCommon::GetInstance())) {
+	if (!common->GetDxCommon() && !common->Initialize(Engine::DirectXCommon::GetInstance())) {
 		return false;
 	}
 	auto sprite = std::make_unique<Engine::Sprite>();
@@ -194,7 +194,7 @@ void SceneManager::DrawFadeOverlay()
 	if (!fadeSprite_ || fadePhase_ == FadePhase::kNone || fadeAlpha_ <= 0.0f) {
 		return;
 	}
-	DirectXCommon* dx = DirectXCommon::GetInstance();
+	Engine::DirectXCommon* dx = Engine::DirectXCommon::GetInstance();
 	fadeSprite_->SetSize({ static_cast<float>(dx->GetClientWidth()), static_cast<float>(dx->GetClientHeight()) });
 	fadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, fadeAlpha_ });
 	fadeSprite_->Update();
@@ -221,7 +221,7 @@ bool SceneManager::RestartCurrentScene()
 void SceneManager::FinalizeCurrentScene()
 {
 	isChangingScene_ = true;
-	DirectXCommon::GetInstance()->WaitForGPU();
+	Engine::DirectXCommon::GetInstance()->WaitForGPU();
 	nextScene_.reset();
 	pendingSceneName_.clear();
 	loadingDestinationSceneName_.clear();
@@ -234,7 +234,7 @@ void SceneManager::FinalizeCurrentScene()
 		scene_->Finalize();
 		scene_.reset();
 	}
-	DirectXCommon::GetInstance()->WaitForGPU();
+	Engine::DirectXCommon::GetInstance()->WaitForGPU();
 	currentSceneName_.clear();
 	sceneChangeCooldownFrames_ = 0;
 	isChangingScene_ = false;

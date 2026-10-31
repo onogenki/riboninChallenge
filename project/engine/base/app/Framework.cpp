@@ -11,6 +11,7 @@
 #include <dbghelp.h>
 #include <strsafe.h>
 #include <system_error>
+#include <stdexcept>
 
 #include "TextureManager.h"
 #include "ModelManager.h"
@@ -56,27 +57,43 @@ void AlignWorkingDirectoryToResources()
 }
 }
 
+// クラッシュごとに別名でDumpを保存し、書込失敗の空ファイルを成功記録として残しません。
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception)
 {
-	//時刻を取得して、時刻を名前に入れたファイルを作成。
-	// Dumpsディレクトリ以下に出力
-	SYSTEMTIME time;
+	SYSTEMTIME time{};
 	GetLocalTime(&time);
-	wchar_t filePath[MAX_PATH] = { 0 };
-	CreateDirectory(L"./Dumps", nullptr);
-	StringCchPrintfW(filePath, MAX_PATH, L"./Dumps/%04d-%02d%02d-%02d%02d.dmp", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute);
-	HANDLE dumpFileHandle = CreateFile(filePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
-	//processId(このexeのID)とクラッシュ(例外)の発生したthreadIdを取得
-	DWORD processId = GetCurrentProcessId();
-	DWORD threadId = GetCurrentThreadId();
-	//設定情報を入力
-	MINIDUMP_EXCEPTION_INFORMATION minidumpInformation{ 0 };
+	const DWORD processId = GetCurrentProcessId();
+	const DWORD threadId = GetCurrentThreadId();
+	wchar_t filePath[MAX_PATH]{};
+	CreateDirectoryW(L"./Dumps", nullptr);
+	const HRESULT pathResult = StringCchPrintfW(
+		filePath, MAX_PATH,
+		L"./Dumps/%04u-%02u%02u-%02u%02u%02u-%03u-%lu-%lu.dmp",
+		time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute,
+		time.wSecond, time.wMilliseconds, processId, threadId);
+	if (FAILED(pathResult)) {
+		return EXCEPTION_EXECUTE_HANDLER;
+	}
+	// 既存のDumpを上書きせず、今回のクラッシュだけに対応するファイルを作ります。
+	HANDLE dumpFileHandle = CreateFileW(
+		filePath, GENERIC_READ | GENERIC_WRITE,
+		FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_NEW,
+		FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (dumpFileHandle == INVALID_HANDLE_VALUE) {
+		return EXCEPTION_EXECUTE_HANDLER;
+	}
+	MINIDUMP_EXCEPTION_INFORMATION minidumpInformation{};
 	minidumpInformation.ThreadId = threadId;
 	minidumpInformation.ExceptionPointers = exception;
-	minidumpInformation.ClientPointers = TRUE;
-	//Dumpを出力。MiniDumpNormalは最低限の情報を出力するフラグ
-	MiniDumpWriteDump(GetCurrentProcess(), processId, dumpFileHandle, MiniDumpNormal, &minidumpInformation, nullptr, nullptr);
-	//他に関連づけられていSEH例外ハンドラあれば実行。通常はプロセスを終了する
+	// ExceptionPointersはこの関数を呼んだ同じプロセスのメモリを指します。
+	minidumpInformation.ClientPointers = FALSE;
+	const BOOL written = MiniDumpWriteDump(
+		GetCurrentProcess(), processId, dumpFileHandle, MiniDumpNormal,
+		&minidumpInformation, nullptr, nullptr);
+	CloseHandle(dumpFileHandle);
+	if (!written) {
+		DeleteFileW(filePath);
+	}
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -104,37 +121,43 @@ void Framework::Initialize()
 
 	Logger::Log("\nHello DirectX!\n");
 
-	winApp_ = std::make_unique<WinApp>();
-	winApp_->Initialize();
+	winApp_ = std::make_unique<Engine::WinApp>();
+	// Windowが作れなければ、無効なHandleをDirectXとInputへ渡さず終了します。
+	if (!winApp_->Initialize()) {
+		RequestEnd(1);
+		return;
+	}
 
 	// GPU資源の生成失敗も後段と同じ終了経路へ渡し、未完成のHeapやRTVを使いません。
 	try {
 		//DirectXの初期化
-		dxCommon_ = DirectXCommon::GetInstance();
+		dxCommon_ = Engine::DirectXCommon::GetInstance();
 		dxCommon_->Initialize(winApp_.get());
 
 		//SRVマネージャの初期化
-		srvManager_ = SrvManager::GetInstance();
+		srvManager_ = Engine::SrvManager::GetInstance();
 		srvManager_->Initialize(dxCommon_);
 		// RenderTextureをShaderから読めるよう、SrvManager初期化後にSRVを生成する
 		dxCommon_->CreateRenderTextureSRV(srvManager_);
-		TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
+		Engine::TextureManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 		// 失敗した資源の後続を初期化しないため、Sceneが必要とする共通部品を順に準備します。
 		// RenderTextureをSwapChainへコピーするPostEffectを初期化する
 		PostEffect::GetInstance()->Initialize(dxCommon_, srvManager_);
 		Engine::ModelManager::GetInstance()->Initialize(dxCommon_);
 		Engine::ParticleManager::GetInstance()->Initialize(dxCommon_, srvManager_);
 		Engine::GPUParticle::GetInstance()->Initialize(dxCommon_, srvManager_);
-		Audio::GetInstance()->Initialize();
+		if (!Engine::Audio::GetInstance()->Initialize()) {
+			throw std::runtime_error("Audio initialization failed.");
+		}
 		isAudioInitialized_ = true;
 
 		// 入力とImGuiは描画資源の準備後に従来どおり初期化します。
-		input_ = Input::GetInstance();
+		input_ = Engine::Input::GetInstance();
 		input_->Initialize(winApp_.get());
 		imGuiManager_ = ImGuiManager::GetInstance();
 		imGuiManager_->Initialize(winApp_.get(), dxCommon_, srvManager_);
 		isImGuiInitialized_ = true;
-		CaptureManager::GetInstance()->Initialize();
+		Engine::CaptureManager::GetInstance()->Initialize();
 	} catch (const std::exception& error) {
 		// GPU資源・必須画像・Shaderが欠けた時は、次の初期化とScene開始を止めます。
 		Logger::Log(std::string("Framework initialization failed: ") + error.what());
@@ -176,10 +199,10 @@ void Framework::Update()
 		return;
 	}
 	input_->Update();
-	Audio::GetInstance()->Update();
+	Engine::Audio::GetInstance()->Update();
 	PostEffect::GetInstance()->Update(dxCommon_->GetDeltaTime());
 	// モデル・Textureを保存したフレームだけ再読込するため、すべてのSceneで同じ確認を行います。
-	TextureManager::GetInstance()->UpdateHotReload();
+	Engine::TextureManager::GetInstance()->UpdateHotReload();
 	Engine::ModelManager::GetInstance()->UpdateHotReload();
 
 	//マネージャーにシーンの更新(と切り替え)を任せる
@@ -193,7 +216,7 @@ void Framework::Finalize()
 	Engine::SceneManager::GetInstance()->FinalizeCurrentScene();
 	Engine::SceneManager::GetInstance()->SetSceneFactory(nullptr);
 
-	CaptureManager::GetInstance()->Finalize();
+	Engine::CaptureManager::GetInstance()->Finalize();
 	if (isImGuiInitialized_) {
 		imGuiManager_->Finalize();
 		isImGuiInitialized_ = false;
@@ -202,9 +225,9 @@ void Framework::Finalize()
 	Engine::ParticleManager::GetInstance()->Finalize();
 	Engine::ModelManager::GetInstance()->Finalize();
 	PostEffect::GetInstance()->Finalize();
-	TextureManager::GetInstance()->Finalize();
+	Engine::TextureManager::GetInstance()->Finalize();
 	if (isAudioInitialized_) {
-		Audio::GetInstance()->Unload();
+		Engine::Audio::GetInstance()->Unload();
 		// Audio::Initializeで開始したMedia Foundationは、音源の解放後に終了します。
 		MFShutdown();
 		isAudioInitialized_ = false;
@@ -220,6 +243,7 @@ void Framework::Finalize()
 }
 
 // 終了理由を資源解放前に取り出し、WinMainへ伝えます。
+// 描画・GPU待ちの失敗は記録して終了し、未完成のフレームを次のUpdateへ渡しません。
 int Framework::Run()
 {
 	//ゲームの初期化
@@ -228,19 +252,30 @@ int Framework::Run()
 	// 初期化失敗を受け取った時は、未完成のSceneを更新・描画せず解放へ進みます。
 	while (!IsEndRequest()) //ゲームループ
 	{
-		//毎フレーム更新
-		Update();
-		//終了リクエストがきたら抜ける
-		if (IsEndRequest())
-		{
+		try {
+			//毎フレーム更新
+			Update();
+			//終了リクエストがきたら抜ける
+			if (IsEndRequest())
+			{
+				break;
+			}
+			//描画
+			Draw();
+		} catch (const std::exception& error) {
+			Logger::Log(std::string("Framework frame failed: ") + error.what());
+			RequestEnd(1);
 			break;
 		}
-		//描画
-		Draw();
 	}
 	// WinAppはFinalizeで解放されるため、先に終了コードを保存します。
 	const int result = exitCode_ != 0 ? exitCode_ : (winApp_ ? winApp_->GetQuitCode() : 0);
 	//ゲームの終了
-	Finalize();
+	try {
+		Finalize();
+	} catch (const std::exception& error) {
+		Logger::Log(std::string("Framework finalization failed: ") + error.what());
+		return 1;
+	}
 	return result;
 }

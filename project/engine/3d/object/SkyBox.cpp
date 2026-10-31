@@ -13,7 +13,7 @@ namespace Engine
 {
 
 // 頂点・Index・行列・Materialを従来の順に作り、未完成の背景をSceneへ渡しません。
-bool SkyBox::Initialize(DirectXCommon* dxCommon, Engine::Camera* camera) {
+bool SkyBox::Initialize(Engine::DirectXCommon* dxCommon, Engine::Camera* camera) {
     ResetResources();
     if (!dxCommon || !camera || !dxCommon->GetDevice()) {
         Logger::Log("SkyBox initialization failed: DirectX device or Camera is unavailable.");
@@ -194,7 +194,7 @@ void SkyBox::Draw() {
     ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 
     //シングルトンからインスタンスを直接取得する
-    Object3dCommon* object3dCommon = Object3dCommon::GetInstance();
+    Engine::Object3dCommon* object3dCommon = Engine::Object3dCommon::GetInstance();
     assert(object3dCommon);
 
     //Skybox専用のパイプラインとシグネチャに切り替える
@@ -207,7 +207,7 @@ void SkyBox::Draw() {
     commandList->SetGraphicsRootConstantBufferView(1, materialResource_->GetGPUVirtualAddress());
 
     // キューブマップテクスチャのバインド（レジスタ t0 にSRVハンドルをセット）
-    TextureManager* textureManager = TextureManager::GetInstance();
+    Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
     commandList->SetGraphicsRootDescriptorTable(2, textureManager->GetSrvHandleGPU(texture_));
 
     // VB, IBをセットして描画

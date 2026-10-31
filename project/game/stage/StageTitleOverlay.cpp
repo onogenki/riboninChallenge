@@ -23,7 +23,7 @@ StageTitleOverlay::StageTitleOverlay() = default;
 StageTitleOverlay::~StageTitleOverlay() = default;
 
 // 二枚とも読めた場合だけSpriteを生成し、失敗時に空の登録を残しません。
-bool StageTitleOverlay::Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
+bool StageTitleOverlay::Initialize(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon)
 {
 	if (!spriteCommon || !directXCommon) {
 		return false;
@@ -31,7 +31,7 @@ bool StageTitleOverlay::Initialize(Engine::SpriteCommon* spriteCommon, DirectXCo
 	if (!spriteCommon->Initialize(directXCommon)) {
 		return false;
 	}
-	TextureManager* textureManager = TextureManager::GetInstance();
+	Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
 	if (!textureManager->LoadTexture(kTemporaryTitleTexture) ||
 		!textureManager->LoadTexture(kTemporaryEnterTexture)) {
 		return false;

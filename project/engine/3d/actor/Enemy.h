@@ -4,8 +4,8 @@
 #include <memory>
 #include <string>
 
-class Object3d;
-class Object3dCommon;
+namespace Engine { class Object3d; }
+namespace Engine { class Object3dCommon; }
 class Object3dRenderContext;
 
 // EnemyManagerが所有する一体分の敵です。見た目と球Colliderを持ち、位置を同期します。
@@ -30,7 +30,7 @@ public:
 	~Enemy();
 
 	// モデル・位置・Colliderを作り、一体のEnemyを出現できる状態にします。
-	bool Initialize(Object3dCommon* object3dCommon, const SpawnData& spawnData);
+	bool Initialize(Engine::Object3dCommon* object3dCommon, const SpawnData& spawnData);
 	// 利用側から借りた描画Contextで、Enemyの見た目とColliderを更新します。
 	void Update(const Object3dRenderContext& renderContext);
 	// 更新済みのEnemyモデルを描画します。
@@ -46,12 +46,12 @@ public:
 	Collision::CollisionInfo CheckCollision(const ObbCollider& other) const { return collider_.Check(other); }
 	// 共通のCollider処理を直接使う必要がある時だけ、Enemyが所有するColliderを返します。
 	const SphereCollider& GetCollider() const { return collider_; }
-	Object3d* GetObject() { return object_.get(); }
-	const Object3d* GetObject() const { return object_.get(); }
+	Engine::Object3d* GetObject() { return object_.get(); }
+	const Engine::Object3d* GetObject() const { return object_.get(); }
 
 private:
 	// Enemy自身が所有する見た目の3Dモデルです。
-	std::unique_ptr<Object3d> object_;
+	std::unique_ptr<Engine::Object3d> object_;
 	// Enemy自身が所有する、Playerや攻撃に使う球Colliderです。
 	SphereCollider collider_{};
 	// ColliderとObject3dが共有するワールド座標です。

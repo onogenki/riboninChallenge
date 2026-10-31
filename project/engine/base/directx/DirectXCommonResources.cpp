@@ -12,6 +12,8 @@
 
 using namespace Logger;
 
+namespace Engine
+{
 // Shaderコンパイル、Descriptor、Texture・Buffer Resource作成と転送をまとめる。
 // Device初期化やフレーム描画パスから分離し、GPU Resource操作だけを追えるようにする。
 // SRV Heapの幅で指定Indexを進め、CPU側でDescriptorを登録する位置を返します。
@@ -233,7 +235,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateRenderTextureResourc
 	return resource;
 }
 
-void DirectXCommon::CreateRenderTextureSRV(SrvManager* srvManager)
+void DirectXCommon::CreateRenderTextureSRV(Engine::SrvManager* srvManager)
 {
 	// 四つの資源と未使用枠を登録前に確かめ、失敗時に範囲外のHandleを作りません。
 	if (!srvManager || !renderTextureResource_ || !postEffectTextureResource_ ||
@@ -498,5 +500,6 @@ bool DirectXCommon::ExecuteTextureTransfer(const Microsoft::WRL::ComPtr<ID3D12Re
 	WaitForGPU();
 	return true;
 
+}
 }
 

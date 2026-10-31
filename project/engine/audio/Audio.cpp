@@ -15,6 +15,8 @@
 
 using namespace Microsoft::WRL;
 
+namespace Engine {
+
 class Audio::SourceVoiceCallback final : public IXAudio2VoiceCallback {
 public:
 	void SetVoice(IXAudio2SourceVoice* voice) { voice_ = voice; }
@@ -35,18 +37,19 @@ private:
 	std::atomic_bool isFinished_ = false;
 };
 
-void Audio::Initialize()
+// 音声装置の途中失敗を呼び出し元へ返し、未準備のままBGM再生へ進ませません。
+bool Audio::Initialize()
 {
 	//初期化処理
 	HRESULT result = XAudio2Create(&xAudio2_, 0, XAUDIO2_DEFAULT_PROCESSOR);
 	if (FAILED(result)) {
-		return;
+		return false;
 	}
 
 	result = xAudio2_->CreateMasteringVoice(&masterVoice_);
 	if (FAILED(result)) {
 		xAudio2_.Reset();
-		return;
+		return false;
 	}
 
 	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
@@ -54,7 +57,9 @@ void Audio::Initialize()
 		masterVoice_->DestroyVoice();
 		masterVoice_ = nullptr;
 		xAudio2_.Reset();
+		return false;
 	}
+	return true;
 }
 
 // 音源をPCMへ読み込み、成功したデータだけを共有キャッシュへ登録します。ここでは再生しません。
@@ -350,3 +355,5 @@ void Audio::ReleaseFinishedVoices()
 		callback->GetVoice()->DestroyVoice();
 	}
 }
+
+} // namespace Engine

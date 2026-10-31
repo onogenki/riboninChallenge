@@ -25,7 +25,7 @@ public:
 	PostEffect& operator=(const PostEffect&) = delete;
 
 	// 描画資源とマスク画像を順に準備し、画像を読めない場合は初期化を止める。
-	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+	void Initialize(Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager);
 	// 自分が所有するGPU資源を返し、借りていたManager参照を外す。
 	void Finalize();
 	// RenderTextureをそのままSwapChainへ転送する。
@@ -119,8 +119,8 @@ private:
 		float padding[2];
 	};
 
-	DirectXCommon* dxCommon_ = nullptr;
-	SrvManager* srvManager_ = nullptr;
+	Engine::DirectXCommon* dxCommon_ = nullptr;
+	Engine::SrvManager* srvManager_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineStates_[static_cast<int>(PipelineType::Count)];
 	Microsoft::WRL::ComPtr<ID3D12Resource> depthBasedOutlineResource_;
@@ -129,8 +129,8 @@ private:
 	DissolveData* dissolveData_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> randomNoiseResource_;
 	RandomNoiseData* randomNoiseData_ = nullptr;
-	uint32_t dissolveMaskSrvIndex_ = SrvManager::kInvalidSrvIndex;
-	uint32_t dissolveMaskNoise1SrvIndex_ = SrvManager::kInvalidSrvIndex;
+	uint32_t dissolveMaskSrvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	uint32_t dissolveMaskNoise1SrvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
 	bool isGrayscale_ = false;
 	bool isSepia_ = false;
 	bool isVignette_ = false;

@@ -18,12 +18,12 @@ public:
 	{
 		// SceneのCamera・Lightと、Managerのモデル・Spriteを借ります。TitleEditorは所有しません。
 		Engine::Camera* camera = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
 		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
-		Object3d::DirectionalLight* directionalLight = nullptr;
-		Object3d::PointLight* pointLight = nullptr;
-		Object3d::SpotLight* spotLight = nullptr;
+		Engine::Object3d::DirectionalLight* directionalLight = nullptr;
+		Engine::Object3d::PointLight* pointLight = nullptr;
+		Engine::Object3d::SpotLight* spotLight = nullptr;
 		// Title開始時から置かれている編集保護対象の数です。
 		size_t baseNormalObjectCount = 0;
 		size_t baseAnimationObjectCount = 0;

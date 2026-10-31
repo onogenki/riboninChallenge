@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace Engine { class Camera; }
-class Object3d;
+namespace Engine { class Object3d; }
 namespace Engine { class Sprite; }
 
 // DebugSceneの3D・2D Edit Viewを表示するDebug用UI部品です。
@@ -17,8 +17,8 @@ public:
 	struct Context
 	{
 		Engine::Camera* camera = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
 		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		// Preview中はEdit Viewで通常SceneのObjectを選択させません。
 		bool isAssetPreviewActive = false;

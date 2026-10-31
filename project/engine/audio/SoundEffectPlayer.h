@@ -3,6 +3,8 @@
 #include <string>
 #include <unordered_map>
 
+namespace Engine {
+
 class Audio;
 
 // 効果音の名前とファイルを対応付け、ゲーム側が短い名前だけで再生できるようにする部品です。
@@ -24,3 +26,5 @@ private:
 	Audio* audio_ = nullptr;
 	std::unordered_map<std::string, std::string> effectFilePaths_;
 };
+
+} // namespace Engine

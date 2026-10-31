@@ -8,7 +8,7 @@ namespace Engine
 {
 
 // 全Spriteが共有する描画設定を作り、失敗時は未完成のPipelineを残しません。
-bool SpriteCommon::Initialize(DirectXCommon* dxCommon)
+bool SpriteCommon::Initialize(Engine::DirectXCommon* dxCommon)
 {
 	rootSignature_.Reset();
 	graphicsPipelineState_.Reset();

@@ -28,7 +28,7 @@ namespace
 
 // 携帯鏡自身にModelとColliderの準備を任せ、生成できた時だけSceneへ渡します。
 std::unique_ptr<CarryableMirror> StageMirrorFactory::CreateCarryableMirror(
-	Object3dCommon* object3dCommon,
+	Engine::Object3dCommon* object3dCommon,
 	const std::string& modelName,
 	const Vector3& position,
 	float width,
@@ -43,7 +43,7 @@ std::unique_ptr<CarryableMirror> StageMirrorFactory::CreateCarryableMirror(
 
 // 鏡床固有の向き・両面反射・Collider同期をまとめ、Sceneに設定漏れを作らないようにします。
 std::unique_ptr<FixedMirror> StageMirrorFactory::CreateMirrorFloor(
-	Object3dCommon* object3dCommon,
+	Engine::Object3dCommon* object3dCommon,
 	const std::string& modelName,
 	const Vector3& position,
 	float width,
@@ -52,8 +52,8 @@ std::unique_ptr<FixedMirror> StageMirrorFactory::CreateMirrorFloor(
 	auto mirror = std::make_unique<FixedMirror>();
 	if (!mirror->Initialize(
 		object3dCommon,
-		DirectXCommon::GetInstance(),
-		SrvManager::GetInstance(),
+		Engine::DirectXCommon::GetInstance(),
+		Engine::SrvManager::GetInstance(),
 		modelName,
 		position,
 		0.0f,
@@ -70,7 +70,7 @@ std::unique_ptr<FixedMirror> StageMirrorFactory::CreateMirrorFloor(
 
 // Sceneの本番一覧とは別の仮一覧へ、反射TextureとColliderを持つMirrorを順番に作ります。
 bool StageMirrorFactory::CreateFixedMirrors(
-	Object3dCommon* object3dCommon,
+	Engine::Object3dCommon* object3dCommon,
 	const std::vector<const LevelLoader::ObjectData*>& mirrorDataList,
 	std::vector<std::unique_ptr<FixedMirror>>& outFixedMirrors)
 {
@@ -84,8 +84,8 @@ bool StageMirrorFactory::CreateFixedMirrors(
 		auto fixedMirror = std::make_unique<FixedMirror>();
 		if (!fixedMirror->Initialize(
 			object3dCommon,
-			DirectXCommon::GetInstance(),
-			SrvManager::GetInstance(),
+			Engine::DirectXCommon::GetInstance(),
+			Engine::SrvManager::GetInstance(),
 			mirrorData->fileName.empty() ? "debug/plane.obj" : mirrorData->fileName,
 			mirrorData->translation,
 			mirrorData->rotation.y,

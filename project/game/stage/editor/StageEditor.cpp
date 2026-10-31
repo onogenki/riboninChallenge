@@ -14,7 +14,7 @@
 #include <cstdio>
 #include <numbers>
 
-// Model Shelfの内容を初期化し、Stage1のEdit Viewで使えるようにします。
+// Model Shelfの内容を初期化し、選択中StageのEdit Viewで使えるようにします。
 void StageEditor::Initialize()
 {
 	levelEditor_.Initialize();
@@ -120,9 +120,9 @@ void StageEditor::DrawPlayerControls(Context& context)
 					playerStart->translation = context.player->GetPosition();
 					mapReloadStatus_ = "PlayerStart copied in memory. Press Save Map to keep it.";
 				}
-				ImGui::TextDisabled("Press Save Map, then restart Stage1 to use this start position.");
+				ImGui::TextDisabled("Press Save Map, then restart the current stage to use this start position.");
 			} else {
-				ImGui::TextDisabled("No PlayerStart object exists in stage1.json.");
+				ImGui::TextDisabled("No PlayerStart object exists in stage%d.json.", context.stageId);
 			}
 		}
 		if (context.carryableMirror) {
@@ -193,11 +193,13 @@ void StageEditor::DrawCollision(const Context& context) const
 	StagePuzzleDebugUi::DrawCollision(collisionContext);
 }
 
-// StageLevelEditorへ、Stage1が所有するJSONと保存・再構築操作を渡し、選択番号は編集UI内で保持します。
+// StageLevelEditorへ、現在Stageが所有するJSONと保存・再構築操作を渡し、選択番号は編集UI内で保持します。
 StageLevelEditor::Context StageEditor::MakeLevelEditorContext(Context& context)
 {
 	StageLevelEditor::Context levelEditorContext{};
+	levelEditorContext.stageId = context.stageId;
 	levelEditorContext.levelData = context.levelData;
+	levelEditorContext.mapRuntime = context.mapRuntime;
 	levelEditorContext.playerPosition = context.playerPosition;
 	levelEditorContext.selectedObjectIndex = &selectedObjectIndex_;
 	levelEditorContext.applyLevelData = context.applyLevelData;
@@ -233,6 +235,13 @@ bool StageEditor::DrawLevelControls(
 		// 成功時はcontext.levelDataが古くなるため、LightingとViewportをこのフレームでは開きません。
 		return true;
 	} else {
+		// 名前と判定の追加はStageLevelEditorが元データ・Runtime反映・失敗時復元をまとめます。
+		if (levelEditorResult.renameRequested) {
+			levelEditor_.RenameSelectedObject(levelEditorContext, levelEditorResult.requestedName);
+		}
+		if (levelEditorResult.addBoxColliderRequested) {
+			levelEditor_.AddBoxCollider(levelEditorContext);
+		}
 		if (levelEditorResult.dataChanged) {
 			// 値だけ変わって画面へ反映できなかった時も、成功と誤認しないよう理由を表示します。
 			setStatus(context.applyLevelData && context.applyLevelData(false)
@@ -266,7 +275,7 @@ bool StageEditor::DrawLevelControls(
 			context.applyLighting();
 			setStatus("Lighting edited in memory. Press Save Map to keep it.");
 		} else {
-			setStatus("Lighting changed in data, but could not be applied to Stage1.");
+			setStatus("Lighting changed in data, but could not be applied to the current stage.");
 		}
 	}
 	return false;
@@ -305,6 +314,14 @@ void StageEditor::ClampSelectedObjectIndex(std::size_t objectCount)
 	selectedObjectIndex_ = objectCount == 0
 		? -1
 		: std::clamp(selectedObjectIndex_, 0, static_cast<int>(objectCount) - 1);
+}
+
+// Stageを切り替えた後のUIが、同じ番号にいた前Stageの別モデルを選択しないよう消します。
+void StageEditor::ResetForStage(std::size_t objectCount)
+{
+	selectedObjectIndex_ = objectCount == 0 ? -1 : 0;
+	editViewport_.Finalize();
+	levelEditor_.ResetForStage();
 }
 
 // Stage1終了時に、編集UIが保持するModel ShelfとViewportの選択状態を破棄します。

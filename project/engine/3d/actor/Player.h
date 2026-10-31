@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
 
 //プレイヤーの移動・重力・ジャンプを管理するクラス
 class Player
@@ -38,7 +38,7 @@ public:
 	};
 
 	// モデルを読み込み、開始位置と当たり判定用の半径を設定します。失敗時はfalseです。
-	bool Initialize(Object3dCommon* object3dCommon, const std::string& modelName, const Vector3& startPosition, float radius);
+	bool Initialize(Engine::Object3dCommon* object3dCommon, const std::string& modelName, const Vector3& startPosition, float radius);
 	// Cameraの正面方向を基準に入力を読み取り、移動・重力・OBBとの接地判定を更新する
 	void Update(
 		float deltaTime,
@@ -58,8 +58,9 @@ public:
 	// 現在の移動値は読み取り専用で返し、外部からの部分的な書き換えを防ぎます。
 	const MovementSettings& GetMovementSettings() const { return movementSettings_; }
 
-	//Stage1の共通描画処理で使用する3Dオブジェクトを取得する
-	Object3d& GetObject() { return object_; }
+	// 共通描画や透明化に使うObjectを借ります。所有権はPlayerが持ちます。
+	// 位置を変更する時はSetPositionを使い、見た目・Collider・移動状態をそろえてください。
+	Engine::Object3d& GetObject() { return object_; }
 	// 開始演出やリスポーン時に、速度を残さずPlayerを指定位置へ移動します。
 	void SetPosition(const Vector3& position);
 	// 復帰時に速度・向き・構え・見た目を開始時と同じ状態へ戻します。
@@ -88,7 +89,7 @@ private:
 	static ControlInput ReadControlInput();
 
 	//画面に描画する球モデル
-	Object3d object_;
+	Engine::Object3d object_;
 	//プレイヤーの中心位置
 	Vector3 position_{};
 	//プレイヤーが最後に移動した方向を表す、Y軸回転角です。

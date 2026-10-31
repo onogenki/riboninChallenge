@@ -14,7 +14,7 @@ StageLightPuzzle::StageLightPuzzle() = default;
 StageLightPuzzle::~StageLightPuzzle() = default;
 
 // Laserの設定と描画用Rendererを作り、見えない光の判定だけを進めないよう失敗を返します。
-bool StageLightPuzzle::Initialize(DirectXCommon* directXCommon)
+bool StageLightPuzzle::Initialize(Engine::DirectXCommon* directXCommon)
 {
 	// Sceneを再初期化しても前回の充電・Door状態を持ち越さないよう、実行中の値だけを戻します。
 	ResetProgress();
@@ -91,11 +91,11 @@ void StageLightPuzzle::Update(
 	const std::vector<OBB>& blockingObbs,
 	const Sphere* playerSphere,
 	FixedMirror* largeMirror,
-	Object3d* laserEmitter,
-	Object3d* doorLaserEmitter,
-	Object3d* chargeSwitch,
-	Object3d* doorSwitch,
-	Object3d* lightDoor)
+	Engine::Object3d* laserEmitter,
+	Engine::Object3d* doorLaserEmitter,
+	Engine::Object3d* chargeSwitch,
+	Engine::Object3d* doorSwitch,
+	Engine::Object3d* lightDoor)
 {
 	if (!largeMirror || !chargeSwitch || !doorSwitch || !lightDoor) {
 		return;
@@ -112,7 +112,7 @@ void StageLightPuzzle::UpdateChargeLaser(
 	const std::vector<const Mirror*>& reflectors,
 	const std::vector<OBB>& blockingObbs,
 	const Sphere* playerSphere,
-	Object3d* laserEmitter)
+	Engine::Object3d* laserEmitter)
 {
 	chargeLaser_.SetOrigin(settings_.laserOrigin);
 	chargeLaser_.SetDirection(settings_.laserDirection);
@@ -160,7 +160,7 @@ void StageLightPuzzle::UpdateDoorLaser(
 	const std::vector<const Mirror*>& reflectors,
 	const std::vector<OBB>& blockingObbs,
 	const Sphere* playerSphere,
-	Object3d* doorLaserEmitter)
+	Engine::Object3d* doorLaserEmitter)
 {
 	doorLaser_.SetOrigin(settings_.doorLaserOrigin);
 	doorLaser_.SetDirection(settings_.doorLaserDirection);
@@ -182,9 +182,9 @@ void StageLightPuzzle::UpdateDoorLaser(
 // Doorの開閉、Door Collider、Switchの大きさを一か所で同期します。
 void StageLightPuzzle::UpdatePuzzleVisuals(
 	float deltaTime,
-	Object3d* chargeSwitch,
-	Object3d* doorSwitch,
-	Object3d* lightDoor)
+	Engine::Object3d* chargeSwitch,
+	Engine::Object3d* doorSwitch,
+	Engine::Object3d* lightDoor)
 {
 	const float doorTarget = isDoorSwitchReceivingLight_ ? 1.0f : 0.0f;
 	const float doorRate = (std::min)(3.0f * (std::max)(deltaTime, 0.0f), 1.0f);

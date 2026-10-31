@@ -5,6 +5,8 @@
 #include <functional>
 #include <string>
 
+class StageMapRuntime;
+
 // Stage1のJSONへモデル・Event・Camera Areaを追加／削除するEdit View用のコマンド部品です。
 // Stage1はLevelDataと実行中モデルを所有し、このクラスは編集UIとObjectDataの初期値を担当します。
 class StageLevelEditor
@@ -12,8 +14,11 @@ class StageLevelEditor
 public:
 	struct Context
 	{
-		// Stage1が所有する編集対象データと、Player近くへ追加する基準位置です。
+		// 現在のStageが所有する編集対象データと、Player近くへ追加する基準位置です。
+		int stageId = 1;
 		LevelLoader::LevelData* levelData = nullptr;
+		// 描画済みモデルの頂点範囲からBOXの初期形状を求めるため、Runtimeを借ります。
+		const StageMapRuntime* mapRuntime = nullptr;
 		Vector3 playerPosition{};
 		int* selectedObjectIndex = nullptr;
 		// Stage1側の実行中モデル再構築・JSON保存・状態表示を呼ぶ窓口です。
@@ -34,12 +39,18 @@ public:
 	bool AddEventPair(const Context& context);
 	bool AddCameraArea(const Context& context);
 	bool AddPathSphere(const Context& context);
+	// 選択中のEditor追加モデルだけを改名し、失敗した再構築では旧名へ戻します。
+	bool RenameSelectedObject(const Context& context, const std::string& requestedName);
+	// 選択中の通常モデルへBOX判定を付け、反映失敗時には元のデータへ戻します。
+	bool AddBoxCollider(const Context& context);
 	// 選択中の削除可能なObjectを消し、再構築失敗時はデータと選択を戻します。
 	bool RemoveSelectedObject(const Context& context);
 	// Editor追加モデルだけを消し、再構築と保存の結果を表示用の文章で返します。
 	std::string ClearEditorAddedObjects(const Context& context);
 	// Scene終了時にShelfの前回選択を破棄します。
 	void Finalize();
+	// Stage番号を変えたとき、resourcesの一覧は保って前Stageの選択と通知だけ消します。
+	void ResetForStage();
 
 private:
 	// 既存Object名と重ならない連番の名前を作ります。
@@ -52,6 +63,6 @@ private:
 		LevelLoader::ObjectData objectData,
 		const std::string& successMessage,
 		const std::string& failureMessage);
-	// Stage1 Edit Viewのresources一覧と選択状態です。
+	// 現在のStageで使うresources一覧と選択状態です。
 	SceneEditor::ShelfState shelfState_{};
 };

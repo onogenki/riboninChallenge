@@ -8,9 +8,9 @@
 #include "PlanarReflectionTarget.h"
 #include <string>
 
-class DirectXCommon;
-class Object3dCommon;
-class SrvManager;
+namespace Engine { class DirectXCommon; }
+namespace Engine { class Object3dCommon; }
+namespace Engine { class SrvManager; }
 
 // 部屋やPlayerを映す、大型Mirrorです。
 // 一枚ごとに専用の反射Cameraと描画先Textureを持ちます。
@@ -18,9 +18,9 @@ class FixedMirror
 {
 public:
 	bool Initialize(
-		Object3dCommon* object3dCommon,
-		DirectXCommon* dxCommon,
-		SrvManager* srvManager,
+		Engine::Object3dCommon* object3dCommon,
+		Engine::DirectXCommon* dxCommon,
+		Engine::SrvManager* srvManager,
 		const std::string& modelName,
 		const Vector3& center,
 		float yaw,
@@ -42,8 +42,8 @@ public:
 	// Cameraが鏡の表側にいる時だけ、反射Textureを表示します。
 	void DrawSurface(const Engine::Camera& camera);
 
-	Object3d& GetObject() { return object_; }
-	const Object3d& GetObject() const { return object_; }
+	Engine::Object3d& GetObject() { return object_; }
+	const Engine::Object3d& GetObject() const { return object_; }
 	const Mirror& GetMirror() const { return mirror_; }
 	Engine::Camera& GetReflectionCamera() { return reflectionCamera_; }
 	const Engine::Camera& GetReflectionCamera() const { return reflectionCamera_; }
@@ -63,7 +63,7 @@ public:
 	bool HasReflectionCapture() const { return hasReflectionCapture_; }
 
 private:
-	Object3d object_;
+	Engine::Object3d object_;
 	Mirror mirror_;
 	Engine::Camera reflectionCamera_;
 	PlanarReflectionTarget reflectionTarget_;

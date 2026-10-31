@@ -18,6 +18,8 @@
 #pragma comment(lib, "mfreadwrite.lib")
 #pragma comment(lib, "mfuuid.lib")
 
+namespace Engine
+{
 // AVI・MP4の保存と、動画エンコーダースレッドをまとめる実装ファイル。
 // スクリーンショット、リプレイ、ImGuiの操作とは責任を分けて読みやすくする。
 // 通常録画と自動確認の一枚保存で、AVIハンドルの寿命と画素の行順を共通管理します。
@@ -119,7 +121,15 @@ struct CaptureManager::AviOutput
 };
 
 CaptureManager::CaptureManager() = default;
-CaptureManager::~CaptureManager() = default;
+
+// GPU障害で通常のFinalizeに届かなくても、所有する録画・リプレイスレッドを停止してから破棄します。
+CaptureManager::~CaptureManager()
+{
+	WaitForReplaySave();
+	StopVideoEncoder();
+	StopReplayEncoder();
+	EndActiveVideo();
+}
 
 // 通常録画のAVI出力先を開き、失敗時に未完成のハンドルを保持しません。
 bool CaptureManager::BeginRecordingAvi(const std::filesystem::path& filePath, int width, int height, int frameRate)
@@ -688,3 +698,4 @@ std::vector<unsigned char> CaptureManager::ResizePixels(
 	}
 	return resized;
 }
+} // namespace Engine

@@ -6,9 +6,9 @@
 #include <vector>
 
 namespace Engine { class Camera; }
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 class FixedMirror;
-class Object3d;
+namespace Engine { class Object3d; }
 class LaserRenderer;
 
 // Charge Laser・Door Laser・Switch・Doorの進行状態だけを担当するStage用ギミックです。
@@ -41,7 +41,7 @@ public:
 	};
 
 	// Laserの計算設定と描画用Rendererを準備し、光を描けない時は失敗を返します。
-	bool Initialize(DirectXCommon* directXCommon);
+	bool Initialize(Engine::DirectXCommon* directXCommon);
 	// Stageを切り替える時に、Rendererを作り直さずCharge・Door・Laserの進行状態だけを初期化します。
 	void ResetProgress();
 	// Scene終了時に、Puzzleが所有する描画用GPUデータを解放します。
@@ -53,11 +53,11 @@ public:
 		const std::vector<MyMath::OBB>& blockingObbs,
 		const MyMath::Sphere* playerSphere,
 		FixedMirror* largeMirror,
-		Object3d* laserEmitter,
-		Object3d* doorLaserEmitter,
-		Object3d* chargeSwitch,
-		Object3d* doorSwitch,
-		Object3d* lightDoor);
+		Engine::Object3d* laserEmitter,
+		Engine::Object3d* doorLaserEmitter,
+		Engine::Object3d* chargeSwitch,
+		Engine::Object3d* doorSwitch,
+		Engine::Object3d* lightDoor);
 
 	// 描画とSpotLight化へ、更新済みの反射後Laser線分を渡します。
 	const Laser& GetChargeLaser() const { return chargeLaser_; }
@@ -84,7 +84,7 @@ private:
 		const std::vector<const Mirror*>& reflectors,
 		const std::vector<MyMath::OBB>& blockingObbs,
 		const MyMath::Sphere* playerSphere,
-		Object3d* laserEmitter);
+		Engine::Object3d* laserEmitter);
 	// 充電量から大型Mirrorの向きを更新します。
 	void UpdateLargeMirror(float deltaTime, FixedMirror& largeMirror);
 	// Door Laserの反射経路と、Player・Door Switchへの接触を更新します。
@@ -92,9 +92,9 @@ private:
 		const std::vector<const Mirror*>& reflectors,
 		const std::vector<MyMath::OBB>& blockingObbs,
 		const MyMath::Sphere* playerSphere,
-		Object3d* doorLaserEmitter);
+		Engine::Object3d* doorLaserEmitter);
 	// Doorと二つのSwitchの見た目・Colliderを、現在の進行状態へ合わせます。
-	void UpdatePuzzleVisuals(float deltaTime, Object3d* chargeSwitch, Object3d* doorSwitch, Object3d* lightDoor);
+	void UpdatePuzzleVisuals(float deltaTime, Engine::Object3d* chargeSwitch, Engine::Object3d* doorSwitch, Engine::Object3d* lightDoor);
 
 	Settings settings_{};
 	Laser chargeLaser_{};

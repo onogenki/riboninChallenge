@@ -14,7 +14,7 @@ public:
 	void Reset();
 	// 接触を一回だけ記録し、Playerの入力と予兆を死亡演出用の状態へ切り替えます。
 	void Begin(Player& player, StageLightWarning& warning);
-	// Playerを上昇・透明化し、一秒の演出が終わった時だけtrueを返します。
+	// Playerを上昇・透明化し、一秒後は復帰完了までtrueを返し続けます。
 	bool Update(Player& player, StageLightWarning& warning, float deltaTime);
 	// 復帰後に通常更新へ戻します。三回目のScene切替待ちでは呼びません。
 	void CompleteRespawn();

@@ -48,10 +48,10 @@ private:
 
 	// FactoryとWindowはFrameworkが所有し、Managerの共有本体は借りて使います。
 	std::unique_ptr<AbstractSceneFactory> sceneFactory_;
-	std::unique_ptr<WinApp> winApp_;
-	DirectXCommon* dxCommon_ = nullptr;
-	SrvManager* srvManager_ = nullptr;
-	Input* input_ = nullptr;
+	std::unique_ptr<Engine::WinApp> winApp_;
+	Engine::DirectXCommon* dxCommon_ = nullptr;
+	Engine::SrvManager* srvManager_ = nullptr;
+	Engine::Input* input_ = nullptr;
 	ImGuiManager* imGuiManager_ = nullptr;
 
 };

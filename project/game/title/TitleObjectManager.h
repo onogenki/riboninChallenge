@@ -7,9 +7,9 @@
 #include <string>
 #include <vector>
 
-class DirectXCommon;
-class Object3d;
-class Object3dCommon;
+namespace Engine { class DirectXCommon; }
+namespace Engine { class Object3d; }
+namespace Engine { class Object3dCommon; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
 
@@ -26,15 +26,15 @@ public:
 	~TitleObjectManager();
 
 	// 既存の一括初期化経路を残し、モデルとSpriteを順に準備します。
-	bool Initialize(Object3dCommon* object3dCommon, Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon);
+	bool Initialize(Engine::Object3dCommon* object3dCommon, Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon);
 	// Titleの最初の画面用に、白背景と仮画像Spriteだけを先に作ります。
-	bool InitializeSprites(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon);
+	bool InitializeSprites(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon);
 	// Spriteを一度描いた後で、監視画面の板と視点移動先の仮床を作ります。
-	bool InitializeModel(Object3dCommon* object3dCommon);
+	bool InitializeModel(Engine::Object3dCommon* object3dCommon);
 	// ウィンドウの大きさが変わっても、背景と仮画像を全画面に保ちます。
 	void ResizeTitleSprites();
 	// Factoryでモデルを作り、Titleの配置規則で通常／Animation一覧へ追加します。
-	bool AddModel(Object3dCommon* object3dCommon, const std::string& fileName);
+	bool AddModel(Engine::Object3dCommon* object3dCommon, const std::string& fileName);
 	// Shelfの仮配置です。画像の縦横比を保ち、同じ数値位置へ追加します。
 	bool AddTexture(Engine::SpriteCommon* spriteCommon, const std::string& textureFilePath);
 	// 本番用は位置とサイズを直接指定します。InspectorのPos/Sizeをそのまま渡せます。
@@ -48,8 +48,8 @@ public:
 	void Finalize();
 
 	// Editorには変更可能な一覧を貸します。所有権はこのManagerに残ります。
-	std::vector<std::unique_ptr<Object3d>>& GetNormalObjects() { return normalObjects_; }
-	std::vector<std::unique_ptr<Object3d>>& GetAnimationObjects() { return animationObjects_; }
+	std::vector<std::unique_ptr<Engine::Object3d>>& GetNormalObjects() { return normalObjects_; }
+	std::vector<std::unique_ptr<Engine::Object3d>>& GetAnimationObjects() { return animationObjects_; }
 	std::vector<std::unique_ptr<Engine::Sprite>>& GetSprites() { return sprites_; }
 	// 初期配置の件数は、Editorの削除対象と追加画像の配置番号に使います。
 	size_t GetBaseNormalObjectCount() const { return baseNormalObjectCount_; }
@@ -58,8 +58,8 @@ public:
 
 private:
 	// 通常モデル、骨付きAnimationモデル、2D画像をそれぞれ所有します。
-	std::vector<std::unique_ptr<Object3d>> normalObjects_;
-	std::vector<std::unique_ptr<Object3d>> animationObjects_;
+	std::vector<std::unique_ptr<Engine::Object3d>> normalObjects_;
+	std::vector<std::unique_ptr<Engine::Object3d>> animationObjects_;
 	std::vector<std::unique_ptr<Engine::Sprite>> sprites_;
 	// Initialize完了時の件数です。ClearAddedで残す先頭要素数を表します。
 	size_t baseNormalObjectCount_ = 0;

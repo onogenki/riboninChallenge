@@ -7,7 +7,7 @@
 #include <vector>
 
 namespace Engine { class Camera; }
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 class LaserRenderer;
 
 // Stage1内を時間で動く4種類の危険Lightを担当するゲームギミックです。
@@ -23,7 +23,7 @@ public:
 	~StageHazardLights();
 
 	// 危険Lightの描画用Rendererを全て準備し、一つでも描けない時は失敗を返します。
-	bool Initialize(DirectXCommon* directXCommon);
+	bool Initialize(Engine::DirectXCommon* directXCommon);
 	// Stage切替時に、危険Lightの時間と前Frameの線分を初期状態へ戻します。
 	void Reset();
 

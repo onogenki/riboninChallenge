@@ -5,9 +5,9 @@
 #include <vector>
 
 namespace Engine { class Camera; }
-class DirectXCommon;
-class Object3d;
-class Object3dCommon;
+namespace Engine { class DirectXCommon; }
+namespace Engine { class Object3d; }
+namespace Engine { class Object3dCommon; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
 struct Vector4;
@@ -29,11 +29,11 @@ public:
 	};
 
 	// RenderTextureへの描画を始める前に、DirectXとSRVの共通設定を行います。
-	static void Begin(DirectXCommon* directXCommon, const Vector4* clearColorOverride = nullptr);
+	static void Begin(Engine::DirectXCommon* directXCommon, const Vector4* clearColorOverride = nullptr);
 	// Object3dの共通Pipelineを設定してから、指定条件に合う一覧をまとめて描画します。
 	static void DrawObjects(
-		Object3dCommon* object3dCommon,
-		const std::vector<std::unique_ptr<Object3d>>& objects,
+		Engine::Object3dCommon* object3dCommon,
+		const std::vector<std::unique_ptr<Engine::Object3d>>& objects,
 		ObjectDrawFilter filter = ObjectDrawFilter::kAll);
 	// Spriteの共通Pipelineを設定し、指定位置以降の空でない要素だけ描画します。
 	static void DrawSprites(
@@ -41,5 +41,5 @@ public:
 		const std::vector<std::unique_ptr<Engine::Sprite>>& sprites,
 		size_t firstSpriteIndex = 0);
 	// Sceneのモデル描画後に、PostEffect・SwapChain・必要ならImGui・Presentまでを順番に実行します。
-	static void End(DirectXCommon* directXCommon, const Engine::Camera* activeCamera, bool drawImGui = true);
+	static void End(Engine::DirectXCommon* directXCommon, const Engine::Camera* activeCamera, bool drawImGui = true);
 };

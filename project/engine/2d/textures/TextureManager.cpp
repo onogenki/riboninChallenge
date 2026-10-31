@@ -3,7 +3,10 @@
 #include "Logger.h"
 #include <cassert>
 #include <filesystem>
+#include <stdexcept>
 
+namespace Engine
+{
 // Manager本体は関数内で所有し、登録Textureの寿命だけをFinalizeで区切ります。
 TextureManager* TextureManager::GetInstance()
 {
@@ -12,13 +15,16 @@ TextureManager* TextureManager::GetInstance()
 }
 
 // 借りたManagerを保持し、画像ごとのSRV登録先を先に確保します。
-void TextureManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
+void TextureManager::Initialize(Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager)
 {
-	assert(dxCommon);
+	// Release系でも未準備のGPU窓口を借りず、Scene開始前の既存の例外経路へ渡します。
+	if (!dxCommon || !dxCommon->GetDevice() || !srvManager || !srvManager->GetDescriptorHeap()) {
+		throw std::invalid_argument("TextureManager: DirectX device or SRV heap is unavailable.");
+	}
 	dxCommon_ = dxCommon;
 	srvManager_ = srvManager;
 	// 最大SRV数を予約しても画像は登録せず、読込成功時だけ一覧へ追加します。
-	textureDatas_.reserve(DirectXCommon::kMaxSRVCount);
+	textureDatas_.reserve(Engine::DirectXCommon::kMaxSRVCount);
 }
 
 // 所有するSRVを返してから登録を消し、次の初期化へ古い参照を残しません。
@@ -149,7 +155,7 @@ bool TextureManager::CreateTextureData(
 	// 初回だけSRVを確保し、再読込は同じSRV番号を書き換えます。
 	if (allocateSrv) {
 		textureData.srvIndex_ = srvManager_->Allocate();
-		if (textureData.srvIndex_ == SrvManager::kInvalidSrvIndex) {
+		if (textureData.srvIndex_ == Engine::SrvManager::kInvalidSrvIndex) {
 			return false;
 		}
 		textureData.srvHandleCPU_ = srvManager_->GetCPUDescriptorHandle(textureData.srvIndex_);
@@ -179,7 +185,7 @@ bool TextureManager::CreateTextureData(
 		// 初回読込だけで取得したSRV番号は、空のTextureを登録せず返却します。
 		if (allocateSrv) {
 			srvManager_->Free(textureData.srvIndex_);
-			textureData.srvIndex_ = SrvManager::kInvalidSrvIndex;
+			textureData.srvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
 			textureData.srvHandleCPU_ = {};
 			textureData.srvHandleGPU_ = {};
 		}
@@ -217,3 +223,4 @@ D3D12_GPU_DESCRIPTOR_HANDLE TextureManager::GetSrvHandleGPU(const std::string& f
 	assert(textureDatas_.contains(filePath));
 	return textureDatas_.at(filePath).srvHandleGPU_;
 }
+} // namespace Engine

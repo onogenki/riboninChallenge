@@ -157,7 +157,7 @@ void DebugTimePlaybackSmoke::Start(
 	}
 	if (replacedCircle || replacedRing || replacedCylinder || createdMissingGroup ||
 		particleManager->GetPlaybackSnapshot("MissingTextureProbe", after) ||
-		TextureManager::GetInstance()->Contains(kMissingParticleTexture)) {
+		Engine::TextureManager::GetInstance()->Contains(kMissingParticleTexture)) {
 		Finish(state, false, "A missing particle texture or group was accepted or registered.");
 		return;
 	}
@@ -301,7 +301,7 @@ void DebugTimePlaybackSmoke::Update(
 				fail("Shelf normal model count changed unexpectedly during delete stress.");
 				return;
 			}
-			Object3d* addedObject = context.normalObjects->back().get();
+			Engine::Object3d* addedObject = context.normalObjects->back().get();
 			const Transform beforeEdit = addedObject->GetTransform();
 			Transform editedTransform = beforeEdit;
 			editedTransform.translate.x += 2.0f;

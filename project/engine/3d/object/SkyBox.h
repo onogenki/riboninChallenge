@@ -7,9 +7,9 @@
 #include "Vector2.h"
 #include "Vector3.h"
 
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 namespace Engine { class Camera; }
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
 
 namespace Engine
 {
@@ -37,7 +37,7 @@ public:
     };
 
     // 四つのGPU Bufferを準備できた場合だけ、Factoryへ成功を返します。
-    bool Initialize(DirectXCommon* dxCommon, Engine::Camera* camera);
+    bool Initialize(Engine::DirectXCommon* dxCommon, Engine::Camera* camera);
     void Update();
     void Draw();
     void SetTexture(const std::string& filePath) { texture_ = filePath; }//キューブマップのDDSのパスを指定
@@ -47,9 +47,9 @@ private:
     // 初期化途中で失敗した時に、自分のBufferと借用先を外します。
     void ResetResources();
 
-    DirectXCommon* dxCommon_ = nullptr;
+    Engine::DirectXCommon* dxCommon_ = nullptr;
     Engine::Camera* camera_ = nullptr;
-    Object3dCommon* object3dCommon_ = nullptr;
+    Engine::Object3dCommon* object3dCommon_ = nullptr;
 
     // SkyBox専用の頂点・インデックスリソース
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexBuffer_;

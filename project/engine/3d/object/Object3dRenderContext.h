@@ -15,27 +15,27 @@ public:
 	// SpotLight一灯を使うScene向けの設定です。
 	Object3dRenderContext(
 		Engine::Camera* camera,
-		const Object3d::DirectionalLight& directionalLight,
-		const Object3d::PointLight& pointLight,
-		const Object3d::SpotLight& spotLight);
+		const Engine::Object3d::DirectionalLight& directionalLight,
+		const Engine::Object3d::PointLight& pointLight,
+		const Engine::Object3d::SpotLight& spotLight);
 	// 複数SpotLightを使うStage向けの設定です。
 	Object3dRenderContext(
 		Engine::Camera* camera,
-		const Object3d::DirectionalLight& directionalLight,
-		const Object3d::PointLight& pointLight,
-		const std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount>& spotLights);
+		const Engine::Object3d::DirectionalLight& directionalLight,
+		const Engine::Object3d::PointLight& pointLight,
+		const std::array<Engine::Object3d::SpotLight, Engine::Object3d::kMaximumSpotLightCount>& spotLights);
 
 	// DirectionalLightの方向を単位ベクトルへそろえ、長さ0なら安全な下向きを設定します。
-	static void NormalizeDirectionalLight(Object3d::DirectionalLight& directionalLight);
+	static void NormalizeDirectionalLight(Engine::Object3d::DirectionalLight& directionalLight);
 	// Camera・Light・行列をObject3dへ反映してから更新します。
-	void UpdateObject(Object3d& object) const;
+	void UpdateObject(Engine::Object3d& object) const;
 	// Sceneが所有するObject3d一覧へ、同じCamera・Light・行列更新をまとめて適用します。
-	void UpdateObjects(const std::vector<std::unique_ptr<Object3d>>& objects) const;
+	void UpdateObjects(const std::vector<std::unique_ptr<Engine::Object3d>>& objects) const;
 
 private:
 	Engine::Camera* camera_ = nullptr;
-	const Object3d::DirectionalLight* directionalLight_ = nullptr;
-	const Object3d::PointLight* pointLight_ = nullptr;
-	const Object3d::SpotLight* spotLight_ = nullptr;
-	const std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount>* spotLights_ = nullptr;
+	const Engine::Object3d::DirectionalLight* directionalLight_ = nullptr;
+	const Engine::Object3d::PointLight* pointLight_ = nullptr;
+	const Engine::Object3d::SpotLight* spotLight_ = nullptr;
+	const std::array<Engine::Object3d::SpotLight, Engine::Object3d::kMaximumSpotLightCount>* spotLights_ = nullptr;
 };

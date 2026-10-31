@@ -22,13 +22,13 @@ StagePauseOverlay::StagePauseOverlay() = default;
 StagePauseOverlay::~StagePauseOverlay() = default;
 
 // 本編開始前に三枚を一度だけ読み、欠けた案内を表示しないようにします。
-bool StagePauseOverlay::Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
+bool StagePauseOverlay::Initialize(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon)
 {
 	Finalize();
 	if (!spriteCommon || !directXCommon || !spriteCommon->Initialize(directXCommon)) {
 		return false;
 	}
-	TextureManager* textureManager = TextureManager::GetInstance();
+	Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
 	if (!textureManager->LoadTexture(kTabTexture) ||
 		!textureManager->LoadTexture(kPauseTexture) ||
 		!textureManager->LoadTexture(kBackToStageSelectTexture)) {

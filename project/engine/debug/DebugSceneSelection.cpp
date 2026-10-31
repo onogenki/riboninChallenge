@@ -8,11 +8,11 @@
 bool DebugSceneSelection::SelectObject(
 	bool isAnimationObject,
 	size_t index,
-	const std::vector<std::unique_ptr<Object3d>>& normalObjects,
-	const std::vector<std::unique_ptr<Object3d>>& animationObjects,
+	const std::vector<std::unique_ptr<Engine::Object3d>>& normalObjects,
+	const std::vector<std::unique_ptr<Engine::Object3d>>& animationObjects,
 	DebugEntityRegistry& entityRegistry)
 {
-	const std::vector<std::unique_ptr<Object3d>>& objects =
+	const std::vector<std::unique_ptr<Engine::Object3d>>& objects =
 		isAnimationObject ? animationObjects : normalObjects;
 	if (index >= objects.size() || !objects[index]) {
 		ClearObjectSelection();

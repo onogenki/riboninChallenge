@@ -72,13 +72,13 @@ void DebugScene::Initialize()
 // 共通描画設定を順にそろえ、SpriteのPipelineが作れなければ後続のScene準備を止めます。
 bool DebugScene::InitializeRenderSystems()
 {
-	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
 	PostEffect::GetInstance()->SetGrayscale(false);
 	PostEffect::GetInstance()->SetSepia(false);
 	Engine::ParticleManager::GetInstance()->ClearAllGroups();
 
 	// 3Dと2Dの共通描画部は、Sceneへ入る時に同じDirectX環境で初期化します。
-	object3dCommon_ = Object3dCommon::GetInstance();
+	object3dCommon_ = Engine::Object3dCommon::GetInstance();
 	object3dCommon_->Initialize(dxCommon);
 	spriteCommon_ = Engine::SpriteCommon::GetInstance();
 	return spriteCommon_->Initialize(dxCommon);
@@ -105,8 +105,8 @@ void DebugScene::InitializeCameras()
 // 夜空と既存の環境反射を別々に読み込み、Debugのモデル反射を変えずに背景だけそろえます。
 bool DebugScene::InitializeSceneResources()
 {
-	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
-	TextureManager* textureManager = TextureManager::GetInstance();
+	Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
+	Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
 	const char* requiredTextures[] = {
 		"Resources/debug/monsterBall.png",
 		"Resources/debug/grass.png",
@@ -140,7 +140,7 @@ bool DebugScene::InitializeSceneResources()
 	object3dCommon_->SetEnvironmentTexturePath(environmentTexturePath);
 
 	// 読み込めたDDSだけをFactoryから受け取り、未登録SRVを描画しません。
-	skyBox_ = Object3dFactory::CreateSkyBox(dxCommon, cameraManager_->GetActiveCamera(), skyBoxTexturePath);
+	skyBox_ = Engine::Object3dFactory::CreateSkyBox(dxCommon, cameraManager_->GetActiveCamera(), skyBoxTexturePath);
 	if (!skyBox_) {
 		Logger::Log("DebugScene initialization failed: SkyBox could not be created.");
 		return false;
@@ -155,7 +155,7 @@ bool DebugScene::InitializeSceneResources()
 bool DebugScene::InitializeInitialContent()
 {
 	// Factoryでモデル読込とObject3d初期化を済ませ、Debug固有の配置だけをここで決めます。
-	auto objPlane = Object3dFactory::Create(object3dCommon_, "debug/terrain.obj");
+	auto objPlane = Engine::Object3dFactory::Create(object3dCommon_, "debug/terrain.obj");
 	if (!objPlane) {
 		return false;
 	}
@@ -329,7 +329,7 @@ void DebugScene::Update()
 	UpdateAutomation();
 	// 編集欄のBackSpaceと混同しないよう、Game View操作中だけTitleへ戻ります。
 	if (ImGuiManager::GetInstance()->IsGameViewActive() &&
-		Input::GetInstance()->TriggerKey(DIK_BACK)) {
+		Engine::Input::GetInstance()->TriggerKey(DIK_BACK)) {
 		Engine::SceneManager::GetInstance()->ChangeSceneWithLoading("TITLE");
 	}
 }
@@ -366,11 +366,11 @@ void DebugScene::UpdateSceneContent()
 		&animationObjects_,
 		&renderContext,
 		&directionalLight_,
-		DirectXCommon::GetInstance()->GetDeltaTime(),
+		Engine::DirectXCommon::GetInstance()->GetDeltaTime(),
 		ImGuiManager::GetInstance()->IsGameViewActive(),
 	});
 
-	if (Object3d* previewObject = assetPreview_.GetObject()) {
+	if (Engine::Object3d* previewObject = assetPreview_.GetObject()) {
 		renderContext.UpdateObject(*previewObject);
 	}
 
@@ -398,8 +398,8 @@ void DebugScene::UpdateEditorUi()
 		ImGui::IsMouseDown(ImGuiMouseButton_Left),
 		ImGui::IsMouseClicked(ImGuiMouseButton_Left),
 		ImGuiManager::GetInstance()->IsMouseOverGameView(
-			Input::GetInstance()->GetMouseScreen().x,
-			Input::GetInstance()->GetMouseScreen().y))) {
+			Engine::Input::GetInstance()->GetMouseScreen().x,
+			Engine::Input::GetInstance()->GetMouseScreen().y))) {
 		ExitModelPreview();
 	}
 #endif
@@ -419,7 +419,7 @@ void DebugScene::Draw()
 	}
 	// 通常SceneとPreviewの描画経路をDebug専用Rendererへ渡します。
 	DebugSceneRenderer::Draw({
-		DirectXCommon::GetInstance(),
+		Engine::DirectXCommon::GetInstance(),
 		object3dCommon_,
 		spriteCommon_,
 		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr,
@@ -439,7 +439,7 @@ void DebugScene::Finalize()
 {
 	isSceneReady_ = false;
 	//GPUの完了を待機
-	DirectXCommon::GetInstance()->WaitForGPU();
+	Engine::DirectXCommon::GetInstance()->WaitForGPU();
 
 	// 中途半端に生き残っている粒子が原因のアクセス違反を防ぐ
 	Engine::ParticleManager::GetInstance()->SetCameraManager(nullptr);

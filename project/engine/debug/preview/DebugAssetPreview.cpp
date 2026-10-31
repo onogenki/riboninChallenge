@@ -23,7 +23,7 @@ void DebugAssetPreview::SaveReturnCamera(Engine::Camera* camera)
 
 // 作成済みモデルをプレビューへ移し、現在のCamera位置を復帰用として保存します。
 bool DebugAssetPreview::EnterModel(
-	std::unique_ptr<Object3d> object,
+	std::unique_ptr<Engine::Object3d> object,
 	const std::string& fileName,
 	const Vector3& modelCenter,
 	float modelRadius,
@@ -59,7 +59,7 @@ bool DebugAssetPreview::EnterTexture(
 	}
 
 	// 画像が欠けている場合は、現在のプレビューと復帰用Camera状態を変えずに戻ります。
-	if (!TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+	if (!Engine::TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
 		return false;
 	}
 	auto sprite = std::make_unique<Engine::Sprite>();
@@ -115,8 +115,8 @@ void DebugAssetPreview::ResetTextureView()
 	if (!sprite_) {
 		return;
 	}
-	const float clientWidth = static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth());
-	const float clientHeight = static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight());
+	const float clientWidth = static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientWidth());
+	const float clientHeight = static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientHeight());
 	const Vector2 originalSize = sprite_->GetTextureSize();
 	const float maxWidth = (std::max)(160.0f, clientWidth * 0.72f);
 	const float maxHeight = (std::max)(120.0f, clientHeight * 0.72f);
@@ -159,7 +159,7 @@ void DebugAssetPreview::Reset(Engine::Camera* camera)
 // プレビュー中のMouse操作とRキー操作を更新します。プレビュー中ならtrueを返します。
 bool DebugAssetPreview::UpdateInput(
 	Engine::Camera* camera,
-	Input* input,
+	Engine::Input* input,
 	bool isMouseOverGameView,
 	bool isCameraDragging)
 {
@@ -185,8 +185,8 @@ bool DebugAssetPreview::UpdateInput(
 		float rectHeight = 0.0f;
 		if (sprite_ && ImGuiManager::GetInstance()->GetGameViewRect(rectX, rectY, rectWidth, rectHeight) &&
 			rectWidth > 0.0f && rectHeight > 0.0f) {
-			const float clientWidth = static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth());
-			const float clientHeight = static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight());
+			const float clientWidth = static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientWidth());
+			const float clientHeight = static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientHeight());
 			if (isCameraDragging && input->IsMouseButtonPressed(0)) {
 				Vector2 position = sprite_->GetPosition();
 				position.x += static_cast<float>(input->GetMouseX()) * (clientWidth / rectWidth);

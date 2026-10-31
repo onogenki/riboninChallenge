@@ -18,7 +18,7 @@
 #endif
 using namespace MyMath;
 
-void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]DirectXCommon* directXCommon, [[maybe_unused]]SrvManager* srvManager)
+void ImGuiManager::Initialize([[maybe_unused]] Engine::WinApp* winApp, [[maybe_unused]]Engine::DirectXCommon* directXCommon, [[maybe_unused]]Engine::SrvManager* srvManager)
 {
 #ifdef USE_IMGUI
 
@@ -57,9 +57,9 @@ void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]D
 	initInfo.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle,
 		D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
 		{
-			SrvManager* srvManager = SrvManager::GetInstance();
+			Engine::SrvManager* srvManager = Engine::SrvManager::GetInstance();
 			uint32_t index = srvManager->Allocate();
-			if (index == SrvManager::kInvalidSrvIndex) {
+			if (index == Engine::SrvManager::kInvalidSrvIndex) {
 				*out_cpu_handle = {};
 				*out_gpu_handle = {};
 				return;
@@ -72,7 +72,7 @@ void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]D
 	initInfo.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle,
 		D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
 		{
-			SrvManager::GetInstance()->Free(cpu_handle);
+			Engine::SrvManager::GetInstance()->Free(cpu_handle);
 			//SrvManagerに解放機能を作っていないためここでは何もしない
 		};
 
@@ -83,6 +83,28 @@ void ImGuiManager::Initialize([[maybe_unused]] WinApp* winApp, [[maybe_unused]]D
 
 }
 
+// Stageの現在番号をこのフレームのScene欄へ渡し、他のSceneへ持ち越しません。
+void ImGuiManager::SetStageSelection(int stageId)
+{
+#ifdef USE_IMGUI
+	stageSelectionId_ = stageId;
+#else
+	(void)stageId;
+#endif
+}
+
+// Scene欄で押されたStage番号を一度だけ返し、Stage自身が安全なUpdate順で切り替えます。
+int ImGuiManager::TakeRequestedStageId()
+{
+#ifdef USE_IMGUI
+	const int requestedStageId = requestedStageId_;
+	requestedStageId_ = 0;
+	return requestedStageId;
+#else
+	return 0;
+#endif
+}
+
 void ImGuiManager::Begin(const char* sceneName)
 {
 #ifdef USE_IMGUI
@@ -91,6 +113,7 @@ void ImGuiManager::Begin(const char* sceneName)
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 	BeginDockSpace(sceneName != nullptr ? sceneName : "Unknown");
+	stageSelectionId_ = 0;
 #endif
 }
 
@@ -139,15 +162,15 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 
 	if (ImGui::BeginMenuBar()) {
 		if (ImGui::BeginMenu("Display")) {
-			const WinApp::WindowMode currentMode = winApp_->GetWindowMode();
-			if (ImGui::MenuItem("Windowed (Current Size)", nullptr, currentMode == WinApp::WindowMode::Windowed)) {
-				winApp_->SetWindowMode(WinApp::WindowMode::Windowed);
+			const Engine::WinApp::WindowMode currentMode = winApp_->GetWindowMode();
+			if (ImGui::MenuItem("Windowed (Current Size)", nullptr, currentMode == Engine::WinApp::WindowMode::Windowed)) {
+				winApp_->SetWindowMode(Engine::WinApp::WindowMode::Windowed);
 			}
-			if (ImGui::MenuItem("Maximized (With Close Button)", nullptr, currentMode == WinApp::WindowMode::Maximized)) {
-				winApp_->SetWindowMode(WinApp::WindowMode::Maximized);
+			if (ImGui::MenuItem("Maximized (With Close Button)", nullptr, currentMode == Engine::WinApp::WindowMode::Maximized)) {
+				winApp_->SetWindowMode(Engine::WinApp::WindowMode::Maximized);
 			}
-			if (ImGui::MenuItem("Borderless Fullscreen", nullptr, currentMode == WinApp::WindowMode::BorderlessFullscreen)) {
-				winApp_->SetWindowMode(WinApp::WindowMode::BorderlessFullscreen);
+			if (ImGui::MenuItem("Borderless Fullscreen", nullptr, currentMode == Engine::WinApp::WindowMode::BorderlessFullscreen)) {
+				winApp_->SetWindowMode(Engine::WinApp::WindowMode::BorderlessFullscreen);
 			}
 			ImGui::Separator();
 			ImGui::TextDisabled("Current: %u x %u", winApp_->GetClientWidth(), winApp_->GetClientHeight());
@@ -172,6 +195,10 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 	}
 	ImGui::TextDisabled("Scene: %s", sceneName);
 	ImGui::SameLine();
+	if (stageSelectionId_ >= 1 && stageSelectionId_ <= 5) {
+		ImGui::TextDisabled("Map: Stage %d", stageSelectionId_);
+		ImGui::SameLine();
+	}
 	ImGui::TextDisabled("FPS: %.1f", ImGui::GetIO().Framerate);
 	ImGui::EndMenuBar();
 	}
@@ -248,7 +275,7 @@ void ImGuiManager::BeginDockSpace(const char* sceneName)
 				ImVec2(fpsGraphWidth, 58.0f));
 
 			ImGui::TableSetColumnIndex(1);
-			CaptureManager::GetInstance()->DrawImGui();
+			Engine::CaptureManager::GetInstance()->DrawImGui();
 
 			ImGui::TableSetColumnIndex(2);
 			ImGui::TextUnformatted("Post Effect");
@@ -589,8 +616,28 @@ void ImGuiManager::SceneWindow(const char* sceneName)
 	ImGui::Separator();
 	ImGui::TextUnformatted(currentLabel);
 	ImGui::Spacing();
+	if (stageSelectionId_ >= 1 && stageSelectionId_ <= 5) {
+		// Stage Sceneを増やさず、同じScene内で選択中JSONだけを切り替えます。
+		ImGui::SeparatorText("Stage Map");
+		const std::string stageLabel = "Stage " + std::to_string(stageSelectionId_);
+		if (ImGui::BeginCombo("Stage ID", stageLabel.c_str())) {
+			for (int stageId = 1; stageId <= 5; ++stageId) {
+				const std::string optionLabel = "Stage " + std::to_string(stageId);
+				const bool isCurrent = stageId == stageSelectionId_;
+				if (ImGui::Selectable(optionLabel.c_str(), isCurrent) && !isCurrent) {
+					requestedStageId_ = stageId;
+				}
+				if (isCurrent) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::TextDisabled("Saves the current map, then loads the selected stage JSON.");
+		ImGui::SeparatorText("Scene");
+	}
 
-		ImGui::BeginDisabled(sceneManager->HasPendingScene());
+	ImGui::BeginDisabled(sceneManager->HasPendingScene());
 	if (ImGui::BeginCombo("Scene", currentLabel)) {
 		for (const std::string& availableScene : sceneManager->GetAvailableSceneNames()) {
 			const bool isCurrent = availableScene == currentScene;
@@ -609,7 +656,7 @@ void ImGuiManager::SceneWindow(const char* sceneName)
 	}
 	if (ImGui::Button("Reload Loaded Model / Texture")) {
 		Engine::ModelManager::GetInstance()->ReloadAllLoadedModels();
-		TextureManager::GetInstance()->ReloadAllLoadedTextures();
+		Engine::TextureManager::GetInstance()->ReloadAllLoadedTextures();
 	}
 	ImGui::TextDisabled("Reload keeps the current Scene and replaces loaded model / PNG / DDS data.");
 	ImGui::EndDisabled();
@@ -659,7 +706,7 @@ bool ImGuiManager::IsMouseOverGameView(float mouseScreenX, float mouseScreenY) c
 		mouseScreenY >= gameViewImageMin_.y &&
 		mouseScreenY <= gameViewImageMin_.y + gameViewImageSize_.y;
 #else
-	const DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	const Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
 	return mouseScreenX >= 0.0f && mouseScreenY >= 0.0f &&
 		mouseScreenX < static_cast<float>(dxCommon->GetClientWidth()) &&
 		mouseScreenY < static_cast<float>(dxCommon->GetClientHeight());
@@ -779,14 +826,14 @@ void ImGuiManager::FPSWindow()
 }
 
 //スプライトデバック
-void ImGuiManager::Draw(DirectXCommon* dxCommon)
+void ImGuiManager::Draw(Engine::DirectXCommon* dxCommon)
 {
 #ifdef USE_IMGUI
 
 	ID3D12GraphicsCommandList* commandList = dxCommon->GetCommandList();
 
 	//デスクリプタヒープの配列をセットするコマンド
-	SrvManager* srvManager = SrvManager::GetInstance();
+	Engine::SrvManager* srvManager = Engine::SrvManager::GetInstance();
 	ID3D12DescriptorHeap* ppHeaps[] = { srvManager->GetDescriptorHeap() };
 
 	commandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);

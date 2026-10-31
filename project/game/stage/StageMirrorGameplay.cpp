@@ -18,7 +18,7 @@ void Stage::UpdateMirrorGameplay()
 		return;
 	}
 
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	const Vector2 mouseScreen = input->GetMouseScreen();
 	// ImGuiのInspectorやSliderを右クリックしても、Game View外ならMirror操作へ渡しません。
 	const bool isMouseOverGameView =
@@ -45,7 +45,7 @@ void Stage::UpdateMirrorGameplay()
 		: 0.0f;
 	// Cameraが別の方向を向いていても、鏡はPlayerが向く正面へ追従させます。
 	carryableMirror_->Update(
-		DirectXCommon::GetInstance()->GetDeltaTime(),
+		Engine::DirectXCommon::GetInstance()->GetDeltaTime(),
 		player_->GetPosition(),
 		player_->GetFacingYaw(),
 		interactPressed,

@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-class Object3d;
+namespace Engine { class Object3d; }
 
 // Debug画面でTransform・Animation・Particleの巻き戻しを自動確認するテスト道具です。
 // DebugSceneは対象Objectとモデル操作関数を渡すだけで、テストの段階・ログ・終了処理はこのクラスが管理します。
@@ -45,11 +45,11 @@ public:
 	struct Context
 	{
 		// Transform・Animationを確認するDebug用モデルです。所有しません。
-		Object3d* objectPlane = nullptr;
-		Object3d* objectAxis = nullptr;
+		Engine::Object3d* objectPlane = nullptr;
+		Engine::Object3d* objectAxis = nullptr;
 		// Sceneが所有するモデル一覧です。削除確認で件数を確認します。
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
 		// Scene初期配置分のモデル数です。
 		size_t baseNormalObjectCount = 0;
 		size_t baseAnimationObjectCount = 0;

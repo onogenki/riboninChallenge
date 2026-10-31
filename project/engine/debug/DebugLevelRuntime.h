@@ -9,8 +9,8 @@
 
 class DebugEntityRegistry;
 class DebugSceneSelection;
-class Object3d;
-class Object3dCommon;
+namespace Engine { class Object3d; }
+namespace Engine { class Object3dCommon; }
 namespace Engine { class Sprite; }
 
 // DebugSceneのscene.json読込とHot Reloadだけを担当する実行部品です。
@@ -20,9 +20,9 @@ class DebugLevelRuntime
 public:
 	struct Context
 	{
-		Object3dCommon* object3dCommon = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		const std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
+		Engine::Object3dCommon* object3dCommon = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		const std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
 		const std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		DebugEntityRegistry* entityRegistry = nullptr;
 		DebugSceneSelection* selection = nullptr;
@@ -50,11 +50,11 @@ private:
 	// JSONツリーを再帰的に調べ、MESHだけを実行中Object3dとして生成します。
 	void CreateLevelObjects(
 		const std::vector<LevelLoader::ObjectData>& objectDataList,
-		Object3dCommon* object3dCommon,
-		std::vector<std::unique_ptr<Object3d>>& outObjects) const;
+		Engine::Object3dCommon* object3dCommon,
+		std::vector<std::unique_ptr<Engine::Object3d>>& outObjects) const;
 
 	std::string levelFileName_;
-	FileHotReload hotReload_{};
+	Engine::FileHotReload hotReload_{};
 	// DebugSceneが最初から生成した通常モデル数です。
 	size_t debugInitialObjectCount_ = 0;
 	// scene.jsonから生成した通常モデル数です。

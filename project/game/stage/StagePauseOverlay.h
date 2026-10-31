@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
 
@@ -15,7 +15,7 @@ public:
 	~StagePauseOverlay();
 
 	// 三枚すべて準備できた時だけ、通常画面とPause画面の案内を使えるようにします。
-	bool Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon);
+	bool Initialize(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon);
 	// 画面サイズに合わせ、常時案内と停止中の案内を同じ比率で配置します。
 	void Update(float clientWidth, float clientHeight);
 	// Scene終了時に、所有する三枚のSpriteを解放します。

@@ -21,12 +21,14 @@ public:
 	// @brief Stage番号を切り替えて読み込み、適用に失敗した場合は元の番号とデータを維持します。
 	// @param stageId 選択するStage番号です。現在の定義では1〜5を受け付けます。
 	// @param applyLoadedData 仮読込したJSON・CSVをSceneのObjectへ反映する関数です。
+	// 失敗時に戻すのはRepositoryの番号とデータです。Scene側で途中変更した状態は呼び出し側で扱います。
 	// @param status 読込結果の説明を受け取ります。
 	// @return 読込とSceneへの反映が両方成功した時だけtrueです。
 	// @throws applyLoadedDataが例外を出した時は、選択番号と読込データを戻して再送出します。
 	bool SelectAndReload(int stageId, const ApplyLoadedData& applyLoadedData, std::string& status);
 	// @brief 現在選択中のJSON・CSVを仮読込し、Sceneへの反映成功後だけ採用します。
 	// @param applyLoadedData 仮データを使って床・鏡・Camera等を反映する関数です。失敗時は旧データへ戻します。
+	// CSVが存在しない場合は空のマップチップとして扱います。Scene側の途中変更は自動では戻しません。
 	// @param status 読込結果の説明を受け取ります。
 	// @return ファイル読込と反映が完了した時だけtrueです。
 	// @throws applyLoadedDataが例外を出した時は、読込データを戻して再送出します。
@@ -46,8 +48,10 @@ public:
 	int TakeRequestedStageId() { return selection_.TakeRequestedStageId(); }
 	int GetStageId() const { return selection_.GetStageId(); }
 	const std::string& GetJsonFilePath() const { return fileMonitor_.GetJsonFilePath(); }
+	// 編集用データを借ります。未読込ならnullptrで、再読込やClearを挟んで保持しないでください。
 	LevelLoader::LevelData* GetLevelData() { return levelData_.get(); }
 	const LevelLoader::LevelData* GetLevelData() const { return levelData_.get(); }
+	// 現在のCSVデータを借ります。CSVがなければ空で、再読込時には内容が置き換わります。
 	const MapChipField& GetMapChipField() const { return mapChipField_; }
 	// Scene終了時に読込データだけを解放し、GPU側のObjectは各所有者が解放します。
 	void Clear();

@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <string>
 
+namespace Engine
+{
 // 外部ファイルの更新日時を監視し、保存された瞬間を一度だけ通知します。
 class FileHotReload
 {
@@ -22,3 +24,4 @@ private:
 	bool existed_ = false;
 	bool hasWriteTime_ = false;
 };
+} // namespace Engine

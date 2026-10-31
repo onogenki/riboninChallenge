@@ -8,7 +8,7 @@
 #include <unordered_set>
 #include <vector>
 
-class Object3d;
+namespace Engine { class Object3d; }
 namespace Engine { class Sprite; }
 
 namespace Ecs {
@@ -29,7 +29,7 @@ struct TransformComponent {
 
 struct ModelComponent {
 	// Non-owning pointer; DebugScene owns the Object3d instance.
-	Object3d* object = nullptr;
+	Engine::Object3d* object = nullptr;
 	std::string sourceFile;
 	bool isAnimated = false;
 };
@@ -67,13 +67,13 @@ public:
 	const std::vector<Entity>& GetEntities() const { return entities_; }
 
 	// Creates an entity linked to a scene-owned render object.
-	Entity CreateModelEntity(Object3d* object, const std::string& sourceFile, bool isAnimated);
+	Entity CreateModelEntity(Engine::Object3d* object, const std::string& sourceFile, bool isAnimated);
 	Entity CreateSpriteEntity(Engine::Sprite* sprite, const std::string& sourceFile);
-	Entity FindEntity(const Object3d* object) const;
+	Entity FindEntity(const Engine::Object3d* object) const;
 	Entity FindEntity(const Engine::Sprite* sprite) const;
 
 	// Drops ECS entities whose scene-owned Object3d or Sprite has been deleted.
-	void PruneMissingBindings(const std::vector<Object3d*>& objects, const std::vector<Engine::Sprite*>& sprites);
+	void PruneMissingBindings(const std::vector<Engine::Object3d*>& objects, const std::vector<Engine::Sprite*>& sprites);
 	// Synchronizes transforms and calculates collider overlaps for the current frame.
 	void UpdateSystems();
 

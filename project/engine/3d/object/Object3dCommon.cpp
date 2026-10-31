@@ -1,13 +1,34 @@
 #include "Object3dCommon.h"
+#include "Logger.h"
+#include <chrono>
+#include <format>
 #include <stdexcept>
 #include <vector>
+#include <Windows.h>
 
-// 全Sceneが借りる描画設定を順に作り、未完成のPipelineを使用側へ渡しません。
-void Object3dCommon::Initialize(DirectXCommon* dxCommon)
+namespace Engine
+{
+namespace
+{
+	// 計測用の明示指定がある時だけ初期化・再利用の記録を出します。
+	bool IsObject3dProfilingEnabled()
+	{
+		char profileValue[2]{};
+		return GetEnvironmentVariableA("RIBONIN_CHALLENGE_PROFILE_OBJECT3D", profileValue, sizeof(profileValue)) == 1 &&
+			profileValue[0] == '1';
+	}
+}
+
+// 全Sceneが借りる描画設定を順に作り、計測指定時だけ初期化時間を記録します。
+void Object3dCommon::Initialize(Engine::DirectXCommon* dxCommon)
 {
 	if (!dxCommon || !dxCommon->GetDevice()) {
 		throw std::invalid_argument("Object3dCommon: DirectX device is unavailable");
 	}
+	const bool profileInitialization = IsObject3dProfilingEnabled();
+	const auto initializationStart = profileInitialization
+		? std::chrono::steady_clock::now()
+		: std::chrono::steady_clock::time_point{};
 	dxCommon_ = dxCommon;
 
 	// ルートシグネチャの生成
@@ -29,6 +50,11 @@ void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 
 	CreateSkyboxRootSignature();
 	CreateSkyboxPipeline();
+	if (profileInitialization) {
+		const double elapsedMilliseconds = std::chrono::duration<double, std::milli>(
+			std::chrono::steady_clock::now() - initializationStart).count();
+		Logger::Log(std::format("Object3dCommon initialization: {:.3f} ms", elapsedMilliseconds));
+	}
 }
 
 void Object3dCommon::SetCommonDrawSetting()
@@ -375,3 +401,4 @@ void Object3dCommon::CreateOccludedSilhouetteGraphicsPipeline()
 		throw std::runtime_error("Object3dCommon: silhouette graphics pipeline creation failed");
 	}
 }
+} // namespace Engine

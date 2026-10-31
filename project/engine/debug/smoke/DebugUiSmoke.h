@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-class CaptureManager;
-class Object3d;
+namespace Engine { class CaptureManager; }
+namespace Engine { class Object3d; }
 namespace Engine { class Sprite; }
 
 // Debug画面のモデル棚・プレビュー・画像保存を自動確認するテスト道具です。
@@ -50,7 +50,7 @@ public:
 		// trueならTextureだけを見るプレビューモードです。
 		bool isTexturePreviewMode = false;
 		// 現在プレビューしている3Dモデルです。所有しません。
-		Object3d* previewObject = nullptr;
+		Engine::Object3d* previewObject = nullptr;
 		// 現在プレビューしているTextureのSpriteです。所有しません。
 		Engine::Sprite* previewSprite = nullptr;
 	};
@@ -74,8 +74,8 @@ public:
 		// モデル棚へ表示する読み込み可能なResource一覧です。所有しません。
 		const std::vector<SceneEditor::ShelfEntry>* modelLibrary = nullptr;
 		// Sceneが所有する3Dモデル・Sprite一覧です。個数確認にだけ使います。
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
 		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 		// Sceneが最初から持つ編集不可の要素数です。
 		size_t baseNormalObjectCount = 0;
@@ -93,9 +93,9 @@ public:
 		std::function<bool(const std::string&)> addTexture;
 		std::function<void()> clearAddedSceneModels;
 		// モデルの見た目から簡易AABBを作る関数です。
-		std::function<bool(const Object3d&, MyMath::AABB&)> buildWorldAabb;
+		std::function<bool(const Engine::Object3d&, MyMath::AABB&)> buildWorldAabb;
 		// Draw後にGame Viewを保存する共通Managerです。所有しません。
-		CaptureManager* captureManager = nullptr;
+		Engine::CaptureManager* captureManager = nullptr;
 	};
 
 	// 環境変数が有効な時に、UI操作の自動確認を開始します。

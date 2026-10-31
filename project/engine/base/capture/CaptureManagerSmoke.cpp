@@ -8,8 +8,68 @@
 #include <fstream>
 #include <sstream>
 
+namespace Engine
+{
 // キャプチャ機能の自動確認だけをまとめる実装ファイル。
 // 通常の撮影・録画処理と分けることで、ゲーム中に必要な処理を追いやすくする。
+// 通常撮影の初期化後に自動確認だけの計数と参照画像を消し、前回の結果を持ち越しません。
+void CaptureManager::InitializeSmokeState(bool smokeRequested, bool performanceBaselineRequested)
+{
+	smokeEnabled_ = smokeRequested;
+	performanceBaselineEnabled_ = performanceBaselineRequested;
+	if (performanceBaselineEnabled_) {
+		replayBufferEnabled_ = false;
+	}
+	smokeFinished_ = false;
+	smokeFrame_ = 0;
+	smokeDebugFrame_ = 0;
+	smokeCaptureAttempts_ = 0;
+	smokeVisibleCaptures_ = 0;
+	smokeSavedPhotos_ = 0;
+	smokeVideoFrameCount_ = 0;
+	smokePhotoPaths_.clear();
+	smokeFirstVideoFrame_.clear();
+	smokeLastVideoFrame_.clear();
+	smokeFirstReplayFrame_.clear();
+	smokeLastReplayFrame_.clear();
+	smokeVideoWidth_ = 0;
+	smokeVideoHeight_ = 0;
+	smokeReplayFrameCount_ = 0;
+	smokeReplayDroppedFrames_ = 0;
+	smokePerformanceFrameCount_ = 0;
+	smokePerformanceTime_ = 0.0f;
+	smokeMaximumDeltaTime_ = 0.0f;
+	smokeReadbackMilliseconds_ = 0.0;
+	smokeVideoMilliseconds_ = 0.0;
+	smokeReplayMilliseconds_ = 0.0;
+	smokeVideoWorkerMilliseconds_ = 0.0;
+	smokeReadbackSamples_ = 0;
+	smokeVideoSamples_ = 0;
+	smokeReplaySamples_ = 0;
+	smokeVideoWorkerSamples_ = 0;
+	smokeMainVideoPath_.clear();
+	smokeReplayPath_.clear();
+	smokeTrackActiveVideo_ = false;
+	smokeLogPath_ = std::filesystem::path("logs") / "capture_manager_smoke.log";
+}
+
+// 動画形式の確定後に自動確認ログを開き、撮影更新のないReleaseはその場で失敗を記録します。
+void CaptureManager::BeginSmokeRun()
+{
+	if (smokeEnabled_) {
+		std::ofstream log(smokeLogPath_, std::ios::trunc);
+		if (log) {
+			log << "START common capture smoke\n";
+		}
+	}
+#ifndef USE_IMGUI
+	// Releaseには撮影更新が無いため、Smokeを開始したまま無限待機させません。
+	if (smokeEnabled_) {
+		FinishSmoke(false, "Capture smoke requires a Development or Debug build with USE_IMGUI.");
+	}
+#endif
+}
+
 bool CaptureManager::IsVisiblyNonBlack(
 	const std::vector<unsigned char>& pixels,
 	int width,
@@ -322,3 +382,4 @@ void CaptureManager::FinishSmoke(bool success, const std::string& message)
 	}
 	PostQuitMessage(success ? 0 : 1);
 }
+} // namespace Engine

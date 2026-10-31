@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-class Object3d;
+namespace Engine { class Object3d; }
 namespace Engine { class Sprite; }
 
 // DebugScene内のObject・SpriteをECS Entityとして登録し、選択中Entityを管理する部品です。
@@ -14,18 +14,18 @@ class DebugEntityRegistry
 {
 public:
 	// 新しく追加したモデル・SpriteをEntityとして登録し、Inspector選択をそのEntityへ移します。
-	void RegisterModel(Object3d* object, const std::string& sourceFile, bool isAnimated);
+	void RegisterModel(Engine::Object3d* object, const std::string& sourceFile, bool isAnimated);
 	void RegisterSprite(Engine::Sprite* sprite, const std::string& sourceFile);
 	// 初期配置やLevel再読込の要素を、Inspector選択を変えずに登録します。
-	void RegisterInitialModel(Object3d* object, const std::string& sourceFile, bool isAnimated);
+	void RegisterInitialModel(Engine::Object3d* object, const std::string& sourceFile, bool isAnimated);
 	void RegisterInitialSprite(Engine::Sprite* sprite, const std::string& sourceFile);
 	// 現在のScene一覧にない古いEntityを外し、ECS Systemを更新します。
 	void Synchronize(
-		const std::vector<std::unique_ptr<Object3d>>& normalObjects,
-		const std::vector<std::unique_ptr<Object3d>>& animationObjects,
+		const std::vector<std::unique_ptr<Engine::Object3d>>& normalObjects,
+		const std::vector<std::unique_ptr<Engine::Object3d>>& animationObjects,
 		const std::vector<std::unique_ptr<Engine::Sprite>>& sprites);
 	// 選択した見た目Objectに対応するEntityをInspector選択にします。
-	void SelectObject(const Object3d* object);
+	void SelectObject(const Engine::Object3d* object);
 	void SelectSprite(const Engine::Sprite* sprite);
 	// Worldと選択中Entityへの参照を、InspectorやCollider表示へ渡します。
 	Ecs::World& GetWorld() { return world_; }

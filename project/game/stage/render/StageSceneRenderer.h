@@ -7,8 +7,8 @@
 namespace Engine { class Camera; }
 class CarryableMirror;
 class FixedMirror;
-class Object3d;
-class Object3dCommon;
+namespace Engine { class Object3d; }
+namespace Engine { class Object3dCommon; }
 class Player;
 namespace Engine { class SkyBox; }
 class StageHazardLights;
@@ -21,10 +21,12 @@ class StageSceneRenderer
 public:
 	struct Context
 	{
-		Object3dCommon* object3dCommon = nullptr;
+		Engine::Object3dCommon* object3dCommon = nullptr;
 		Engine::Camera* activeCamera = nullptr;
 		Engine::SkyBox* skyBox = nullptr;
-		const std::vector<std::unique_ptr<Object3d>>* sceneObjects = nullptr;
+		const std::vector<std::unique_ptr<Engine::Object3d>>* sceneObjects = nullptr;
+		Engine::Object3d* floor = nullptr;
+		bool drawStagePuzzle = true;
 		const StageMapRuntime* stageMapRuntime = nullptr;
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;
 		FixedMirror* mirrorFloor = nullptr;

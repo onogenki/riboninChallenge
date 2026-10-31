@@ -9,6 +9,7 @@
 #include "FixedMirror.h"
 #include "Laser.h"
 #include "Object3d.h"
+#include "Object3dFactory.h"
 #include "Player.h"
 #include "StageCollisionWorld.h"
 #include "StageHazardLights.h"
@@ -51,6 +52,46 @@ namespace
 	// 高フレームレート時に秒数より先に終了しないための、安全用フレーム上限です。
 	constexpr int kGameplaySmokeMaximumFrameCount = 10000;
 
+	// 本編を動かさず、横・下・回転Lightの周期と切替の境目を確認します。
+	bool CheckHazardLightTiming()
+	{
+		StageHazardLights lights;
+		const auto advance = [&lights](float seconds) {
+			lights.Update(seconds, nullptr, {});
+			const auto& segments = lights.GetHorizontalMoveSegments();
+			return segments.empty() ? -1.0f : segments.front().start.z;
+		};
+		const auto nearPosition = [](float actual, float expected) {
+			return std::abs(actual - expected) < 0.001f;
+		};
+		// 回転中の角度ではなく中心からの距離を調べ、3本の広がりを確認します。
+		const auto orbitHasRadius = [&lights, &nearPosition](float radius) {
+			const auto& segments = lights.GetOrbitSegments();
+			return segments.size() == 3 && std::all_of(segments.begin(), segments.end(), [&](const LaserSegment& segment) {
+				const float x = segment.start.x - 24.0f;
+				const float z = segment.start.z - 62.0f;
+				return nearPosition(std::sqrt(x * x + z * z), radius);
+			});
+		};
+		const bool startsNear = nearPosition(advance(0.0f), 30.0f) && !lights.GetBottomPulseSegments().empty();
+		const bool orbitStartsClosed = orbitHasRadius(1.2f);
+		advance(2.0f);
+		const bool orbitFullyOpen = orbitHasRadius(5.0f);
+		const bool waitsNear = nearPosition(advance(1.0f), 30.0f);
+		const bool movesForward = nearPosition(advance(1.0f), 42.5f);
+		const bool orbitClosesAfterCycle = orbitHasRadius(1.2f);
+		const bool reachesFar = nearPosition(advance(1.0f), 55.0f) && lights.GetBottomPulseSegments().empty();
+		const bool waitsFar = nearPosition(advance(3.0f), 55.0f);
+		const bool movesBack = nearPosition(advance(1.0f), 42.5f);
+		const bool returnsNear = nearPosition(advance(1.0f), 30.0f);
+		advance(2.0f);
+		const bool warns = !lights.GetBottomPulseWarningSegments().empty() && lights.GetBottomPulseSegments().empty();
+		advance(3.0f);
+		const bool restarts = !lights.GetBottomPulseSegments().empty() && lights.GetBottomPulseWarningSegments().empty();
+		return startsNear && orbitStartsClosed && orbitFullyOpen && orbitClosesAfterCycle &&
+			waitsNear && movesForward && reachesFar && waitsFar && movesBack && returnsNear && warns && restarts;
+	}
+
 	// 本編Playerを動かさず、接触一回・一秒の上昇・復帰後の再開を検証します。
 	bool CheckStageLightDeath()
 	{
@@ -69,24 +110,27 @@ namespace
 			std::abs(player.GetPosition().y - 7.0f) < 0.001f;
 		const bool completed = death.Update(player, warning, 0.45f) &&
 			std::abs(player.GetPosition().y - 7.0f) < 0.001f;
+		// Scene切替を予約できないフレームでも、次のUpdateで完了を再確認できます。
+		const bool remainsCompleted = death.Update(player, warning, 0.1f) &&
+			death.IsPlaying() && death.GetDeathCount() == 1;
 		death.CompleteRespawn();
 		const bool resumed = !death.IsPlaying() && death.GetDeathCount() == 1;
 		death.Begin(player, warning);
 		const bool nextContact = death.IsPlaying() && death.GetDeathCount() == 2;
 		death.Reset();
-		return countedOnce && rising && completed && resumed && nextContact &&
+		return countedOnce && rising && completed && remainsCompleted && resumed && nextContact &&
 			!death.IsPlaying() && death.GetDeathCount() == 0;
 	}
 
 	// ColliderのフラグをOBB一覧へ変換する時に失わないか、実素材を使わず確認します。
 	bool CheckStageMapColliderFlags()
 	{
-		Object3d floor;
+		Engine::Object3d floor;
 		floor.SetScale({ 1.0f, 1.0f, 1.0f });
 		StageMapRuntime mapRuntime;
 		StageMapRuntime::RuntimeObject runtimeObject{};
 		runtimeObject.tag = "CameraBoundary";
-		runtimeObject.visual = std::make_unique<Object3d>();
+		runtimeObject.visual = std::make_unique<Engine::Object3d>();
 		runtimeObject.visual->SetScale({ 1.0f, 1.0f, 1.0f });
 		runtimeObject.hasBoxCollider = true;
 		runtimeObject.collider.SetLocalShape({}, { 1.0f, 1.0f, 1.0f });
@@ -221,6 +265,155 @@ namespace
 			saveFailureReported && applyCalls == 4;
 	}
 
+	// 実モデルに合うBOX判定と改名がRuntimeへ届き、不正対象と反映失敗では元のデータを保つか確認します。
+	bool CheckStageEditorModelMetadata(
+		Engine::Object3dCommon* object3dCommon,
+		bool& playerCollision)
+	{
+		playerCollision = false;
+		LevelLoader::LevelData levelData{};
+		LevelLoader::ObjectData group{};
+		group.name = "Group";
+		LevelLoader::ObjectData child{};
+		child.name = "UsedInside";
+		group.children.push_back(std::move(child));
+		LevelLoader::ObjectData nestedEditorName{};
+		nestedEditorName.name = "EditorModel2";
+		group.children.push_back(std::move(nestedEditorName));
+		levelData.objects.push_back(std::move(group));
+		LevelLoader::ObjectData added{};
+		added.type = "MESH";
+		added.name = "EditorModel1";
+		added.tag = "EditorAdded";
+		added.objectType = "STATIC";
+		added.fileName = "debug/floor.obj";
+		levelData.objects.push_back(std::move(added));
+		int selectedIndex = 1;
+		StageMapRuntime runtime;
+		StageMapRuntime::RuntimeObject runtimeObject{};
+		runtimeObject.sourceName = "EditorModel1";
+		runtimeObject.visual = Engine::Object3dFactory::Create(object3dCommon, levelData.objects[1].fileName);
+		if (!runtimeObject.visual || !runtimeObject.visual->GetModel()) {
+			return false;
+		}
+		const auto& modelVertices = runtimeObject.visual->GetModel()->GetModelData().vertices;
+		if (modelVertices.empty()) {
+			return false;
+		}
+		Vector3 expectedMin{
+			modelVertices.front().position.x,
+			modelVertices.front().position.y,
+			modelVertices.front().position.z,
+		};
+		Vector3 expectedMax = expectedMin;
+		for (const auto& vertex : modelVertices) {
+			expectedMin.x = (std::min)(expectedMin.x, vertex.position.x);
+			expectedMin.y = (std::min)(expectedMin.y, vertex.position.y);
+			expectedMin.z = (std::min)(expectedMin.z, vertex.position.z);
+			expectedMax.x = (std::max)(expectedMax.x, vertex.position.x);
+			expectedMax.y = (std::max)(expectedMax.y, vertex.position.y);
+			expectedMax.z = (std::max)(expectedMax.z, vertex.position.z);
+		}
+		runtime.GetObjects().push_back(std::move(runtimeObject));
+		StageLevelEditor::Context context{};
+		context.levelData = &levelData;
+		context.selectedObjectIndex = &selectedIndex;
+		context.mapRuntime = &runtime;
+		context.applyLevelData = [&](bool rebuild)
+		{
+			if (rebuild) {
+				runtime.GetObjects().front().sourceName = levelData.objects[1].name;
+			}
+			runtime.ApplyEdits({ &levelData.objects[1] });
+			return true;
+		};
+		StageLevelEditor editor;
+		const bool rejectedDuplicate = !editor.RenameSelectedObject(context, "UsedInside") &&
+			levelData.objects[1].name == "EditorModel1";
+		const bool rejectedBlank = !editor.RenameSelectedObject(context, "   ") &&
+			levelData.objects[1].name == "EditorModel1";
+		const bool renamed = editor.RenameSelectedObject(context, "HallFloor") &&
+			levelData.objects[1].name == "HallFloor" &&
+			runtime.GetObjects().front().sourceName == "HallFloor";
+		// Xだけの一致では縦方向の薄い床を検証できないため、三軸の中心と寸法を確認します。
+		const auto matchesModelBounds = [&]()
+		{
+			const LevelLoader::ColliderData& collider = levelData.objects[1].collider;
+			const auto nearlyEqual = [](float first, float second)
+			{
+				return std::abs(first - second) < 0.001f;
+			};
+			return nearlyEqual(collider.center.x, (expectedMin.x + expectedMax.x) * 0.5f) &&
+				nearlyEqual(collider.center.y, (expectedMin.y + expectedMax.y) * 0.5f) &&
+				nearlyEqual(collider.center.z, (expectedMin.z + expectedMax.z) * 0.5f) &&
+				nearlyEqual(collider.size.x, (std::max)(expectedMax.x - expectedMin.x, 0.1f)) &&
+				nearlyEqual(collider.size.y, (std::max)(expectedMax.y - expectedMin.y, 0.1f)) &&
+				nearlyEqual(collider.size.z, (std::max)(expectedMax.z - expectedMin.z, 0.1f));
+		};
+		const bool addedCollider = editor.AddBoxCollider(context) &&
+			levelData.objects[1].hasCollider && levelData.objects[1].collider.type == "BOX" &&
+			runtime.GetObjects().front().hasBoxCollider && matchesModelBounds();
+		Engine::Object3d floor;
+		StageCollisionWorld collisionWorld;
+		StageCollisionWorld::Context collisionContext{};
+		collisionContext.floor = &floor;
+		collisionContext.stageMapRuntime = &runtime;
+		collisionWorld.Rebuild(collisionContext);
+		const bool entersSolidWorld = collisionWorld.GetSolidObbs().size() == 2;
+		if (entersSolidWorld) {
+			// 追加モデルを回転しても、Playerの接地・側面停止を同じ判定経路で確認します。
+			levelData.objects[1].rotation.y = 0.785398f;
+			runtime.ApplyEdits({ &levelData.objects[1] });
+			collisionWorld.Rebuild(collisionContext);
+			const MyMath::OBB& modelObb = collisionWorld.GetSolidObbs()[1];
+			constexpr float kProbeRadius = 0.5f;
+			const Vector3 topStart = Add(
+				modelObb.center,
+				{ 0.0f, modelObb.size.y + kProbeRadius - 0.05f, 0.0f });
+			Player collisionProbe;
+			if (collisionProbe.Initialize(object3dCommon, "debug/sphere.obj", topStart, kProbeRadius)) {
+				const std::vector<MyMath::OBB> modelOnly{ modelObb };
+				collisionProbe.UpdateWithControl(1.0f / 60.0f, modelOnly, { 0.0f, 0.0f, 1.0f }, {});
+				const bool landed = collisionProbe.IsGrounded() && collisionProbe.IsColliding() &&
+					collisionProbe.GetPosition().y >= topStart.y;
+				const Vector3 sideStart = Add(
+					modelObb.center,
+					Multiply(modelObb.size.x + kProbeRadius - 0.08f, modelObb.orientations[0]));
+				collisionProbe.SetPosition(sideStart);
+				collisionProbe.UpdateWithControl(1.0f / 60.0f, modelOnly, { 0.0f, 0.0f, 1.0f }, {});
+				const Vector3 sidePush = Subtract(collisionProbe.GetPosition(), sideStart);
+				const bool stoppedAtSide = collisionProbe.IsColliding() && !collisionProbe.IsGrounded() &&
+					Dot(sidePush, modelObb.orientations[0]) > 0.02f;
+				const Vector3 farStart = Add(
+					modelObb.center,
+					Multiply(modelObb.size.x + kProbeRadius + 2.0f, modelObb.orientations[0]));
+				collisionProbe.SetPosition(farStart);
+				collisionProbe.UpdateWithControl(1.0f / 60.0f, modelOnly, { 0.0f, 0.0f, 1.0f }, {});
+				playerCollision = landed && stoppedAtSide && !collisionProbe.IsColliding();
+			}
+		}
+		levelData.objects[1].hasCollider = false;
+		levelData.objects[1].collider = {};
+		levelData.objects[1].objectType = "CARRYABLE_MIRROR";
+		const bool rejectsCarryableMirror = !editor.AddBoxCollider(context) &&
+			!levelData.objects[1].hasCollider;
+		levelData.objects[1].objectType = "STATIC";
+		context.applyLevelData = [](bool) { return false; };
+		const bool renameRollback = !editor.RenameSelectedObject(context, "RejectedName") &&
+			levelData.objects[1].name == "HallFloor";
+		const bool colliderRollback = !editor.AddBoxCollider(context) &&
+			!levelData.objects[1].hasCollider;
+		LevelLoader::ObjectData reservedName{};
+		reservedName.name = "EditorModel1";
+		levelData.objects.push_back(std::move(reservedName));
+		context.applyLevelData = [](bool) { return true; };
+		const bool uniqueAddedName = editor.AddModel(context, "debug/floor.obj") &&
+			levelData.objects.back().name == "EditorModel3";
+		return rejectedDuplicate && rejectedBlank && renamed && addedCollider && entersSolidWorld &&
+			playerCollision &&
+			rejectsCarryableMirror && renameRollback && colliderRollback && uniqueAddedName;
+	}
+
 	// 実Stageを触らず、JSONの採用失敗と別Stageへの切替失敗で旧データを保つか確認します。
 	bool CheckStageMapRepositoryRollback()
 	{
@@ -274,9 +467,11 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 		return;
 	}
 
-	VerifyColliderAndEditorContracts();
+	VerifyColliderAndEditorContracts(context.object3dCommon);
 	// 演出の更新値は独立Playerで確認し、実プレイ中の移動や死亡回数を変えません。
 	gameplaySmokeLightDeathState_ = CheckStageLightDeath();
+	// 実際のStage配置やPlayerに影響させず、危険Lightの周期だけを確認します。
+	gameplaySmokeHazardTiming_ = CheckHazardLightTiming();
 
 	VerifyEnemyManagerOwnership(context.object3dCommon);
 
@@ -501,7 +696,7 @@ void Stage1GameplaySmoke::VerifyLaserBlockingAndDrop(const Vector3& mirrorPositi
 }
 
 // Colliderと編集処理の契約を、Stage本編を変えずに検証します。
-void Stage1GameplaySmoke::VerifyColliderAndEditorContracts()
+void Stage1GameplaySmoke::VerifyColliderAndEditorContracts(Engine::Object3dCommon* object3dCommon)
 {
 	// GameObjectを作らずに、Colliderだけで重なり・非重なり・無効状態を確認します。
 	SphereCollider firstSphereCollider({ 0.0f, 0.0f, 0.0f }, 1.0f);
@@ -555,12 +750,14 @@ void Stage1GameplaySmoke::VerifyColliderAndEditorContracts()
 	gameplaySmokeStageMapColliderFlags_ = CheckStageMapColliderFlags();
 	gameplaySmokeMirrorEditAtomicity_ = CheckMirrorEditsRejectPartialUpdate();
 	gameplaySmokeStageEditorRollback_ = CheckStageEditorFailureRollback();
+	gameplaySmokeStageEditorModelMetadata_ = CheckStageEditorModelMetadata(
+		object3dCommon, gameplaySmokeStageEditorPlayerCollision_);
 	gameplaySmokeStageEditorMirrorSync_ = CheckStageEditorMirrorSynchronization();
 	gameplaySmokeStageMapRepositoryRollback_ = CheckStageMapRepositoryRollback();
 }
 
 // Enemyの生成と所有・解放をManagerへ任せられるか検証します。
-void Stage1GameplaySmoke::VerifyEnemyManagerOwnership(Object3dCommon* object3dCommon)
+void Stage1GameplaySmoke::VerifyEnemyManagerOwnership(Engine::Object3dCommon* object3dCommon)
 {
 	// StageがEnemyを直接newせず、Managerへ一覧生成と寿命管理を任せられるか確認します。
 	EnemyManager enemyManager;
@@ -650,11 +847,9 @@ void Stage1GameplaySmoke::VerifyFixedMirrorAndDoor(const std::vector<std::unique
 	}
 }
 
-// 描画用Cameraとは独立したControllerで、段階操作と壁制限を検証します。
-void Stage1GameplaySmoke::VerifyCameraControls()
+// 同名登録や別名共有の変更時に、CameraManagerが選択中の登録を正しく維持するか確認します。
+void Stage1GameplaySmoke::VerifyCameraRegistration(Engine::Camera& testCamera)
 {
-	// 描画用Cameraとは別の小さなControllerを作り、段階操作と壁制限を確認します。
-	Engine::Camera testCamera;
 	// 同名再登録と別名共有の両方で、選択中の登録だけが切り替わることを確認します。
 	Engine::Camera replacementCamera;
 	Engine::CameraManager testCameraManager;
@@ -683,6 +878,14 @@ void Stage1GameplaySmoke::VerifyCameraControls()
 	gameplaySmokeCameraRegistrationReplacement_ =
 		gameplaySmokeCameraRegistrationReplacement_ &&
 		testCameraManager.GetActiveCamera() == nullptr;
+}
+
+// 描画用Cameraとは独立したControllerで、段階操作と壁制限を検証します。
+void Stage1GameplaySmoke::VerifyCameraControls()
+{
+	// CameraManagerの登録を先に確認し、その後に同じCameraで操作を確認します。
+	Engine::Camera testCamera;
+	VerifyCameraRegistration(testCamera);
 	Engine::CameraController testController;
 	testController.Initialize(&testCamera, { 0.0f, 0.0f, 0.0f });
 	testController.SetAutoRecenterEnabled(false);
@@ -950,8 +1153,11 @@ void Stage1GameplaySmoke::FinishWhenReady()
 		gameplaySmokeSphereColliderApi_ &&
 		gameplaySmokeStageMapColliderFlags_ &&
 		gameplaySmokeLightDeathState_ &&
+		gameplaySmokeHazardTiming_ &&
 		gameplaySmokeMirrorEditAtomicity_ &&
 		gameplaySmokeStageEditorRollback_ &&
+		gameplaySmokeStageEditorModelMetadata_ &&
+		gameplaySmokeStageEditorPlayerCollision_ &&
 		gameplaySmokeStageEditorMirrorSync_ &&
 		gameplaySmokeStageMapRepositoryRollback_ &&
 		gameplaySmokeEnemyManagerSpawn_ &&
@@ -988,8 +1194,11 @@ void Stage1GameplaySmoke::FinishWhenReady()
 			<< ": sphereColliderApi=" << gameplaySmokeSphereColliderApi_
 			<< " stageMapColliderFlags=" << gameplaySmokeStageMapColliderFlags_
 			<< " lightDeathState=" << gameplaySmokeLightDeathState_
+			<< " hazardTiming=" << gameplaySmokeHazardTiming_
 			<< " mirrorEditAtomicity=" << gameplaySmokeMirrorEditAtomicity_
 			<< " stageEditorRollback=" << gameplaySmokeStageEditorRollback_
+			<< " stageEditorModelMetadata=" << gameplaySmokeStageEditorModelMetadata_
+			<< " stageEditorPlayerCollision=" << gameplaySmokeStageEditorPlayerCollision_
 			<< " stageEditorMirrorSync=" << gameplaySmokeStageEditorMirrorSync_
 			<< " stageMapRepositoryRollback=" << gameplaySmokeStageMapRepositoryRollback_
 			<< " enemyManager=" << gameplaySmokeEnemyManagerSpawn_

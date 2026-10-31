@@ -1,12 +1,15 @@
 #include "WinApp.h"
 
 #include "ImGuiManager.h"
+#include "Logger.h"
 
 #pragma comment(lib, "winmm.lib")
 
 #ifdef USE_IMGUI
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif
+
+namespace Engine {
 
 LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
@@ -40,16 +43,23 @@ LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 	}
 }
 
-// 登録するウィンドウ名を実行ファイルと揃え、起動時の表示と識別名を一致させます。
-void WinApp::Initialize()
+// COM・Window Class・Handleを順に確認し、描画先に使えないWindowをFrameworkへ渡しません。
+bool WinApp::Initialize()
 {
 	isComInitialized_ = SUCCEEDED(CoInitializeEx(nullptr, COINIT_MULTITHREADED));
+	if (!isComInitialized_) {
+		Logger::Log("WinApp initialization failed: COM could not be initialized.");
+		return false;
+	}
 
 	wc_.lpfnWndProc = WindowProc;
 	wc_.lpszClassName = L"riboninChallengeWindowClass";
 	wc_.hInstance = GetModuleHandle(nullptr);
 	wc_.hCursor = LoadCursor(nullptr, IDC_ARROW);
-	RegisterClass(&wc_);
+	if (!RegisterClass(&wc_)) {
+		Logger::Log("WinApp initialization failed: Window Class could not be registered.");
+		return false;
+	}
 
 	RECT windowRect{ 0, 0, kClientWidth, kClientHeight };
 	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, false);
@@ -76,19 +86,30 @@ void WinApp::Initialize()
 		wc_.hInstance,
 		this);
 
+	if (!hwnd_) {
+		Logger::Log("WinApp initialization failed: Window could not be created.");
+		UnregisterClass(wc_.lpszClassName, wc_.hInstance);
+		return false;
+	}
 	ShowWindow(hwnd_, SW_MAXIMIZE);
-	timeBeginPeriod(1);
+	isTimerPeriodStarted_ = timeBeginPeriod(1) == TIMERR_NOERROR;
+	return true;
 }
 
 void WinApp::Update()
 {
 }
 
-// Windowを閉じてCOMを解放し、次回起動へ今回の資源を持ち越さないようにします。
+// 初期化が途中で止まっても、開始済みのWindow・タイマー精度・COMだけを解放します。
 void WinApp::Finalize()
 {
-	timeEndPeriod(1);
-	CloseWindow(hwnd_);
+	if (isTimerPeriodStarted_) {
+		timeEndPeriod(1);
+		isTimerPeriodStarted_ = false;
+	}
+	if (hwnd_) {
+		CloseWindow(hwnd_);
+	}
 	if (isComInitialized_) {
 		CoUninitialize();
 		isComInitialized_ = false;
@@ -177,3 +198,5 @@ uint32_t WinApp::GetClientHeight() const
 	GetClientRect(hwnd_, &rect);
 	return static_cast<uint32_t>(rect.bottom - rect.top);
 }
+
+} // namespace Engine

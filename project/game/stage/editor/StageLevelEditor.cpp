@@ -1,21 +1,46 @@
 #include "StageLevelEditor.h"
 
+#include "Model.h"
+#include "StageMapRuntime.h"
+
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <utility>
 
-// Stage1用Model Shelfのresources一覧を作ります。
+namespace
+{
+	// 追加名・改名の両方で、子Objectを含む同名を一つの規則で調べます。
+	bool HasObjectName(
+		const std::vector<LevelLoader::ObjectData>& objects,
+		const std::string& name,
+		const LevelLoader::ObjectData* excluded = nullptr)
+	{
+		for (const LevelLoader::ObjectData& objectData : objects) {
+			if (&objectData != excluded && objectData.name == name) {
+				return true;
+			}
+			if (HasObjectName(objectData.children, name, excluded)) {
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
+// 各Stageで共通に使うModel Shelfのresources一覧を作ります。
 void StageLevelEditor::Initialize()
 {
 	SceneEditor::ScanResourceShelf(shelfState_);
 }
 
-// Model Shelfからの追加・一括削除を、Stage1が渡したLevelData操作へ変換し、保存失敗を棚にも表示します。
+// Model Shelfからの追加・一括削除を、現在StageのLevelData操作へ変換し、保存失敗を棚にも表示します。
 void StageLevelEditor::DrawModelShelf(const Context& context)
 {
 #ifdef USE_IMGUI
 	SceneEditor::ShelfCallbacks callbacks{};
 	std::string actionMessage;
-	callbacks.sceneLabel = "Stage1 Edit View";
+	callbacks.sceneLabel = "Stage " + std::to_string(context.stageId) + " Edit View";
 	if (context.levelData) {
 		callbacks.addedModelCount = static_cast<size_t>(std::count_if(
 			context.levelData->objects.begin(),
@@ -54,7 +79,7 @@ void StageLevelEditor::HandleShelfDropOnEditView(const Context& context)
 #ifdef USE_IMGUI
 	SceneEditor::ShelfCallbacks callbacks{};
 	std::string actionMessage;
-	callbacks.sceneLabel = "Stage1 Edit View";
+	callbacks.sceneLabel = "Stage " + std::to_string(context.stageId) + " Edit View";
 	callbacks.addModel = [this, &context, &actionMessage](const std::string& fileName)
 	{
 		const bool added = AddModel(context, fileName);
@@ -102,6 +127,128 @@ bool StageLevelEditor::AddModel(const Context& context, const std::string& fileN
 		std::move(objectData),
 		"Added model from Edit View: " + fileName,
 		"Add failed. Model could not be loaded: " + fileName);
+}
+
+// Editor追加モデルの名前をJSONとRuntimeで同時に変え、子Objectまで含めた同名を拒みます。
+bool StageLevelEditor::RenameSelectedObject(const Context& context, const std::string& requestedName)
+{
+	if (!context.levelData || !context.selectedObjectIndex || !context.applyLevelData ||
+		*context.selectedObjectIndex < 0 ||
+		*context.selectedObjectIndex >= static_cast<int>(context.levelData->objects.size())) {
+		return false;
+	}
+	LevelLoader::ObjectData& selected = context.levelData->objects[*context.selectedObjectIndex];
+	if (selected.tag != "EditorAdded" ||
+		requestedName.find_first_not_of(" \t\r\n") == std::string::npos ||
+		HasObjectName(context.levelData->objects, requestedName, &selected)) {
+		if (context.setStatus) {
+			context.setStatus("Rename failed. Enter a unique, nonempty name for an added model.");
+		}
+		return false;
+	}
+	if (selected.name == requestedName) {
+		return true;
+	}
+	const std::string previousName = selected.name;
+	selected.name = requestedName;
+	if (!context.applyLevelData(true)) {
+		selected.name = previousName;
+		if (context.setStatus) {
+			context.setStatus("Rename failed. Current stage was kept.");
+		}
+		return false;
+	}
+	if (context.setStatus) {
+		context.setStatus("Renamed " + previousName + " to " + selected.name + ". Press Save Map to keep it.");
+	}
+	return true;
+}
+
+// Runtimeが所有する通常モデルだけにBOX判定を作り、そのモデル名を結果へ明示します。
+bool StageLevelEditor::AddBoxCollider(const Context& context)
+{
+	if (!context.levelData || !context.selectedObjectIndex || !context.applyLevelData ||
+		*context.selectedObjectIndex < 0 ||
+		*context.selectedObjectIndex >= static_cast<int>(context.levelData->objects.size())) {
+		return false;
+	}
+	LevelLoader::ObjectData& selected = context.levelData->objects[*context.selectedObjectIndex];
+	const bool isRuntimeMesh = selected.type == "MESH" && !selected.fileName.empty() &&
+		selected.tag != "Mirror" && selected.tag != "Floor" && selected.tag != "PlayerStart" &&
+		selected.objectType != "CARRYABLE_MIRROR" && selected.objectType != "EVENT_TRIGGER" &&
+		selected.objectType != "EVENT_CAMERA" && selected.objectType != "CAMERA_AREA";
+	if (!isRuntimeMesh || selected.hasCollider) {
+		if (context.setStatus) {
+			context.setStatus("Collider was not added. Select a normal model without a collider.");
+		}
+		return false;
+	}
+	const LevelLoader::ColliderData previousCollider = selected.collider;
+	selected.hasCollider = true;
+	selected.collider.type = "BOX";
+	selected.collider.center = {};
+	selected.collider.size = { 1.0f, 1.0f, 1.0f };
+	bool fittedToModel = false;
+	if (context.mapRuntime) {
+		const auto& runtimeObjects = context.mapRuntime->GetObjects();
+		const auto found = std::find_if(runtimeObjects.begin(), runtimeObjects.end(),
+			[&](const StageMapRuntime::RuntimeObject& runtimeObject)
+			{
+				return runtimeObject.sourceName == selected.name;
+			});
+		if (found != runtimeObjects.end() && found->visual && found->visual->GetModel()) {
+			const auto& vertices = found->visual->GetModel()->GetModelData().vertices;
+			Vector3 minPoint{
+				(std::numeric_limits<float>::max)(),
+				(std::numeric_limits<float>::max)(),
+				(std::numeric_limits<float>::max)(),
+			};
+			Vector3 maxPoint{
+				std::numeric_limits<float>::lowest(),
+				std::numeric_limits<float>::lowest(),
+				std::numeric_limits<float>::lowest(),
+			};
+			for (const Engine::Model::VertexData& vertex : vertices) {
+				if (!std::isfinite(vertex.position.x) || !std::isfinite(vertex.position.y) ||
+					!std::isfinite(vertex.position.z)) {
+					continue;
+				}
+				minPoint.x = (std::min)(minPoint.x, vertex.position.x);
+				minPoint.y = (std::min)(minPoint.y, vertex.position.y);
+				minPoint.z = (std::min)(minPoint.z, vertex.position.z);
+				maxPoint.x = (std::max)(maxPoint.x, vertex.position.x);
+				maxPoint.y = (std::max)(maxPoint.y, vertex.position.y);
+				maxPoint.z = (std::max)(maxPoint.z, vertex.position.z);
+				fittedToModel = true;
+			}
+			if (fittedToModel) {
+				selected.collider.center = {
+					(minPoint.x + maxPoint.x) * 0.5f,
+					(minPoint.y + maxPoint.y) * 0.5f,
+					(minPoint.z + maxPoint.z) * 0.5f,
+				};
+				selected.collider.size = {
+					(std::max)(maxPoint.x - minPoint.x, 0.1f),
+					(std::max)(maxPoint.y - minPoint.y, 0.1f),
+					(std::max)(maxPoint.z - minPoint.z, 0.1f),
+				};
+			}
+		}
+	}
+	if (!context.applyLevelData(false)) {
+		selected.hasCollider = false;
+		selected.collider = previousCollider;
+		if (context.setStatus) {
+			context.setStatus("Collider could not be applied. Current model was kept.");
+		}
+		return false;
+	}
+	if (context.setStatus) {
+		context.setStatus("Box Collider added to " + selected.name +
+			(fittedToModel ? ". Fitted to model; review size, then press Save Map."
+				: ". Default size 1; adjust size, then press Save Map."));
+	}
+	return true;
 }
 
 // Box Collider付きのsphere.objを、Player前方へ追加します。
@@ -339,10 +486,7 @@ std::string StageLevelEditor::MakeUniqueName(
 	std::string objectName;
 	do {
 		objectName = prefix + std::to_string(number++);
-	} while (std::any_of(levelData.objects.begin(), levelData.objects.end(), [&](const LevelLoader::ObjectData& objectData)
-	{
-		return objectData.name == objectName;
-	}));
+	} while (HasObjectName(levelData.objects, objectName));
 	return objectName;
 }
 
@@ -377,6 +521,12 @@ bool StageLevelEditor::CommitAddedObject(
 void StageLevelEditor::Finalize()
 {
 	shelfState_.entries.clear();
+	ResetForStage();
+}
+
+// 次のStageへ同じShelf資源を使い回し、前Stageの選択と操作結果だけを消します。
+void StageLevelEditor::ResetForStage()
+{
 	shelfState_.selectedEntry.clear();
 	shelfState_.message.clear();
 }

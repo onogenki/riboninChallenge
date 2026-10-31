@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
 
@@ -15,7 +15,7 @@ public:
 	~StageTitleOverlay();
 
 	// 二枚とも読めた場合だけSpriteを生成し、失敗時に空の登録を残しません。
-	bool Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon);
+	bool Initialize(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon);
 	// Titleは一度だけ濃くし、Enterは5秒表示と1秒非表示を繰り返します。
 	void Update(float deltaTime, float clientWidth, float clientHeight);
 	// Scene終了時に、二枚のSpriteを解放します。
