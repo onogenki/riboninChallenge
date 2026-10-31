@@ -11,6 +11,8 @@
 #include <memory>
 #include <mutex>
 
+namespace Engine {
+
 //音声データ
 struct SoundData {
 	//波形フォーマット
@@ -38,7 +40,8 @@ public:
 	Audio(const Audio&) = delete;
 	Audio& operator=(const Audio&) = delete;
 
-	void Initialize();
+	// XAudio2とMedia Foundationを順に準備し、全部使える時だけtrueを返します。
+	bool Initialize();
 	void Update();
 
 	// 音源を共有キャッシュへ読み込みます。再生は行いません。読込失敗時はfalseです。
@@ -87,3 +90,5 @@ private:
 	// 完了通知を受けたVoiceを一覧から外して破棄します。FrameworkのUpdateから呼びます。
 	void ReleaseFinishedVoices();
 };
+
+} // namespace Engine

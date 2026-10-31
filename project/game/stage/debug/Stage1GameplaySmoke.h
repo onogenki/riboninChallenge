@@ -8,7 +8,8 @@
 
 class CarryableMirror;
 class FixedMirror;
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
+namespace Engine { class Camera; }
 class Player;
 class StageHazardLights;
 
@@ -33,7 +34,7 @@ public:
 		float largeMirrorBaseYaw = 0.0f;
 		float largeMirrorTargetYawOffset = 0.0f;
 		// EnemyManagerがEnemyを生成する時に使う共通3D描画設定です。所有しません。
-		Object3dCommon* object3dCommon = nullptr;
+		Engine::Object3dCommon* object3dCommon = nullptr;
 		// 本編と同じ鏡・遮蔽物を使う、危険Lightの反射経路です。
 		std::function<std::vector<LaserSegment>(const std::vector<LaserSegment>&)> reflectHazardSegments;
 	};
@@ -57,11 +58,13 @@ public:
 
 private:
 	// 本編に影響しない契約確認を、Collider・生成管理・鏡・Cameraの順に実行します。
-	void VerifyColliderAndEditorContracts();
-	void VerifyEnemyManagerOwnership(Object3dCommon* object3dCommon);
+	void VerifyColliderAndEditorContracts(Engine::Object3dCommon* object3dCommon);
+	void VerifyEnemyManagerOwnership(Engine::Object3dCommon* object3dCommon);
 	Vector3 VerifyCarryMirrorControls(const InitializeContext& context);
 	void VerifyFixedMirrorAndDoor(const std::vector<std::unique_ptr<FixedMirror>>& fixedMirrors);
 	void VerifyLaserBlockingAndDrop(const Vector3& mirrorPosition);
+	// 同名登録・別名共有・解除時の選択を、Camera操作とは別に確認します。
+	void VerifyCameraRegistration(Engine::Camera& testCamera);
 	void VerifyCameraControls();
 	// 毎フレームの描画・接地・Light Puzzle結果を、後続の操作検証より先に記録します。
 	void ObserveFrame(const UpdateContext& context, float deltaTime);
@@ -97,10 +100,16 @@ private:
 	bool gameplaySmokeStageMapColliderFlags_ = false;
 	// 独立Playerで、接触回数・一秒の上昇・復帰後の状態がそろうか記録します。
 	bool gameplaySmokeLightDeathState_ = false;
+	// 横Lightの往復と下Lightの点灯・予告が所定の時刻に切り替わるか記録します。
+	bool gameplaySmokeHazardTiming_ = false;
 	// 不正な鏡編集データで既存Mirrorが途中まで変更されないか記録します。
 	bool gameplaySmokeMirrorEditAtomicity_ = false;
 	// Editorの再構築失敗でJSONデータと選択が元へ戻るか記録します。
 	bool gameplaySmokeStageEditorRollback_ = false;
+	// 追加モデルの改名・BOX判定反映・不正対象の拒否を記録します。
+	bool gameplaySmokeStageEditorModelMetadata_ = false;
+	// 追加した回転BOXで独立Playerが着地・壁停止し、離れた時は衝突しないか記録します。
+	bool gameplaySmokeStageEditorPlayerCollision_ = false;
 	// 入れ子の固定鏡だけを編集用JSONへ同期し、二枚目を変えないか記録します。
 	bool gameplaySmokeStageEditorMirrorSync_ = false;
 	// Stageの読込・反映失敗で現在のマップデータと監視先を保つか記録します。

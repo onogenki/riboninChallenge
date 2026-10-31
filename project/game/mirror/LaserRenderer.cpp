@@ -7,7 +7,7 @@
 
 using namespace MyMath;
 
-bool LaserRenderer::Initialize(DirectXCommon* dxCommon, size_t maximumSegmentCount)
+bool LaserRenderer::Initialize(Engine::DirectXCommon* dxCommon, size_t maximumSegmentCount)
 {
 	if (!dxCommon) {
 		return false;

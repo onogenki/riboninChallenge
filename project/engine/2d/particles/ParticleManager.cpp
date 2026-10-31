@@ -20,7 +20,7 @@ ParticleManager* ParticleManager::GetInstance() {
 }
 
 // Pipelineと描画資源を元の順に作り、最初のUpdateより前に風と再生状態をそろえます。
-void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager) {
+void ParticleManager::Initialize(Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager) {
     // Frameworkから借りるDeviceとSRV管理がなければ、後続のGPU生成へ進みません。
     if (!dxCommon || !srvManager || !dxCommon->GetDevice()) {
         Logger::Log("ParticleManager: DirectX device or SRV manager is unavailable");
@@ -255,7 +255,7 @@ bool ParticleManager::InitializeInstancingResources(ParticleGroup& group)
         return false;
     }
     group.instancingSrvIndex = srvManager_->Allocate();
-    if (group.instancingSrvIndex == SrvManager::kInvalidSrvIndex) {
+    if (group.instancingSrvIndex == Engine::SrvManager::kInvalidSrvIndex) {
         Logger::Log("ParticleManager: no SRV available for instancing buffer");
         return false;
     }
@@ -275,7 +275,7 @@ bool ParticleManager::PrepareGroupResources(const std::string& textureFilePath)
 		Logger::Log("ParticleManager: no SRV available for particle group texture: " + textureFilePath);
 		return false;
 	}
-	if (!TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+	if (!Engine::TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
 		Logger::Log("ParticleManager: particle texture could not be loaded: " + textureFilePath);
 		return false;
 	}
@@ -788,7 +788,7 @@ void ParticleManager::Draw() {
         srvManager_->SetGraphicsRootDescriptorTable(1, group.instancingSrvIndex);
 
         // グループのTextureを読み取り、別グループの画像を使い回さないようにします。
-        D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = TextureManager::GetInstance()->GetSrvHandleGPU(group.textureFilePath);
+        D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = Engine::TextureManager::GetInstance()->GetSrvHandleGPU(group.textureFilePath);
         commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 
         // Updateで数えた有効な粒子だけを描画します。

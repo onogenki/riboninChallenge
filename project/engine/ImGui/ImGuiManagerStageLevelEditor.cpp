@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <numbers>
 
-// レベルファイルの再読込と、Stage1内オブジェクトを編集するInspector UIを表示します。
+// 選択中StageのJSON再読込と、その配置物だけを編集するInspector UIを表示します。
 LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 	bool& autoReload,
 	const std::string& filePath,
@@ -21,18 +21,18 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		return result;
 	}
 
-	ImGui::Separator();
-	ImGui::TextUnformatted("Stage Map Editor / Hot Reload");
-	ImGui::Separator();
-	ImGui::TextWrapped("Edit an object here, then press Save Map. Editing the JSON file outside the game also reloads it.");
-	ImGui::TextWrapped("File: %s", filePath.c_str());
-	ImGui::Checkbox("Auto Reload", &autoReload);
-	ImGui::TextDisabled("Auto Reload: use after saving stage1.json in an external editor.");
-	result.reloadRequested = ImGui::Button("Reload Now");
-	ImGui::SameLine();
-	result.saveRequested = ImGui::Button("Save Map");
-	ImGui::TextDisabled("Reload Now discards unsaved editor changes and reads the JSON file again.");
-	ImGui::Separator();
+	// 保存先と再読込を独立した欄にまとめ、選択物の編集欄を探しやすくします。
+	if (ImGui::CollapsingHeader("Map File", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::TextWrapped("%s", filePath.c_str());
+		ImGui::Checkbox("Auto Reload", &autoReload);
+		ImGui::TextDisabled("Watches changes saved by an external editor.");
+		result.saveRequested = ImGui::Button("Save Map");
+		ImGui::SameLine();
+		result.reloadRequested = ImGui::Button("Reload Now");
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("Discards unsaved edits and reloads the JSON file.");
+		}
+	}
 	ImGui::TextWrapped("Status: %s", status.c_str());
 
 	ImGui::SeparatorText("Map Objects");
@@ -90,59 +90,122 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		}
 
 		LevelLoader::ObjectData& objectData = objects[selectedObjectIndex];
-		ImGui::Text("Model: %s", objectData.fileName.empty() ? "(none)" : objectData.fileName.c_str());
+		ImGui::SeparatorText("Object Details");
+		// 狭いInspectorでも選択対象の名前を最後まで読み、判定先を取り違えないよう折り返します。
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.82f, 1.0f, 1.0f));
+		ImGui::TextWrapped("Editing: %s", objectData.name.c_str());
+		ImGui::PopStyleColor();
+		ImGui::TextWrapped("Model: %s", objectData.fileName.empty() ? "(none)" : objectData.fileName.c_str());
 		ImGui::Text("Tag: %s", objectData.tag.empty() ? "(none)" : objectData.tag.c_str());
-
-		const char* positionLabel = objectData.objectType == "EVENT_TRIGGER"
-			? "Trigger Position"
-			: (objectData.objectType == "CAMERA_AREA" ? "Area Position" : "Position");
-		result.dataChanged |= ImGui::DragFloat3(
-			positionLabel,
-			&objectData.translation.x,
-			0.05f);
+		if (objectData.tag == "EditorAdded") {
+			// 入力中の文字をフレーム間で保持し、確定後だけRuntimeの名前対応を作り直します。
+			static int nameEditIndex = -1;
+			static std::string originalName;
+			static std::string originalFilePath;
+			static char nameBuffer[128]{};
+			if (nameEditIndex != selectedObjectIndex || originalName != objectData.name ||
+				originalFilePath != filePath) {
+				nameEditIndex = selectedObjectIndex;
+				originalName = objectData.name;
+				originalFilePath = filePath;
+				strncpy_s(nameBuffer, objectData.name.c_str(), _TRUNCATE);
+			}
+			const bool enterPressed = ImGui::InputText("Object Name", nameBuffer, sizeof(nameBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
+			ImGui::SameLine();
+			const bool renameClicked = ImGui::Button("Rename");
+			if (enterPressed || renameClicked) {
+				result.renameRequested = true;
+				result.requestedName = nameBuffer;
+			}
+		}
 
 		constexpr float kRadianToDegree = 180.0f / std::numbers::pi_v<float>;
 		constexpr float kDegreeToRadian = std::numbers::pi_v<float> / 180.0f;
-		float rotationDegrees[3]{
-			objectData.rotation.x * kRadianToDegree,
-			objectData.rotation.y * kRadianToDegree,
-			objectData.rotation.z * kRadianToDegree,
-		};
-		const char* rotationLabel = objectData.objectType == "EVENT_TRIGGER"
-			? "Trigger Rotation (deg)"
-			: (objectData.objectType == "CAMERA_AREA" ? "Area Rotation (deg)" : "Rotation (deg)");
-		if (ImGui::DragFloat3(rotationLabel, rotationDegrees, 1.0f)) {
-			objectData.rotation = {
-				rotationDegrees[0] * kDegreeToRadian,
-				rotationDegrees[1] * kDegreeToRadian,
-				rotationDegrees[2] * kDegreeToRadian,
-			};
-			result.dataChanged = true;
-		}
-
-		const char* scaleLabel = objectData.objectType == "EVENT_TRIGGER"
-			? "Trigger Scale"
-			: (objectData.objectType == "CAMERA_AREA" ? "Area Scale" : "Scale");
-		result.dataChanged |= ImGui::DragFloat3(
-			scaleLabel,
-			&objectData.scaling.x,
-			0.05f,
-			0.01f,
-			100.0f);
-
-		if (objectData.hasCollider) {
-			ImGui::SeparatorText("Box Collider");
-			ImGui::TextDisabled("The box follows this object's Position, Rotation, and Scale.");
+		if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
+			const char* positionLabel = objectData.objectType == "EVENT_TRIGGER"
+				? "Trigger Position"
+				: (objectData.objectType == "CAMERA_AREA" ? "Area Position" : "Position");
 			result.dataChanged |= ImGui::DragFloat3(
-				"Collider Center",
-				&objectData.collider.center.x,
+				positionLabel,
+				&objectData.translation.x,
 				0.05f);
+
+			float rotationDegrees[3]{
+				objectData.rotation.x * kRadianToDegree,
+				objectData.rotation.y * kRadianToDegree,
+				objectData.rotation.z * kRadianToDegree,
+			};
+			const char* rotationLabel = objectData.objectType == "EVENT_TRIGGER"
+				? "Trigger Rotation (deg)"
+				: (objectData.objectType == "CAMERA_AREA" ? "Area Rotation (deg)" : "Rotation (deg)");
+			if (ImGui::DragFloat3(rotationLabel, rotationDegrees, 1.0f)) {
+				objectData.rotation = {
+					rotationDegrees[0] * kDegreeToRadian,
+					rotationDegrees[1] * kDegreeToRadian,
+					rotationDegrees[2] * kDegreeToRadian,
+				};
+				result.dataChanged = true;
+			}
+
+			const char* scaleLabel = objectData.objectType == "EVENT_TRIGGER"
+				? "Trigger Scale"
+				: (objectData.objectType == "CAMERA_AREA" ? "Area Scale" : "Scale");
 			result.dataChanged |= ImGui::DragFloat3(
-				"Collider Size",
-				&objectData.collider.size.x,
+				scaleLabel,
+				&objectData.scaling.x,
 				0.05f,
 				0.01f,
 				100.0f);
+		}
+
+		if (ImGui::CollapsingHeader("Collision", ImGuiTreeNodeFlags_DefaultOpen)) {
+			// 対象名とモデルを判定操作の直前にも示し、別の配置物への誤追加を防ぎます。
+			ImGui::TextWrapped("Target: %s", objectData.name.c_str());
+			ImGui::TextWrapped("Model: %s", objectData.fileName.empty() ? "(none)" : objectData.fileName.c_str());
+			const bool canAddSolidCollider = objectData.type == "MESH" && !objectData.fileName.empty() &&
+				objectData.tag != "Mirror" && objectData.tag != "Floor" && objectData.tag != "PlayerStart" &&
+				objectData.objectType != "CARRYABLE_MIRROR" && objectData.objectType != "EVENT_TRIGGER" &&
+				objectData.objectType != "EVENT_CAMERA" && objectData.objectType != "CAMERA_AREA";
+			if (!objectData.hasCollider && canAddSolidCollider) {
+				ImGui::TextColored(ImVec4(1.0f, 0.72f, 0.25f, 1.0f), "No collider: player passes through.");
+				// 対象名を直上に示したまま、狭いInspectorへ収まる幅で操作を出します。
+				if (ImGui::Button("Add Box Collider", ImVec2(-1.0f, 0.0f))) {
+					result.addBoxColliderRequested = true;
+				}
+				if (ImGui::IsItemHovered()) {
+					ImGui::SetTooltip("Add a solid box to %s", objectData.name.c_str());
+				}
+			}
+			if (objectData.objectType == "CARRYABLE_MIRROR") {
+				ImGui::TextDisabled("The carryable mirror owns its collider outside this JSON field.");
+			} else if (objectData.objectType == "EVENT_CAMERA") {
+				ImGui::TextDisabled("Event cameras do not use a solid collider.");
+			} else if (objectData.hasCollider) {
+				if (objectData.objectType == "EVENT_TRIGGER" || objectData.objectType == "CAMERA_AREA") {
+					ImGui::TextUnformatted("Detection area: not a solid wall.");
+				} else if (objectData.collider.type == "BOX") {
+					ImGui::TextColored(ImVec4(0.55f, 0.88f, 0.55f, 1.0f), "Box Collider enabled.");
+				} else {
+					ImGui::TextUnformatted("Collider data is present.");
+				}
+				if (objectData.collider.type == "BOX") {
+					ImGui::TextDisabled("The box follows Position, Rotation, and Scale above.");
+					result.dataChanged |= ImGui::DragFloat3(
+						"Collider Center",
+						&objectData.collider.center.x,
+						0.05f);
+					result.dataChanged |= ImGui::DragFloat3(
+						"Collider Size",
+						&objectData.collider.size.x,
+						0.05f,
+						0.01f,
+						100.0f);
+				} else {
+					ImGui::TextDisabled("This collider type is not editable here: %s", objectData.collider.type.c_str());
+				}
+			} else if (!canAddSolidCollider) {
+				ImGui::TextDisabled("No solid collider for this object.");
+			}
 		}
 
 		if (objectData.objectType == "EVENT_TRIGGER") {
@@ -298,25 +361,27 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 			}
 		}
 
-		ImGui::Separator();
-		result.addSphereRequested = ImGui::Button("Add Sphere Object");
-		ImGui::SameLine();
-		result.addEventPairRequested = ImGui::Button("Add Event Camera + Trigger");
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Adds a camera and its detection box. The new camera is selected for editing.");
-		}
-		result.addCameraAreaRequested = ImGui::Button("Add Camera Area");
-		if (ImGui::IsItemHovered()) {
-			ImGui::SetTooltip("Adds a box that changes distance, pitch, and FOV while player stays in control.");
-		}
-		result.addPathSphereRequested = ImGui::Button("Add Path Sphere");
-		const bool protectedObject =
-			objectData.tag == "Floor" || objectData.tag == "Mirror";
-		ImGui::BeginDisabled(protectedObject);
-		result.removeSelectedRequested = ImGui::Button("Remove Selected");
-		ImGui::EndDisabled();
-		if (protectedObject && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-			ImGui::SetTooltip("Floor and Mirror cannot be removed.");
+		if (ImGui::CollapsingHeader("Object Actions")) {
+			ImGui::Text("Selected: %s", objectData.name.c_str());
+			result.addSphereRequested = ImGui::Button("Add Sphere Object");
+			ImGui::SameLine();
+			result.addEventPairRequested = ImGui::Button("Add Event Camera + Trigger");
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Adds a camera and its detection box. The new camera is selected for editing.");
+			}
+			result.addCameraAreaRequested = ImGui::Button("Add Camera Area");
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Adds a box that changes distance, pitch, and FOV while player stays in control.");
+			}
+			result.addPathSphereRequested = ImGui::Button("Add Path Sphere");
+			const bool protectedObject =
+				objectData.tag == "Floor" || objectData.tag == "Mirror";
+			ImGui::BeginDisabled(protectedObject);
+			result.removeSelectedRequested = ImGui::Button("Remove Selected");
+			ImGui::EndDisabled();
+			if (protectedObject && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+				ImGui::SetTooltip("Floor and Mirror cannot be removed.");
+			}
 		}
 	}
 	ImGui::End();

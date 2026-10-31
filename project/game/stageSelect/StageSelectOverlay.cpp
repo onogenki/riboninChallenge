@@ -22,13 +22,13 @@ StageSelectOverlay::StageSelectOverlay() = default;
 StageSelectOverlay::~StageSelectOverlay() = default;
 
 // 背景とは別に三枚の画像を読み、すべてできた時だけSceneへ渡します。
-bool StageSelectOverlay::Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
+bool StageSelectOverlay::Initialize(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon)
 {
 	sprites_.clear();
 	if (!spriteCommon || !directXCommon || !spriteCommon->Initialize(directXCommon)) {
 		return false;
 	}
-	TextureManager* textureManager = TextureManager::GetInstance();
+	Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
 	if (!textureManager->LoadTexture(kBackToTitleTexture) ||
 		!textureManager->LoadTexture(kStageSelectTexture) ||
 		!textureManager->LoadTexture(kEnterTexture)) {

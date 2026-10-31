@@ -18,7 +18,7 @@
 
 namespace Engine { class Camera; }
 namespace Engine { class CameraManager; }
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
 namespace Engine { class ParticleEmitter; }
 namespace Engine { class SkyBox; }
 namespace Engine { class Sprite; }
@@ -46,7 +46,7 @@ private:
 	// Cameraと描画共通設定はDebugSceneが所有・借用し、他Sceneの状態を書き換えません。
 	std::unique_ptr<Engine::CameraManager> cameraManager_;
 	std::unique_ptr<Engine::Camera> mainCamera_;
-	Object3dCommon* object3dCommon_ = nullptr;
+	Engine::Object3dCommon* object3dCommon_ = nullptr;
 	Engine::SpriteCommon* spriteCommon_ = nullptr;
 
 	// ---------- DebugScene開始時の準備 ----------
@@ -110,9 +110,9 @@ private:
     // ---------- Scene内の3Dモデル・Sprite・ECS ----------
 
     // Animationを使わない3Dモデルです。
-    std::vector<std::unique_ptr<Object3d>> normalObjects_;
+    std::vector<std::unique_ptr<Engine::Object3d>> normalObjects_;
     // Animationを再生する3Dモデルです。
-    std::vector<std::unique_ptr<Object3d>> animationObjects_;
+    std::vector<std::unique_ptr<Engine::Object3d>> animationObjects_;
 	// 歩行Animation・手持ちWeapon・足跡Particleをまとめて確認するDebug部品です。
 	DebugAnimationPreview debugAnimationPreview_{};
 
@@ -154,18 +154,18 @@ private:
     std::unique_ptr<Engine::ParticleEmitter> emitterPlane_;
 
 	// Emitter位置の基準にする平面モデルへの非所有ポインタです。
-    Object3d* objectPlane_ = nullptr;
+    Engine::Object3d* objectPlane_ = nullptr;
 	// Inspectorで現在選択しているEmitterへの非所有ポインタです。
     Engine::ParticleEmitter* activeEmitter_ = nullptr;
 
     // ---------- Debug画面全体のライト ----------
 
 	// 太陽光のように、全モデルへ同じ方向から当てる光です。
-    Object3d::DirectionalLight directionalLight_;
+    Engine::Object3d::DirectionalLight directionalLight_;
 	// 指定した一点から周囲へ広がる光です。
-    Object3d::PointLight pointLight_;
+    Engine::Object3d::PointLight pointLight_;
 	// 円すい状の範囲だけを照らす光です。
-    Object3d::SpotLight spotLight_;
+    Engine::Object3d::SpotLight spotLight_;
 
     // ---------- Particleの見た目設定 ----------
 

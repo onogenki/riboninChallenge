@@ -1,8 +1,14 @@
 #include "SrvManager.h"
 #include <stdexcept>
 
+namespace Engine
+{
 // DirectXから共通Heapを作り、使用済み番号を残さず全枠を割当可能にします。
-void SrvManager::Initialize(DirectXCommon* dxCommon){
+void SrvManager::Initialize(Engine::DirectXCommon* dxCommon){
+	// Device未準備のままHeapを作ると参照先が無効になるため、先に失敗を通知します。
+	if (!dxCommon || !dxCommon->GetDevice()) {
+		throw std::invalid_argument("SrvManager: DirectX device is unavailable.");
+	}
 	//引数で受け取ってメンバ変数に記録する
 	directXCommon_ = dxCommon;
 
@@ -74,7 +80,12 @@ void SrvManager::Free(D3D12_CPU_DESCRIPTOR_HANDLE handle)
 	if (offset % descriptorSize_ != 0) {
 		return;
 	}
-	Free(static_cast<uint32_t>(offset / descriptorSize_));
+	// 別Heapの遠いHandleを32bitへ縮めると、実在する枠番号に化ける可能性があります。
+	const SIZE_T index = offset / descriptorSize_;
+	if (index >= kMaxSRVCount) {
+		return;
+	}
+	Free(static_cast<uint32_t>(index));
 }
 
 // 登録先の枠を指定するため、先頭Handleへ一枠の幅と番号を加えます。
@@ -171,3 +182,4 @@ void SrvManager::SetComputeRootDescriptorTable(UINT RootParameterIndex, uint32_t
 {
 	directXCommon_->GetCommandList()->SetComputeRootDescriptorTable(RootParameterIndex, GetGPUDescriptorHandle(srvIndex));
 }
+} // namespace Engine

@@ -11,7 +11,7 @@
 using namespace MyMath;
 
 // 行列・Camera・輪郭用Bufferをそろえてから、Lightの初期値を使える状態にします。
-bool Object3dGpuData::Initialize(DirectXCommon* dxCommon)
+bool Object3dGpuData::Initialize(Engine::DirectXCommon* dxCommon)
 {
 	ResetResources();
 	if (!dxCommon || !dxCommon->GetDevice()) {
@@ -119,11 +119,11 @@ bool Object3dGpuData::BindForObjectDraw(ID3D12GraphicsCommandList* commandList)
 // 一回の描画専用Upload領域を確保し、Map失敗時は描画しないように知らせます。
 bool Object3dGpuData::CreateDrawConstants(DrawConstants& constants)
 {
-	constants.transformResource = dxCommon_->CreateBufferResource(sizeof(Object3d::TransformationMatrix));
-	constants.cameraResource = dxCommon_->CreateBufferResource(sizeof(Object3d::CameraForGPU));
-	constants.directionalLightResource = dxCommon_->CreateBufferResource(sizeof(Object3d::DirectionalLight));
-	constants.pointLightResource = dxCommon_->CreateBufferResource(sizeof(Object3d::PointLight));
-	constants.spotLightResource = dxCommon_->CreateBufferResource(sizeof(Object3d::SpotLightSet));
+	constants.transformResource = dxCommon_->CreateBufferResource(sizeof(Engine::Object3d::TransformationMatrix));
+	constants.cameraResource = dxCommon_->CreateBufferResource(sizeof(Engine::Object3d::CameraForGPU));
+	constants.directionalLightResource = dxCommon_->CreateBufferResource(sizeof(Engine::Object3d::DirectionalLight));
+	constants.pointLightResource = dxCommon_->CreateBufferResource(sizeof(Engine::Object3d::PointLight));
+	constants.spotLightResource = dxCommon_->CreateBufferResource(sizeof(Engine::Object3d::SpotLightSet));
 	if (!constants.transformResource || !constants.cameraResource ||
 		!constants.directionalLightResource || !constants.pointLightResource ||
 		!constants.spotLightResource) {
@@ -205,8 +205,8 @@ bool Object3dGpuData::BindForMirrorDraw(
 // 鏡面一回分のUpload領域を作り、どちらかの確保・Map失敗時は描画しないようにします。
 bool Object3dGpuData::CreateMirrorDrawConstants(MirrorDrawConstants& constants)
 {
-	constants.transformResource = dxCommon_->CreateBufferResource(sizeof(Object3d::TransformationMatrix));
-	constants.reflectionResource = dxCommon_->CreateBufferResource(sizeof(Object3d::ReflectionData));
+	constants.transformResource = dxCommon_->CreateBufferResource(sizeof(Engine::Object3d::TransformationMatrix));
+	constants.reflectionResource = dxCommon_->CreateBufferResource(sizeof(Engine::Object3d::ReflectionData));
 	if (!constants.transformResource || !constants.reflectionResource) {
 		return false;
 	}
@@ -220,7 +220,7 @@ bool Object3dGpuData::CreateMirrorDrawConstants(MirrorDrawConstants& constants)
 }
 
 // 一灯だけを設定する既存Scene向けに、配列の先頭だけへSpotLightを入れます。
-void Object3dGpuData::SetSpotLight(const Object3d::SpotLight& light)
+void Object3dGpuData::SetSpotLight(const Engine::Object3d::SpotLight& light)
 {
 	spotLightData_.lights.fill({});
 	spotLightData_.lights[0] = light;
@@ -228,15 +228,15 @@ void Object3dGpuData::SetSpotLight(const Object3d::SpotLight& light)
 
 // 複数SpotLightをそのままGPU用配列へコピーします。
 void Object3dGpuData::SetSpotLights(
-	const std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount>& lights)
+	const std::array<Engine::Object3d::SpotLight, Engine::Object3d::kMaximumSpotLightCount>& lights)
 {
 	spotLightData_.lights = lights;
 }
 
 // Transform行列用Bufferの生成とMapを確認し、失敗した行列へ書き込みません。
-bool Object3dGpuData::CreateTransformationMatrixData(DirectXCommon* dxCommon)
+bool Object3dGpuData::CreateTransformationMatrixData(Engine::DirectXCommon* dxCommon)
 {
-	transformationMatrixResource_ = dxCommon->CreateBufferResource(sizeof(Object3d::TransformationMatrix));
+	transformationMatrixResource_ = dxCommon->CreateBufferResource(sizeof(Engine::Object3d::TransformationMatrix));
 	if (!transformationMatrixResource_ ||
 		FAILED(transformationMatrixResource_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_))) ||
 		!transformationMatrixData_) {
@@ -250,9 +250,9 @@ bool Object3dGpuData::CreateTransformationMatrixData(DirectXCommon* dxCommon)
 }
 
 // Camera位置用Bufferの生成とMapを確認し、失敗した値へ書き込みません。
-bool Object3dGpuData::CreateCameraData(DirectXCommon* dxCommon)
+bool Object3dGpuData::CreateCameraData(Engine::DirectXCommon* dxCommon)
 {
-	cameraResource_ = dxCommon->CreateBufferResource(sizeof(Object3d::CameraForGPU));
+	cameraResource_ = dxCommon->CreateBufferResource(sizeof(Engine::Object3d::CameraForGPU));
 	if (!cameraResource_ ||
 		FAILED(cameraResource_->Map(0, nullptr, reinterpret_cast<void**>(&cameraData_))) ||
 		!cameraData_) {
@@ -271,9 +271,9 @@ bool Object3dGpuData::CreateCameraData(DirectXCommon* dxCommon)
 }
 
 // 壁越しシルエット用Bufferの生成とMapを確認し、失敗した色へ書き込みません。
-bool Object3dGpuData::CreateOccludedSilhouetteData(DirectXCommon* dxCommon)
+bool Object3dGpuData::CreateOccludedSilhouetteData(Engine::DirectXCommon* dxCommon)
 {
-	occludedSilhouetteResource_ = dxCommon->CreateBufferResource(sizeof(Object3d::OccludedSilhouetteData));
+	occludedSilhouetteResource_ = dxCommon->CreateBufferResource(sizeof(Engine::Object3d::OccludedSilhouetteData));
 	if (!occludedSilhouetteResource_ ||
 		FAILED(occludedSilhouetteResource_->Map(
 			0, nullptr, reinterpret_cast<void**>(&occludedSilhouetteData_))) ||
@@ -297,7 +297,7 @@ void Object3dGpuData::InitializeDefaultLights()
 	pointLightData_.radius = 10.0f;
 	pointLightData_.decay = 1.0f;
 	spotLightData_.lights.fill({});
-	Object3d::SpotLight& defaultLight = spotLightData_.lights[0];
+	Engine::Object3d::SpotLight& defaultLight = spotLightData_.lights[0];
 	defaultLight.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	defaultLight.position = { 2.0f, 1.25f, 0.0f };
 	defaultLight.distance = 7.0f;

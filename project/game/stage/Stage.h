@@ -31,13 +31,16 @@ namespace Engine { class SkyBox; }
 class StageTitleOverlay;
 class StagePauseOverlay;
 namespace Engine { class CameraManager; }
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
 
 // Stage IDに対応したLevelを読み込み、共通のPlayer・Camera・描画を維持したまま進行するSceneです。
+// 現在の完成データはStage1だけです。Stage2〜5のファイル名定義は今後の実装用です。
 class Stage : public BaseScene
 {
 public:
 	// 前方宣言した所有型を安全に生成するため、実装はStage.cppに置きます。
+	// @param initialStageId 最初に読み込むStage番号です。現在の通常起動では1を使います。
+	// @param startsWithTemporaryTitle trueなら本編のPause案内に代えて仮Title案内を所有します。
 	explicit Stage(int initialStageId = 1, bool startsWithTemporaryTitle = false);
 	// 前方宣言した所有型を安全に破棄するため、実装はStage.cppに置きます。
 	~Stage() override;
@@ -50,10 +53,14 @@ public:
 	void Update() override;
 	// 毎フレーム、SkyBox・部屋・球・鏡の板を画面に描画します。
 	void Draw() override;
+	// 必須資源がそろった時だけ白フェードの解除を許します。
+	// @return 初期化が最後まで成功していればtrueです。
 	bool IsReadyForTransition() const override { return isStageReady_; }
-	// 次の更新で指定IDのJSONへ切り替える要求を予約し、IDが1〜5以外なら受け付けません。
+	// Stage変更を次のUpdateへ予約します。ここではJSON・CSVを読み込みません。
+	// @param stageId ファイル名が定義された1〜5の番号です。現時点で完成データがあるのは1だけです。
+	// @return 仮Titleでなく、番号の予約を受け付けた時だけtrueです。読込成功は示しません。
 	bool RequestStage(int stageId);
-	// 現在読み込んでいるStage IDを返します。
+	// @return 読込が確定したStage IDです。予約中の番号は含みません。
 	int GetStageId() const { return stageMapRepository_.GetStageId(); }
 
 private:
@@ -65,7 +72,7 @@ private:
 	// 選択中StageのCameraを所有し、描画共通設定はManagerから借ります。
 	std::unique_ptr<Engine::CameraManager> cameraManager_;
 	std::unique_ptr<Engine::Camera> mainCamera_;
-	Object3dCommon* object3dCommon_ = nullptr;
+	Engine::Object3dCommon* object3dCommon_ = nullptr;
 
 	// ---------- JSONを実行中のオブジェクトへ変換する補助構造体 ----------
 
@@ -82,7 +89,7 @@ private:
 	bool InitializePlayerAndCamera();
 	// CSV・JSONの開始位置がない時も、生成・演出・復帰・再読込で同じ既定座標を使います。
 	Vector3 GetStagePlayerStartPosition() const;
-	// Stage1本編の初期化時に、従来のPlayer登場演出を同じ設定で開始します。
+	// 本編の初期化時に、選択中StageのPlayer登場演出を開始します。
 	void BeginStageStart();
 	// 本編を所有しない自動動作確認へ、必要なStage固有データだけを渡します。
 	void InitializeGameplaySmoke();
@@ -111,7 +118,7 @@ private:
 
 	// Playerを自動追尾する通常Cameraを更新します。
 	void UpdateMainCamera();
-	// 開始演出・通常追従・Event Cameraの優先順位で、Stage1のCameraを更新します。
+	// 開始演出・通常追従・Event Cameraの優先順位で、選択中StageのCameraを更新します。
 	void UpdateStageCamera(float deltaTime, bool isStageStartPlaying);
 	// 固定CameraのTitle中と本編の双方で、同じRenderContextへ描画対象を渡します。
 	void PrepareStageRenderObjects();
@@ -123,11 +130,11 @@ private:
 	void DrawStagePuzzleDebugUi();
 	// Edit Viewでだけ、Levelの編集・保存・Collider確認UIをまとめて表示します。
 	void DrawStageEditorUi();
-	// ---------- stage1.jsonの読込・保存・編集 ----------
+	// ---------- 選択中StageのJSON読込・保存・編集 ----------
 
-	// Stage1の外部マップファイルが保存されたかを確認します。
+	// 選択中Stageの外部マップファイルが保存されたかを確認します。
 	void UpdateStageMapHotReload();
-	// Stage1の外部マップファイルを読み、成功した場合だけ床と鏡へ反映します。
+	// 選択中Stageの外部マップファイルを読み、成功した場合だけ床と鏡へ反映します。
 	bool ReloadStageMap(bool resetPlayerPosition = false);
 	// ゲーム内で編集したLevelDataをJSONへ保存します。
 	bool SaveStageMap();
@@ -142,14 +149,14 @@ private:
 		const std::vector<const LevelLoader::ObjectData*>& eventTriggerDataList,
 		const std::vector<const LevelLoader::ObjectData*>& eventCameraDataList,
 		const std::vector<const LevelLoader::ObjectData*>& cameraAreaDataList);
-	// JSONの床TransformとBOX Colliderを、Stage1が所有する床へ反映します。
+	// JSONの床TransformとBOX Colliderを、選択中Stageが所有する床へ反映します。
 	void ApplyFloorData(const LevelLoader::ObjectData& floorData);
 	// 読み込んだLevelDataを床・鏡・追加オブジェクトへ反映します。
 	bool ApplyStageMapData(bool rebuildRuntimeObjects);
-	// ---------- Stage1が所有する3Dオブジェクト ----------
+	// ---------- 選択中Stageが所有する3Dオブジェクト ----------
 
 	// 床・発射装置・Switch・Doorを所有し、通常画面と鏡の反射描画へ一覧を貸します。
-	Object3dCollection sceneObjects_{};
+	Engine::Object3dCollection sceneObjects_{};
 	// 仮Titleと本編が同じ夜空を使い、Scene終了時にSkyBoxを解放します。
 	std::unique_ptr<Engine::SkyBox> skyBox_;
 	// ---------- 鏡の状態 ----------
@@ -172,9 +179,9 @@ private:
 	// Laser・Switch・Doorの進行状態と判定規則を所有するStage専用ギミックです。
 	StageLightPuzzle lightPuzzle_{};
 	// Charge Laserの発射位置を見分けるために置く、小さな白い球です。
-	Object3d* laserEmitter_ = nullptr;
+	Engine::Object3d* laserEmitter_ = nullptr;
 	// 大型Mirrorの回転後にDoor Switchへ送る、オレンジ色の専用Laserです。
-	Object3d* doorLaserEmitter_ = nullptr;
+	Engine::Object3d* doorLaserEmitter_ = nullptr;
 	// ---------- 時間制御で動く危険Light ----------
 	// 危険Lightの軌道・反射後線分・Player接触・描画をまとめるStage固有ギミックです。
 	StageHazardLights hazardLights_{};
@@ -183,25 +190,25 @@ private:
 	// ---------- Light PuzzleのSwitchとDoor ----------
 
 	// 携帯鏡で反射したLaserを受け、一定時間で大型Mirrorを起動する充電Switchです。
-	Object3d* chargeSwitch_ = nullptr;
+	Engine::Object3d* chargeSwitch_ = nullptr;
 	// 斜めを向いた大型Mirrorの反射Laserを受け、Doorを開けるSwitchです。
-	Object3d* doorSwitch_ = nullptr;
+	Engine::Object3d* doorSwitch_ = nullptr;
 	// Door Switchへ光が当たっている間だけ上へ移動するDoorです。開いたDoorはPlayerの衝突一覧から外します。
-	Object3d* lightDoor_ = nullptr;
+	Engine::Object3d* lightDoor_ = nullptr;
 	// ---------- Player・床・当たり判定 ----------
 
 	// WASD移動とジャンプを行う球のPlayerです。
 	std::unique_ptr<Player> player_;
-	// stage1.jsonのPlayerStartから読み込んだ、本編開始時のPlayer座標です。
+	// 選択中StageのJSONにあるPlayerStartから読み込んだ、本編開始時のPlayer座標です。
 	Vector3 stagePlayerStartPosition_{ 0.0f, -0.8f, 5.0f };
-	// PlayerStartがstage1.jsonに書かれていた時だけtrueになります。
+	// PlayerStartが選択中StageのJSONに書かれていた時だけtrueになります。
 	bool hasStagePlayerStart_ = false;
 	// 危険Lightに触れた回数と一秒の消失演出は、このStage専用部品が所有します。
 	StageLightDeath lightDeath_{};
 	// Scene切替の予約はStageが行い、消失演出部品にはSceneManagerを持たせません。
 	bool isLeavingForGameOver_ = false;
 	// 床の見た目です。寿命はsceneObjects_、判定形状はcollisionWorld_が管理します。
-	Object3d* floor_ = nullptr;
+	Engine::Object3d* floor_ = nullptr;
 	// ---------- 通常Cameraと開始演出 ----------
 
 	// Player などの対象を追従する、三人称カメラ専用の操作役です。
@@ -221,13 +228,13 @@ private:
 	std::unique_ptr<StageTitleOverlay> stageTitleOverlay_;
 	// 本編だけが持つTab・Pause案内です。仮TitleのSpriteとは寿命と表示条件を分けます。
 	std::unique_ptr<StagePauseOverlay> stagePauseOverlay_;
-	// stage1.jsonのstage_startから読み込む、開始演出の調整値です。
+	// 選択中StageのJSONにあるstage_startから読み込む、開始演出の調整値です。
 	StageStart::Settings stageStartSettings_{};
 	// 初回描画を待つ条件とVoiceの寿命を一か所で管理します。
 	StageBgmPlayback stageBgm_{};
 	// Player用とLaser遮蔽用のOBB一覧を、Stageの現在状態からまとめて作る部品です。
 	StageCollisionWorld collisionWorld_{};
-	// ---------- stage1.jsonの実行中データ ----------
+	// ---------- 選択中Stageの実行中データ ----------
 
 	// Stage ID・JSON/CSV・変更監視をまとめて所有し、Sceneへ読込成否を返します。
 	StageMapRepository stageMapRepository_{};
@@ -237,7 +244,7 @@ private:
 	StageCameraEvents stageCameraEvents_;
 	// Collider確認、Level編集、Viewport操作をまとめるEdit View専用の窓口です。
 	StageEditor stageEditor_{};
-	// ---------- Stage1全体のライト ----------
+	// ---------- 選択中Stage全体のライト ----------
 
 	// JSONの三灯とLaser・危険Lightの線分から作る照明値を所有します。
 	StageLighting stageLighting_{};

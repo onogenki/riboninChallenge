@@ -43,7 +43,7 @@ public:
 	}
 
 	// Frameworkが初期化した二つの窓口を借り、粒子用資源を作ります。SRVの空きが7枠必要です。
-	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+	void Initialize(Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager);
 	// Debug Sceneが使う固定画像を読み、失敗時は描画できない状態を保ちます。
 	bool PrepareTexture();
 	// deltaTime秒だけEmitterを進め、発生とGPU上の粒子更新をこの順に行います。
@@ -162,17 +162,17 @@ private:
 	void UpdateEmitterTiming(float deltaTime);
 	void DispatchParticleSimulation();
 
-	DirectXCommon* dxCommon_ = nullptr;
-	SrvManager* srvManager_ = nullptr;
+	Engine::DirectXCommon* dxCommon_ = nullptr;
+	Engine::SrvManager* srvManager_ = nullptr;
 	// 固定画像の読込に成功した時だけDrawでSRVを取得します。
 	bool isTextureReady_ = false;
-	uint32_t particleSrvIndex_ = SrvManager::kInvalidSrvIndex;
-	uint32_t activeParticleIndicesSrvIndex_ = SrvManager::kInvalidSrvIndex;
-	uint32_t particleUavIndex_ = SrvManager::kInvalidSrvIndex;
-	uint32_t freeListIndexUavIndex_ = SrvManager::kInvalidSrvIndex;
-	uint32_t freeListUavIndex_ = SrvManager::kInvalidSrvIndex;
-	uint32_t activeParticleIndicesUavIndex_ = SrvManager::kInvalidSrvIndex;
-	uint32_t drawArgumentsUavIndex_ = SrvManager::kInvalidSrvIndex;
+	uint32_t particleSrvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	uint32_t activeParticleIndicesSrvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	uint32_t particleUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	uint32_t freeListIndexUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	uint32_t freeListUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	uint32_t activeParticleIndicesUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	uint32_t drawArgumentsUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
 	Microsoft::WRL::ComPtr<ID3D12Resource> particleResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> freeListIndexResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> freeListResource_;

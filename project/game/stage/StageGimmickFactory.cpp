@@ -4,9 +4,9 @@
 #include "Object3dCollection.h"
 
 // 床の上面が従来どおりY=-2.0になる予備位置を設定します。
-Object3d* StageGimmickFactory::CreateFloor(Object3dCollection& objects)
+Engine::Object3d* StageGimmickFactory::CreateFloor(Object3dCollection& objects)
 {
-	Object3d* floor = objects.Create("debug/floor.obj");
+	Engine::Object3d* floor = objects.Create("debug/floor.obj");
 	if (!floor) {
 		return nullptr;
 	}
@@ -22,7 +22,7 @@ bool StageGimmickFactory::CreateLaserEmitters(
 	const StageLightPuzzle::Settings& settings,
 	LaserEmitters& outEmitters)
 {
-	Object3d* charge = objects.Create("debug/sphere.obj");
+	Engine::Object3d* charge = objects.Create("debug/sphere.obj");
 	if (!charge) {
 		return false;
 	}
@@ -32,7 +32,7 @@ bool StageGimmickFactory::CreateLaserEmitters(
 		return false;
 	}
 
-	Object3d* door = objects.Create("debug/sphere.obj");
+	Engine::Object3d* door = objects.Create("debug/sphere.obj");
 	if (!door) {
 		return false;
 	}
@@ -51,7 +51,7 @@ bool StageGimmickFactory::CreateSwitchesAndDoor(
 	const StageLightPuzzle::Settings& settings,
 	SwitchesAndDoor& outObjects)
 {
-	Object3d* chargeSwitch = objects.Create("debug/sphere.obj");
+	Engine::Object3d* chargeSwitch = objects.Create("debug/sphere.obj");
 	if (!chargeSwitch) {
 		return false;
 	}
@@ -65,7 +65,7 @@ bool StageGimmickFactory::CreateSwitchesAndDoor(
 		return false;
 	}
 
-	Object3d* doorSwitch = objects.Create("debug/sphere.obj");
+	Engine::Object3d* doorSwitch = objects.Create("debug/sphere.obj");
 	if (!doorSwitch) {
 		return false;
 	}
@@ -79,7 +79,7 @@ bool StageGimmickFactory::CreateSwitchesAndDoor(
 		return false;
 	}
 
-	Object3d* lightDoor = objects.Create("debug/floor.obj");
+	Engine::Object3d* lightDoor = objects.Create("debug/floor.obj");
 	if (!lightDoor) {
 		return false;
 	}

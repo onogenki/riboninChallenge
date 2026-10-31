@@ -5,6 +5,7 @@
 #include "StageMapChipFactory.h"
 #include "StageMapFileMonitor.h"
 #include "StageMapSelection.h"
+#include "StageMapRepository.h"
 
 #include <chrono>
 #include <filesystem>
@@ -84,6 +85,77 @@ namespace
 		return selection.GetStageId() == 5 && selection.GetDefinition() == activeDefinition;
 	}
 
+	// Stage IDごとに別のJSONを読み、右Inspectorへ渡す一覧に前Stageの配置物が混ざらないことを確認します。
+	bool CheckStageJsonIsolation()
+	{
+		StageMapRepository repository;
+		std::string status;
+		for (int stageId = 1; stageId <= 5; ++stageId) {
+			if (!repository.SelectAndReload(stageId, []() { return true; }, status) ||
+				repository.GetStageId() != stageId || !repository.GetLevelData()) {
+				return false;
+			}
+			const LevelLoader::LevelData& levelData = *repository.GetLevelData();
+			StageMapObjectIndex index;
+			index.Build(levelData);
+			if (!index.GetFloor() || !index.GetPlayerStart()) {
+				return false;
+			}
+			if (stageId == 1) {
+				if (levelData.objects.size() <= 2) {
+					return false;
+				}
+				continue;
+			}
+			const std::string expectedFloorName = "Stage" + std::to_string(stageId) + "Floor";
+			if (levelData.objects.size() != 2 || index.GetFloor()->name != expectedFloorName ||
+				!index.GetFixedMirrors().empty() || !index.GetRuntimeObjects().empty()) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// Inspectorで改名・BOX追加した通常モデルを、Stage JSONへ保存して再読込しても保てるか確認します。
+	bool CheckModelMetadataJsonRoundTrip()
+	{
+		const std::string fileName = "SmokeMetadata_" +
+			std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+		const std::filesystem::path jsonPath =
+			std::filesystem::path("resources/levels") / (fileName + ".json");
+		std::filesystem::path temporaryPath = jsonPath;
+		temporaryPath += ".tmp";
+		LevelLoader::LevelData levelData{};
+		levelData.coordinateSystem = "engine";
+		LevelLoader::ObjectData model{};
+		model.type = "MESH";
+		model.name = "HallFloor";
+		model.tag = "EditorAdded";
+		model.objectType = "STATIC";
+		model.fileName = "debug/floor.obj";
+		model.hasCollider = true;
+		model.collider.type = "BOX";
+		model.collider.center = { 1.0f, 0.0f, -2.0f };
+		model.collider.size = { 4.0f, 0.5f, 6.0f };
+		levelData.objects.push_back(std::move(model));
+		const bool saved = LevelLoader::Save(fileName, levelData);
+		const std::unique_ptr<LevelLoader::LevelData> loaded =
+			saved ? LevelLoader::Load(fileName) : nullptr;
+		bool passed = loaded && loaded->objects.size() == 1;
+		if (passed) {
+			const LevelLoader::ObjectData& reloaded = loaded->objects.front();
+			passed = reloaded.name == "HallFloor" && reloaded.fileName == "debug/floor.obj" &&
+				reloaded.tag == "EditorAdded" && reloaded.hasCollider &&
+				reloaded.collider.type == "BOX" &&
+				MatchesVector3(reloaded.collider.center, { 1.0f, 0.0f, -2.0f }) &&
+				MatchesVector3(reloaded.collider.size, { 4.0f, 0.5f, 6.0f });
+		}
+		std::error_code cleanupError;
+		std::filesystem::remove(jsonPath, cleanupError);
+		std::filesystem::remove(temporaryPath, cleanupError);
+		return passed && !cleanupError;
+	}
+
 	// 専用の一時JSON/CSVだけを使い、変更検知とゲーム内保存後の時刻同期を確認します。
 	bool CheckStageMapFileMonitor()
 	{
@@ -158,6 +230,8 @@ namespace
 		const fs::path temporaryJsonPath = levelsDirectory / "Smoke.json.tmp";
 		const fs::path newJsonPath = levelsDirectory / "SmokeNew.json";
 		const fs::path newTemporaryJsonPath = levelsDirectory / "SmokeNew.json.tmp";
+		const fs::path stageJsonPath = levelsDirectory / "stage1.json";
+		const fs::path stageTemporaryJsonPath = levelsDirectory / "stage1.json.tmp";
 		bool passed = false;
 		try {
 			fs::create_directories(levelsDirectory);
@@ -176,6 +250,46 @@ namespace
 			passed = loadMatches(R"({"name":17,"objects":[]})", false) &&
 				loadMatches(R"({"name":"scene","coordinate_system":17,"objects":[]})", false) &&
 				loadMatches(R"({"name":"scene","coordinate_system":"engine","objects":[]})", true);
+			// Stage専用の仮JSONをロックし、保存失敗時の座標系と成功後の保存形式を確認します。
+			std::ofstream stageFile(stageJsonPath, std::ios::trunc);
+			stageFile << R"({"name":"scene","coordinate_system":"blender","objects":[]})";
+			stageFile.close();
+			StageMapRepository repository;
+			std::string repositoryStatus;
+			const bool stageLoaded = stageFile && repository.SelectAndReload(1, []() { return true; }, repositoryStatus);
+			const HANDLE lockedStage = CreateFileW(stageJsonPath.c_str(), GENERIC_READ, FILE_SHARE_READ,
+				nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+			bool repositorySaveChecks = false;
+			if (stageLoaded && lockedStage != INVALID_HANDLE_VALUE) {
+				const bool rejected = !repository.Save(repositoryStatus);
+				const bool keptCoordinates = repository.GetLevelData()->coordinateSystem == "blender";
+				CloseHandle(lockedStage);
+				const bool saved = repository.Save(repositoryStatus);
+				const auto savedStage = LevelLoader::Load("stage1");
+				repositorySaveChecks = rejected && keptCoordinates && saved && savedStage &&
+					repository.GetLevelData()->coordinateSystem == "engine" && savedStage->coordinateSystem == "engine";
+				// 不正なUTF-8でJSON出力を例外終了させ、保存済みJSONと編集中の座標系を守れるか確認します。
+				repository.GetLevelData()->coordinateSystem = "blender";
+				LevelLoader::ObjectData invalidObject;
+				invalidObject.name = std::string(1, static_cast<char>(0xff));
+				repository.GetLevelData()->objects.push_back(invalidObject);
+				bool exceptionThrown = false;
+				try {
+					repository.Save(repositoryStatus);
+				} catch (const std::exception&) {
+					exceptionThrown = true;
+				}
+				const auto afterException = LevelLoader::Load("stage1");
+				repositorySaveChecks = repositorySaveChecks && exceptionThrown &&
+					repository.GetLevelData()->coordinateSystem == "blender" &&
+					afterException && afterException->coordinateSystem == "engine" && afterException->objects.empty();
+			} else if (lockedStage != INVALID_HANDLE_VALUE) {
+				CloseHandle(lockedStage);
+			}
+			if (!repositorySaveChecks) {
+				std::cerr << "DETAIL FAIL: Stage save coordinate rollback\n";
+			}
+			passed = passed && repositorySaveChecks;
 			if (!passed) {
 				std::cerr << "DETAIL FAIL: JSON type validation\n";
 			}
@@ -275,7 +389,7 @@ namespace
 		bool cleanedUp = true;
 		// 作成した既知のパスだけを内側から消し、ほかの一時ファイルには触れません。
 		for (const fs::path& path : {
-			newTemporaryJsonPath, newJsonPath, temporaryJsonPath, jsonPath,
+			stageTemporaryJsonPath, stageJsonPath, newTemporaryJsonPath, newJsonPath, temporaryJsonPath, jsonPath,
 			levelsDirectory, resourcesDirectory, temporaryDirectory }) {
 			error.clear();
 			fs::remove(path, error);
@@ -376,6 +490,10 @@ int main()
 		"JSON validation, new/replacement saves, and failed replacement preserve the old file");
 	check(CheckStageMapSelection(),
 		"Stage IDs 1-5 map to files; invalid IDs preserve selection and requests run once");
+	check(CheckStageJsonIsolation(),
+		"Stage 1-5 load separate JSON objects without carrying Stage1 models into the next Inspector");
+	check(CheckModelMetadataJsonRoundTrip(),
+		"renamed model and BOX collider survive JSON save and reload");
 	check(CheckStageMapFileMonitor(),
 		"JSON and CSV changes reload once, including simultaneous saves; saving JSON synchronizes its timestamp");
 	std::cout << (failures == 0 ? "SUCCESS" : "FAILURE") << ": failures=" << failures << '\n';

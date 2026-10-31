@@ -94,7 +94,7 @@ void SceneEditor::ScanResourceShelf(ShelfState& state)
 		if (isTextureFile) {
 			shelfEntry.isTexture = true;
 			shelfEntry.textureFilePath = (std::filesystem::path("Resources") / relativePath).generic_string();
-			TextureManager* textureManager = TextureManager::GetInstance();
+			Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
 			if (!textureManager->LoadTexture(shelfEntry.textureFilePath)) {
 				// 未登録のままSRVや寸法を取得するとDebugのassertやReleaseの例外になるため飛ばします。
 				Logger::Log("SceneEditor: shelf texture load failed: " + shelfEntry.textureFilePath);

@@ -15,7 +15,7 @@
 // 鏡面の専用Pipelineから通常設定へ戻し、後続Objectの描画形式が変わらないようにします。
 void StageSceneRenderer::Draw(const Context& context)
 {
-	if (!context.object3dCommon || !context.activeCamera || !context.skyBox || !context.sceneObjects ||
+	if (!context.object3dCommon || !context.activeCamera || !context.skyBox || !context.sceneObjects || !context.floor ||
 		!context.stageMapRuntime || !context.fixedMirrors || !context.lightPuzzle ||
 		!context.hazardLights) {
 		return;
@@ -23,8 +23,13 @@ void StageSceneRenderer::Draw(const Context& context)
 
 	// 深度を書かないSkyBoxを先に置き、後から描く半透明の光を夜空で上書きしません。
 	context.skyBox->Draw();
-	// 発射装置もこの一覧に含まれます。壁などのJSON配置物と同じ通常深度で描きます。
-	SceneRenderPipeline::DrawObjects(context.object3dCommon, *context.sceneObjects);
+	// 固定鏡のない設計開始Stageでは、共通生成済みのStage1パズル部品を描かず床だけを残します。
+	if (context.drawStagePuzzle) {
+		SceneRenderPipeline::DrawObjects(context.object3dCommon, *context.sceneObjects);
+	} else {
+		context.object3dCommon->SetCommonDrawSetting();
+		context.floor->Draw();
+	}
 	context.stageMapRuntime->Draw();
 	for (const std::unique_ptr<FixedMirror>& fixedMirror : *context.fixedMirrors) {
 		if (!fixedMirror) {
@@ -51,6 +56,8 @@ void StageSceneRenderer::Draw(const Context& context)
 	// 発射装置はsceneObjectsの通常描画だけにし、壁越しのシルエットを重ねません。
 	// 後続Objectが通常Pipelineを前提にできるよう、描画設定を戻します。
 	context.object3dCommon->SetCommonDrawSetting();
-	context.lightPuzzle->Draw(*context.activeCamera);
-	context.hazardLights->Draw(*context.activeCamera);
+	if (context.drawStagePuzzle) {
+		context.lightPuzzle->Draw(*context.activeCamera);
+		context.hazardLights->Draw(*context.activeCamera);
+	}
 }

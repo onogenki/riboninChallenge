@@ -14,9 +14,9 @@ class DebugAssetPreview;
 class DebugEntityRegistry;
 class DebugParticleEffects;
 class DebugSceneSelection;
-class DirectXCommon;
-class CaptureManager;
-class Object3d;
+namespace Engine { class DirectXCommon; }
+namespace Engine { class CaptureManager; }
+namespace Engine { class Object3d; }
 namespace Engine { class ParticleEmitter; }
 namespace Engine { class Sprite; }
 
@@ -28,15 +28,15 @@ public:
 	struct Context
 	{
 		// DebugSceneが所有する編集対象と、その描画共通設定です。
-		DirectXCommon* directXCommon = nullptr;
+		Engine::DirectXCommon* directXCommon = nullptr;
 		Engine::Camera* camera = nullptr;
 		Engine::CameraManager* cameraManager = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
 		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
-		Object3d::DirectionalLight* directionalLight = nullptr;
-		Object3d::PointLight* pointLight = nullptr;
-		Object3d::SpotLight* spotLight = nullptr;
+		Engine::Object3d::DirectionalLight* directionalLight = nullptr;
+		Engine::Object3d::PointLight* pointLight = nullptr;
+		Engine::Object3d::SpotLight* spotLight = nullptr;
 		size_t protectedNormalObjectCount = 0;
 		size_t protectedAnimationObjectCount = 0;
 		size_t protectedSpriteCount = 0;
@@ -44,7 +44,7 @@ public:
 		DebugSceneSelection* selection = nullptr;
 		DebugEntityRegistry* entityRegistry = nullptr;
 		DebugAssetPreview* assetPreview = nullptr;
-		CaptureManager* captureManager = nullptr;
+		Engine::CaptureManager* captureManager = nullptr;
 		// Inspector内のParticle・Effect・Camera・ECSタブが使う値です。
 		Transform* emitterTransform = nullptr;
 		Engine::ParticleEmitter* emitterCircle = nullptr;

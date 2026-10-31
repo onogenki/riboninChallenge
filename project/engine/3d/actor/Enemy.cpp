@@ -9,9 +9,9 @@ Enemy::Enemy() = default;
 Enemy::~Enemy() = default;
 
 // SpawnDataから敵一体の見た目・開始位置・球Colliderを作ります。
-bool Enemy::Initialize(Object3dCommon* object3dCommon, const SpawnData& spawnData)
+bool Enemy::Initialize(Engine::Object3dCommon* object3dCommon, const SpawnData& spawnData)
 {
-	object_ = Object3dFactory::Create(
+	object_ = Engine::Object3dFactory::Create(
 		object3dCommon,
 		spawnData.modelName,
 		spawnData.initializeAnimation);

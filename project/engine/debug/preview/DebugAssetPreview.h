@@ -5,8 +5,8 @@
 #include <string>
 
 namespace Engine { class Camera; }
-class Input;
-class Object3d;
+namespace Engine { class Input; }
+namespace Engine { class Object3d; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
 
@@ -17,7 +17,7 @@ class DebugAssetPreview
 public:
 	// 作成済みモデルをプレビューへ移し、現在のCamera位置を復帰用として保存します。
 	bool EnterModel(
-		std::unique_ptr<Object3d> object,
+		std::unique_ptr<Engine::Object3d> object,
 		const std::string& fileName,
 		const Vector3& modelCenter,
 		float modelRadius,
@@ -31,13 +31,13 @@ public:
 	// モデル用Camera、またはTextureの表示位置・大きさを初期値へ戻します。
 	void Reset(Engine::Camera* camera);
 	// プレビュー中のMouse操作とRキー操作を更新します。プレビュー中ならtrueを返します。
-	bool UpdateInput(Engine::Camera* camera, Input* input, bool isMouseOverGameView, bool isCameraDragging);
+	bool UpdateInput(Engine::Camera* camera, Engine::Input* input, bool isMouseOverGameView, bool isCameraDragging);
 	// 外側をクリックした時に、プレビューを閉じてよい状態かを判定します。
 	bool ShouldExitOnOutsideClick(bool isLeftMouseDown, bool isLeftMouseClicked, bool isMouseOverGameView);
 
 	bool IsActive() const { return isActive_; }
 	bool IsTexturePreview() const { return isTexturePreview_; }
-	Object3d* GetObject() const { return object_.get(); }
+	Engine::Object3d* GetObject() const { return object_.get(); }
 	Engine::Sprite* GetSprite() const { return sprite_.get(); }
 	const std::string& GetDisplayName() const { return displayName_; }
 	const std::string& GetTextureFilePath() const { return textureFilePath_; }
@@ -51,7 +51,7 @@ private:
 	void SaveReturnCamera(Engine::Camera* camera);
 
 	// プレビュー中だけ所有する3Dモデルです。
-	std::unique_ptr<Object3d> object_;
+	std::unique_ptr<Engine::Object3d> object_;
 	// Textureプレビュー中だけ所有する2D Spriteです。
 	std::unique_ptr<Engine::Sprite> sprite_;
 	// ShelfとGame Viewへ表示するモデル名またはTextureパスです。

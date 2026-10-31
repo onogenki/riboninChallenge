@@ -14,7 +14,7 @@ namespace Engine { class Camera; }
 namespace Engine { class CameraController; }
 class CarryableMirror;
 class FixedMirror;
-class Object3d;
+namespace Engine { class Object3d; }
 class Player;
 class StageCameraEvents;
 class StageMapRuntime;
@@ -28,6 +28,7 @@ public:
 	{
 		// Edit View以外では何も表示しないための状態です。
 		bool isEditViewActive = false;
+		int stageId = 1;
 		std::string mapFilePath;
 		// JSONと実行中のStageデータはStage1が所有します。
 		LevelLoader::LevelData* levelData = nullptr;
@@ -35,7 +36,7 @@ public:
 		bool playerStartFromCsv = false;
 		Player* player = nullptr;
 		const MyMath::OBB* floorObb = nullptr;
-		Object3d* floor = nullptr;
+		Engine::Object3d* floor = nullptr;
 		Engine::Camera* activeCamera = nullptr;
 		Engine::CameraController* cameraController = nullptr;
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;
@@ -69,6 +70,8 @@ public:
 	bool SynchronizeFirstMirror(LevelLoader::LevelData& levelData, const FixedMirror& fixedMirror, float baseYaw);
 	// JSONのオブジェクト数が変わった時だけ、編集対象の番号を有効範囲へ戻します。
 	void ClampSelectedObjectIndex(std::size_t objectCount);
+	// Stage切替時だけInspector・Viewport・Shelfの前Stage選択を消します。
+	void ResetForStage(std::size_t objectCount);
 
 private:
 	// 現在のPlayerと通常Cameraの角度、次回のPlayerStartを別々に表示します。

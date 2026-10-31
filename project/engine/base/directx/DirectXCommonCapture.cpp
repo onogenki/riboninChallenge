@@ -3,7 +3,9 @@
 #include <cstring>
 #include <tmmintrin.h>
 
-// Game Viewの描画先を同期的に読み戻します。通常描画の状態へ戻してから、CPUへRGBA画素を渡します。
+namespace Engine
+{
+// Game Viewの描画先を同期的に読み戻します。通常描画の状態へ戻してから、保存用のBGRA画素を渡します。
 bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels, int& outWidth, int& outHeight, bool usePostEffectTexture)
 {
 	ID3D12Resource* sourceResource = usePostEffectTexture
@@ -112,7 +114,7 @@ bool DirectXCommon::CaptureGameTexturePixels(std::vector<unsigned char>& pixels,
 
 	const size_t sourceRowPitch = static_cast<size_t>(footprint.Footprint.RowPitch);
 	const size_t tightRowPitch = static_cast<size_t>(outWidth) * 4;
-	// 保存処理が期待するRGBAへ並べ替え、GPU側の行末余白を除いて詰め直します。
+	// 保存処理が期待するBGRAへ並べ替え、GPU側の行末余白を除いて詰め直します。
 	for (int y = 0; y < outHeight; ++y) {
 		const unsigned char* sourceRow = mappedData + footprint.Offset + static_cast<size_t>(y) * sourceRowPitch;
 		unsigned char* destinationRow = pixels.data() + static_cast<size_t>(y) * tightRowPitch;
@@ -354,5 +356,6 @@ bool DirectXCommon::TryGetGameTextureCapturePixels(
 	oldestSlot->readbackResource_->Unmap(0, &writtenRange);
 	oldestSlot->pending_ = false;
 	return true;
+}
 }
 

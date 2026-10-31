@@ -4,6 +4,8 @@
 #include <vector>
 
 
+namespace Engine
+{
 // Skybox専用のShader結合位置を作り、失敗時は描画Pipelineへ進みません。
 void Object3dCommon::CreateSkyboxRootSignature()
 {
@@ -165,4 +167,5 @@ void Object3dCommon::CreateSkyboxPipeline()
 		throw std::runtime_error("Object3dCommon: skybox graphics pipeline creation failed");
 	}
 }
+} // namespace Engine
 

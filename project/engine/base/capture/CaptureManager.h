@@ -10,6 +10,8 @@
 #include <thread>
 #include <vector>
 
+namespace Engine
+{
 // スクリーンショット、動画録画、リプレイ保存を管理するシングルトン。
 // GPUからの読み戻し後のエンコードはワーカースレッドで行い、描画を止めない。
 class CaptureManager
@@ -29,22 +31,42 @@ public:
 	// PostDraw後にGPUバックバッファを読み戻して各キャプチャ要求を処理する。
 	void UpdateAfterDraw();
 
+	// @return 録画中だけtrueです。録画開始を予約しただけの状態は含めません。
 	bool IsRecording() const { return isRecording_; }
 	// Inspectorへ共通録画の経過秒数を渡し、Debug専用の計時状態を増やしません。
+	// @return 現在の録画経過秒数です。
 	float GetRecordingTime() const { return recordingTime_; }
+	// @return 最後の保存・録画操作の結果を示す文字列への読み取り専用参照です。
 	const std::string& GetLastMessage() const { return lastMessage_; }
-	// Debug画面の自動確認も通常撮影と同じ保存先・画素処理を使います。
+	// Debug画面の自動確認も通常撮影と同じ保存先を使います。
+	// @param folderName Captures直下に作る保存先フォルダ名です。
+	// @return resources/Captures/folderNameのパスです。この関数だけではフォルダを作りません。
 	std::filesystem::path GetCaptureDirectory(const char* folderName) const;
+	// @return ファイル名に使うローカル時刻です。形式はYYYYMMDD_HHMMSS_mmmです。
 	std::string MakeTimestampString() const;
-	// 現在の描画結果をRGBAピクセル配列としてCPUメモリへ読み戻します。
+	// 現在の描画結果を同期的に読み戻します。GPU待ちが入るため連続撮影には使いません。
+	// @param pixels 成功時にBGRA順の画素を受け取る出力先です。
+	// @param width 成功時に画像の幅を受け取る出力先です。
+	// @param height 成功時に画像の高さを受け取る出力先です。
+	// @return 画素を取得できた時だけtrueです。
 	bool CapturePixels(std::vector<unsigned char>& pixels, int& width, int& height) const;
-	// Debug自動確認用のBMP保存も通常撮影の画素検証と保存処理へまとめます。
+	// Debug自動確認用のBMPを、通常撮影と同じ画素順で保存します。
+	// @param filePath 書き出すBMPのパスです。親フォルダは必要に応じて作ります。
+	// @param pixels BGRA順で上から下へ並ぶ4バイト画素です。
+	// @param width 画像の幅です。正の値が必要です。
+	// @param height 画像の高さです。正の値が必要です。
+	// @return サイズと書き込みが成功した時だけtrueです。
 	bool SavePixelsAsBmp(
 		const std::filesystem::path& filePath,
 		const std::vector<unsigned char>& pixels,
 		int width,
 		int height) const;
 	// 一枚のAVI保存は通常録画とは独立した出力先で実行します。
+	// @param filePath 書き出すAVIのパスです。
+	// @param pixels BGRA順で上から下へ並ぶ4バイト画素です。
+	// @param width 画像の幅です。正の値が必要です。
+	// @param height 画像の高さです。正の値が必要です。
+	// @return AVIを開き、一枚の書き込みが成功した時だけtrueです。
 	bool SaveSingleFrameAvi(
 		const std::filesystem::path& filePath,
 		const std::vector<unsigned char>& pixels,
@@ -159,6 +181,10 @@ private:
 	bool EncodeReplayFrame(const ReplayEncodeJob& job, ReplayFrame& frame) const;
 	bool DecodeReplayFrame(const ReplayFrame& frame, std::vector<unsigned char>& pixels) const;
 	void ClearReplayBuffer();
+	// 自動確認の状態だけを初期化し、通常の撮影要求や動画形式の選択を変更しません。
+	void InitializeSmokeState(bool smokeRequested, bool performanceBaselineRequested);
+	// 動画形式の選択後に自動確認ログを開始し、非対応のRelease構成は失敗を記録します。
+	void BeginSmokeRun();
 	// SmokeのScene別進行と保存結果の判定を分け、撮影本体の更新順を変えずに確認します。
 	void UpdateSmokeBeforeCapture();
 	void UpdateTitleSmoke();
@@ -306,3 +332,4 @@ private:
 	static constexpr size_t kReplayMaximumQueuedFrames_ = 32;
 	static constexpr size_t kVideoMaximumQueuedFrames_ = 8;
 };
+} // namespace Engine

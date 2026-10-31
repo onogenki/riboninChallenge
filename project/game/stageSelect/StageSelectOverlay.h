@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
 
@@ -15,7 +15,7 @@ public:
 	~StageSelectOverlay();
 
 	// 三枚の画像とSpriteをそろえ、欠けた案内を描画へ渡さないようにします。
-	bool Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon);
+	bool Initialize(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon);
 	// 透明余白を除いた案内を左上・下中央、見出しを上中央へ配置します。
 	void Update(float clientWidth, float clientHeight);
 	// Scene終了時に所有するSpriteを解放します。

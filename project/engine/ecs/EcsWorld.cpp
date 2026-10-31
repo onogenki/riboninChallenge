@@ -47,7 +47,7 @@ bool World::IsAlive(Entity entity) const
 	return aliveEntities_.contains(entity);
 }
 
-Entity World::CreateModelEntity(Object3d* object, const std::string& sourceFile, bool isAnimated)
+Entity World::CreateModelEntity(Engine::Object3d* object, const std::string& sourceFile, bool isAnimated)
 {
 	if (!object) {
 		return kInvalidEntity;
@@ -76,7 +76,7 @@ Entity World::CreateSpriteEntity(Engine::Sprite* sprite, const std::string& sour
 	return entity;
 }
 
-Entity World::FindEntity(const Object3d* object) const
+Entity World::FindEntity(const Engine::Object3d* object) const
 {
 	for (const auto& [entity, model] : models_) {
 		if (model.object == object) {
@@ -96,9 +96,9 @@ Entity World::FindEntity(const Engine::Sprite* sprite) const
 	return kInvalidEntity;
 }
 
-void World::PruneMissingBindings(const std::vector<Object3d*>& objects, const std::vector<Engine::Sprite*>& sprites)
+void World::PruneMissingBindings(const std::vector<Engine::Object3d*>& objects, const std::vector<Engine::Sprite*>& sprites)
 {
-	const std::unordered_set<const Object3d*> objectSet(objects.begin(), objects.end());
+	const std::unordered_set<const Engine::Object3d*> objectSet(objects.begin(), objects.end());
 	const std::unordered_set<const Engine::Sprite*> spriteSet(sprites.begin(), sprites.end());
 	std::vector<Entity> removedEntities;
 	for (const auto& [entity, model] : models_) {

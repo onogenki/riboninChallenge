@@ -1,0 +1,66 @@
+{
+    "coordinate_system": "engine",
+    "name": "scene",
+    "objects": [
+        {
+            "name": "PlayerStart",
+            "object_type": "PLAYER_START",
+            "tag": "PlayerStart",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    0.0,
+                    -0.800000011920929,
+                    5.0
+                ]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    20.0,
+                    3.0,
+                    20.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "debug/floor.obj",
+            "name": "Stage3Floor",
+            "object_type": "STATIC",
+            "tag": "Floor",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    0.0,
+                    -3.5,
+                    5.0
+                ]
+            },
+            "type": "MESH"
+        }
+    ]
+}

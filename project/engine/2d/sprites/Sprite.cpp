@@ -13,7 +13,7 @@ namespace Engine
 void Sprite::AdjustTextureSize()
 {
 	//テクスチャメタデータを取得
-	const DirectX::TexMetadata& metadata = TextureManager::GetInstance()->GetMetaData(textureFilePath_);
+	const DirectX::TexMetadata& metadata = Engine::TextureManager::GetInstance()->GetMetaData(textureFilePath_);
 
 	textureSize_.x = static_cast<float>(metadata.width);
 	textureSize_.y = static_cast<float>(metadata.height);
@@ -189,7 +189,7 @@ void Sprite::Update()
 	}
 
 	const DirectX::TexMetadata& metadata =
-		TextureManager::GetInstance()->GetMetaData(textureFilePath_);
+		Engine::TextureManager::GetInstance()->GetMetaData(textureFilePath_);
 	float tex_left = textureLeftTop_.x / metadata.width;
 	float tex_right = (textureLeftTop_.x + textureSize_.x) / metadata.width;
 	float tex_top = textureLeftTop_.y / metadata.height;
@@ -216,7 +216,7 @@ void Sprite::Draw()
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(textureFilePath_));
+	commandList->SetGraphicsRootDescriptorTable(2, Engine::TextureManager::GetInstance()->GetSrvHandleGPU(textureFilePath_));
 	commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 }
@@ -225,7 +225,7 @@ void Sprite::Draw()
 bool Sprite::SetTexture(const std::string& textureFilePath) {
 	// Loadingなど、Sceneが事前読込していない画像も、サイズを参照する前に必ず読み込みます。
 	// 同じ画像の再読込はTextureManagerが省くため、Sprite側でGPU資源を重複所有しません。
-	const bool isLoaded = TextureManager::GetInstance()->LoadTexture(textureFilePath);
+	const bool isLoaded = Engine::TextureManager::GetInstance()->LoadTexture(textureFilePath);
 	if (!isLoaded) {
 		Logger::Log("Sprite texture could not be loaded: " + textureFilePath);
 		return false;

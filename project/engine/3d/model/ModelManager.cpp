@@ -13,7 +13,7 @@ ModelManager* ModelManager::GetInstance()
 }
 
 // 共通DirectX操作窓口を先に所有し、後から作るModelへ有効な参照を渡します。
-void ModelManager::Initialize(DirectXCommon* dxCommon)
+void ModelManager::Initialize(Engine::DirectXCommon* dxCommon)
 {
 	// Model共通部はManagerが所有し、モデルにはその参照を渡します。
 	modelCommon_ = std::make_unique<ModelCommon>();

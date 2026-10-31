@@ -45,6 +45,7 @@
     <ClCompile Include="..\game\stage\StageMapChipFactory.cpp" />
     <ClCompile Include="..\game\stage\StageMapFileMonitor.cpp" />
     <ClCompile Include="..\game\stage\StageMapSelection.cpp" />
+    <ClCompile Include="..\game\stage\StageMapRepository.cpp" />
     <ClInclude Include="..\engine\level\LevelLoader.h" />
     <ClInclude Include="..\engine\level\MapChipField.h" />
     <ClInclude Include="..\engine\level\MapChipRegistry.h" />
@@ -53,6 +54,7 @@
     <ClInclude Include="..\game\stage\StageMapChipFactory.h" />
     <ClInclude Include="..\game\stage\StageMapFileMonitor.h" />
     <ClInclude Include="..\game\stage\StageMapSelection.h" />
+    <ClInclude Include="..\game\stage\StageMapRepository.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

@@ -4,9 +4,9 @@
 #include <vector>
 
 namespace Engine { class Camera; }
-class DirectXCommon;
-class Object3d;
-class Object3dCommon;
+namespace Engine { class DirectXCommon; }
+namespace Engine { class Object3d; }
+namespace Engine { class Object3dCommon; }
 namespace Engine { class SkyBox; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
@@ -18,15 +18,15 @@ class DebugSceneRenderer
 public:
 	struct Context
 	{
-		DirectXCommon* directXCommon = nullptr;
-		Object3dCommon* object3dCommon = nullptr;
+		Engine::DirectXCommon* directXCommon = nullptr;
+		Engine::Object3dCommon* object3dCommon = nullptr;
 		Engine::SpriteCommon* spriteCommon = nullptr;
 		Engine::Camera* camera = nullptr;
-		Object3d* previewObject = nullptr;
+		Engine::Object3d* previewObject = nullptr;
 		Engine::Sprite* previewSprite = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
-		Object3d* handWeapon = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
+		Engine::Object3d* handWeapon = nullptr;
 		Engine::SkyBox* skyBox = nullptr;
 		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
 	};

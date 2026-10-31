@@ -6,7 +6,7 @@
 #include <wrl.h>
 
 namespace Engine { class Camera; }
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 struct ID3D12GraphicsCommandList;
 struct ID3D12Resource;
 
@@ -16,7 +16,7 @@ class Object3dGpuData
 {
 public:
 	// 三つのConstant Bufferが完成した時だけ、Object3dへ成功を返します。
-	bool Initialize(DirectXCommon* dxCommon);
+	bool Initialize(Engine::DirectXCommon* dxCommon);
 	// World行列とCameraを使い、通常描画用の行列・Camera位置を更新します。
 	void UpdateTransform(const Matrix4x4& worldMatrix, const Engine::Camera* camera);
 	// 通常モデル描画で使う各Constant BufferをRoot Parameterへ設定します。
@@ -32,11 +32,11 @@ public:
 		const Vector4& tint);
 
 	// Sceneが決めたLightをこのObjectのCPU側へ保持し、Draw時にGPU用バッファへ固定します。
-	void SetDirectionalLight(const Object3d::DirectionalLight& light) { directionalLightData_ = light; }
-	void SetPointLight(const Object3d::PointLight& light) { pointLightData_ = light; }
-	void SetSpotLight(const Object3d::SpotLight& light);
-	void SetSpotLights(const std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount>& lights);
-	const Object3d::DirectionalLight& GetDirectionalLight() const { return directionalLightData_; }
+	void SetDirectionalLight(const Engine::Object3d::DirectionalLight& light) { directionalLightData_ = light; }
+	void SetPointLight(const Engine::Object3d::PointLight& light) { pointLightData_ = light; }
+	void SetSpotLight(const Engine::Object3d::SpotLight& light);
+	void SetSpotLights(const std::array<Engine::Object3d::SpotLight, Engine::Object3d::kMaximumSpotLightCount>& lights);
+	const Engine::Object3d::DirectionalLight& GetDirectionalLight() const { return directionalLightData_; }
 	// Camera用バッファの空き成分で、Objectごとの裏面の明るさを渡します。
 	void SetBackFaceBrightness(float brightness) { cameraData_->backFaceBrightness = brightness; }
 	// 個体別の透明度をCamera用Constant Bufferへ渡します。
@@ -57,15 +57,15 @@ private:
 	struct DrawConstants
 	{
 		Microsoft::WRL::ComPtr<ID3D12Resource> transformResource;
-		Object3d::TransformationMatrix* transformData = nullptr;
+		Engine::Object3d::TransformationMatrix* transformData = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource;
-		Object3d::CameraForGPU* cameraData = nullptr;
+		Engine::Object3d::CameraForGPU* cameraData = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource;
-		Object3d::DirectionalLight* directionalLightData = nullptr;
+		Engine::Object3d::DirectionalLight* directionalLightData = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource;
-		Object3d::PointLight* pointLightData = nullptr;
+		Engine::Object3d::PointLight* pointLightData = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource;
-		Object3d::SpotLightSet* spotLightData = nullptr;
+		Engine::Object3d::SpotLightSet* spotLightData = nullptr;
 	};
 	// SwapChainの枠が再利用可能になるまで、描画ごとの行列・Camera・Lightを残します。
 	struct FrameDrawConstants
@@ -78,9 +78,9 @@ private:
 	struct MirrorDrawConstants
 	{
 		Microsoft::WRL::ComPtr<ID3D12Resource> transformResource;
-		Object3d::TransformationMatrix* transformData = nullptr;
+		Engine::Object3d::TransformationMatrix* transformData = nullptr;
 		Microsoft::WRL::ComPtr<ID3D12Resource> reflectionResource;
-		Object3d::ReflectionData* reflectionData = nullptr;
+		Engine::Object3d::ReflectionData* reflectionData = nullptr;
 	};
 	// SwapChain枠のFence待ち後だけ、同じ鏡面用領域を再利用します。
 	struct FrameMirrorConstants
@@ -95,23 +95,23 @@ private:
 	// 鏡面描画一回分の行列と反射情報バッファを作成します。
 	bool CreateMirrorDrawConstants(MirrorDrawConstants& constants);
 	// 行列・Camera・壁越し表示用のBufferをそれぞれ作り、Map失敗を返します。
-	bool CreateTransformationMatrixData(DirectXCommon* dxCommon);
-	bool CreateCameraData(DirectXCommon* dxCommon);
-	bool CreateOccludedSilhouetteData(DirectXCommon* dxCommon);
+	bool CreateTransformationMatrixData(Engine::DirectXCommon* dxCommon);
+	bool CreateCameraData(Engine::DirectXCommon* dxCommon);
+	bool CreateOccludedSilhouetteData(Engine::DirectXCommon* dxCommon);
 	// 初期化が途中で止まった時、所有するGPU資源とMap先を一緒に外します。
 	void ResetResources();
 	void InitializeDefaultLights();
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource_;
-	Object3d::TransformationMatrix* transformationMatrixData_ = nullptr;
+	Engine::Object3d::TransformationMatrix* transformationMatrixData_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> cameraResource_;
-	Object3d::CameraForGPU* cameraData_ = nullptr;
+	Engine::Object3d::CameraForGPU* cameraData_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12Resource> occludedSilhouetteResource_;
-	Object3d::OccludedSilhouetteData* occludedSilhouetteData_ = nullptr;
-	Object3d::DirectionalLight directionalLightData_{};
-	Object3d::PointLight pointLightData_{};
-	Object3d::SpotLightSet spotLightData_{};
-	DirectXCommon* dxCommon_ = nullptr;
+	Engine::Object3d::OccludedSilhouetteData* occludedSilhouetteData_ = nullptr;
+	Engine::Object3d::DirectionalLight directionalLightData_{};
+	Engine::Object3d::PointLight pointLightData_{};
+	Engine::Object3d::SpotLightSet spotLightData_{};
+	Engine::DirectXCommon* dxCommon_ = nullptr;
 	FrameDrawConstants frameDrawConstants_[kFrameSlotCount]{};
 	FrameMirrorConstants frameMirrorConstants_[kFrameSlotCount]{};
 };

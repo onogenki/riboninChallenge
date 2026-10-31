@@ -5,6 +5,11 @@
 #include <mfapi.h>
 #include <iostream>
 
+using Engine::Audio;
+using Engine::AudioMixer;
+using Engine::BgmPlayer;
+using Engine::SoundEffectPlayer;
+
 namespace
 {
 	// assertに頼らず、NDEBUGの構成でも全てのAPIを実行して失敗を記録します。
@@ -33,7 +38,12 @@ int main(int argc, char** argv)
 	int failures = 0;
 	Audio* audio = Audio::GetInstance();
 	AudioMixer* mixer = AudioMixer::GetInstance();
-	audio->Initialize();
+	// 音声装置が使えなければ、後続の再生結果を初期化失敗と混同しないで終了します。
+	if (!audio->Initialize()) {
+		std::cerr << "Audio initialization failed\n";
+		CoUninitialize();
+		return 1;
+	}
 	Check(!audio->SetVoiceVolume(Audio::kInvalidVoiceId, 0.0f), "invalid volume target", failures);
 	Check(!audio->PauseWave(Audio::kInvalidVoiceId), "invalid pause target", failures);
 	Check(!audio->ResumeWave(Audio::kInvalidVoiceId), "invalid resume target", failures);
@@ -91,7 +101,12 @@ int main(int argc, char** argv)
 	audio->Unload();
 	MFShutdown();
 	// 解放した音声装置をもう一度作り、前のVoiceや音源を引きずらず再利用できるか確認します。
-	audio->Initialize();
+	// 解放後の再初期化も成功を確認してから、Voice生成を検査します。
+	if (!audio->Initialize()) {
+		std::cerr << "Audio reinitialization failed\n";
+		CoUninitialize();
+		return 1;
+	}
 	Check(audio->LoadFile(filename), "reload after audio reinitialization", failures);
 	const Audio::VoiceId restartedVoiceId = audio->PlayWaveLoop(filename, 0.0f);
 	Check(restartedVoiceId != Audio::kInvalidVoiceId, "play after audio reinitialization", failures);

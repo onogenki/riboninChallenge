@@ -4,6 +4,8 @@
 #include <vector>
 
 
+namespace Engine
+{
 // 骨ありモデルのShader結合位置を作り、失敗時は未完成のPipelineへ進みません。
 void Object3dCommon::CreateSkinningRootSignature()
 {
@@ -296,4 +298,5 @@ void Object3dCommon::CreateSkinningComputePipeline()
 		throw std::runtime_error("Object3dCommon: compute skinning pipeline creation failed");
 	}
 }
+} // namespace Engine
 

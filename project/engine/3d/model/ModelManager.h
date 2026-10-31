@@ -19,7 +19,7 @@ public:
 
 	// @brief 初期化済みDirectXを借り、モデル読込が使う共通部を作ります。
 	// @param dxCommon ModelManagerのFinalizeまで生存するDirectX共通部です。
-	void Initialize(DirectXCommon* dxCommon);
+	void Initialize(Engine::DirectXCommon* dxCommon);
 
 	// Managerが所有するモデルと共通部を解放します。
 	void Finalize();

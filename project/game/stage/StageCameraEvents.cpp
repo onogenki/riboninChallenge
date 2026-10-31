@@ -15,6 +15,14 @@ StageCameraEvents::~StageCameraEvents() = default;
 
 namespace
 {
+	// Event Cameraだけに使う操作値です。CameraControllerの通常追従設定とは分けます。
+	constexpr float kEventCameraFocusHeight = 1.0f;
+	constexpr float kEventCameraMinDistance = 3.0f;
+	constexpr float kEventCameraMaxDistance = 20.0f;
+	constexpr float kEventCameraYawRadiansPerPixel = 0.005f;
+	constexpr float kEventCameraPitchRadiansPerPixel = 0.003f;
+	constexpr float kEventCameraWheelDistancePerUnit = 0.005f;
+
 	void ApplyBoxCollider(
 		Transform& transform,
 		ObbCollider& collider,
@@ -165,6 +173,7 @@ void StageCameraEvents::ApplyEdits(
 	}
 }
 
+// Triggerの選択結果からEvent Cameraを切り替え、専用の距離・感度で手動操作を更新します。
 void StageCameraEvents::UpdateEventCamera(
 	Player& player,
 	Engine::CameraManager& cameraManager,
@@ -199,7 +208,7 @@ void StageCameraEvents::UpdateEventCamera(
 		if (cameraFound != eventCameras_.end() && cameraFound->camera) {
 			const Vector3 initialFocus{
 				player.GetPosition().x,
-				player.GetPosition().y + 1.0f,
+				player.GetPosition().y + kEventCameraFocusHeight,
 				player.GetPosition().z,
 			};
 			const Vector3 cameraOffset{
@@ -207,7 +216,7 @@ void StageCameraEvents::UpdateEventCamera(
 				cameraFound->camera->GetTranslate().y - initialFocus.y,
 				cameraFound->camera->GetTranslate().z - initialFocus.z,
 			};
-			const float distance = (std::max)(Length(cameraOffset), 3.0f);
+			const float distance = (std::max)(Length(cameraOffset), kEventCameraMinDistance);
 			const float yaw = std::atan2(-cameraOffset.x, -cameraOffset.z);
 			const float pitch = std::asin(std::clamp(cameraOffset.y / distance, -1.0f, 1.0f));
 			cameraFound->manualController = std::make_unique<Engine::CameraController>();
@@ -236,19 +245,19 @@ void StageCameraEvents::UpdateEventCamera(
 		return;
 	}
 
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	const bool isOrbitInput = input->IsMouseButtonPressed(1);
 	if (isOrbitInput) {
 		activeCameraFound->manualController->AddOrbitYaw(
-			-static_cast<float>(input->GetMouseX()) * 0.005f);
+			-static_cast<float>(input->GetMouseX()) * kEventCameraYawRadiansPerPixel);
 		activeCameraFound->manualController->AddOrbitPitch(
-			-static_cast<float>(input->GetMouseY()) * 0.003f);
+			-static_cast<float>(input->GetMouseY()) * kEventCameraPitchRadiansPerPixel);
 	}
 	const float distance = std::clamp(
 		activeCameraFound->manualController->GetDistance() -
-			static_cast<float>(input->GetMouseWheel()) * 0.005f,
-		3.0f,
-		20.0f);
+			static_cast<float>(input->GetMouseWheel()) * kEventCameraWheelDistancePerUnit,
+		kEventCameraMinDistance,
+		kEventCameraMaxDistance);
 	activeCameraFound->manualController->SetDistance(distance);
 	activeCameraFound->manualController->Update(
 		deltaTime,

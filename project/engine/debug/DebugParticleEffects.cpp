@@ -13,7 +13,7 @@
 // TextureとGroupを既存順に作り、見えない粒子を成功扱いにしないため成否を返します。
 bool DebugParticleEffects::InitializeResources()
 {
-	TextureManager* textureManager = TextureManager::GetInstance();
+	Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
 	Engine::GPUParticle* gpuParticle = Engine::GPUParticle::GetInstance();
 	if (!textureManager->LoadTexture("Resources/debug/uvChecker.png") ||
 		!textureManager->LoadTexture("Resources/debug/circle.png")) {
@@ -176,7 +176,7 @@ void DebugParticleEffects::EmitHitAndRing(const Vector3& effectPosition)
 // Debug用の0・Pキー入力を読み、Particle表示・単発発生を切り替えます。
 void DebugParticleEffects::HandleShortcutInput(const Vector3& effectPosition)
 {
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	if (input->TriggerKey(DIK_0)) {
 		ToggleCylinder(effectPosition);
 	}

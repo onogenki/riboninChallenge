@@ -5,7 +5,7 @@
 #include "Matrix4x4.h"
 
 namespace Engine { class Camera; }
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 
 // DebugのGame View上のMouse座標を、3Dモデル用またはSprite用の配置座標へ変換する部品です。
 class DebugViewportPlacement
@@ -19,7 +19,7 @@ public:
 		Vector3& outPosition);
 	// Game ViewのMouse位置から、Spriteが使う画面ピクセル座標を作ります。
 	static bool TryGetSpritePosition(
-		DirectXCommon* directXCommon,
+		Engine::DirectXCommon* directXCommon,
 		float screenX,
 		float screenY,
 		Vector2& outPosition);

@@ -16,11 +16,11 @@ public:
 	struct Context
 	{
 		// DebugSceneが所有する通常モデルです。所有しません。
-		const std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
+		const std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
 		// DebugSceneが所有するAnimationモデルです。所有しません。
-		const std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
+		const std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
 		// プレビュー中だけ表示するモデルです。所有しません。
-		const Object3d* previewObject = nullptr;
+		const Engine::Object3d* previewObject = nullptr;
 		// trueならScene内モデルではなくpreviewObjectだけを表示します。
 		bool isPreviewMode = false;
 		// ECSで管理するBOX Collider一覧を取得します。所有しません。
@@ -30,7 +30,7 @@ public:
 	};
 
 	// Object3dの頂点をワールド座標へ変換し、Debug表示用のAABBを作ります。
-	static bool BuildWorldAabb(const Object3d& object, MyMath::AABB& outAabb);
+	static bool BuildWorldAabb(const Engine::Object3d& object, MyMath::AABB& outAabb);
 	// Game ViewへColliderの線を描画します。重なりは赤、通常は青で表示します。
 	static void Draw(const Context& context);
 };

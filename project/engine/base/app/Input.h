@@ -7,6 +7,8 @@
 #include"WinApp.h"
 #include"Vector2.h"
 
+namespace Engine
+{
 //操作する機種の種類を表す
 enum class InputDevice
 {
@@ -106,4 +108,5 @@ private:
 	//WindowsAPI
 	WinApp* winApp_ = nullptr;
 };
+} // namespace Engine
 

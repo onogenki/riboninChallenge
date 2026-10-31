@@ -21,6 +21,8 @@
 #include <iomanip>
 #include <sstream>
 
+namespace Engine
+{
 namespace {
 std::string GetEnvironmentString(const char* name)
 {
@@ -59,7 +61,7 @@ CaptureManager* CaptureManager::GetInstance()
 	return &instance;
 }
 
-// 撮影機能を初期化し、対応しない構成のSmokeは待ち続けず失敗を記録します。
+// 通常撮影の要求を初期化してから自動確認の状態と動画形式を設定し、ワーカーを起動します。
 void CaptureManager::Initialize()
 {
 	if (initialized_) {
@@ -74,60 +76,16 @@ void CaptureManager::Initialize()
 	pendingCaptureRequests_.clear();
 	droppedCaptureFrames_ = 0;
 	CreateCaptureDirectories();
-	smokeEnabled_ = GetEnvironmentString("RIBONIN_CHALLENGE_CAPTURE_SMOKE") == "1";
-	performanceBaselineEnabled_ = GetEnvironmentString("RIBONIN_CHALLENGE_CAPTURE_PERF_BASELINE") == "1";
-	if (performanceBaselineEnabled_) {
-		replayBufferEnabled_ = false;
-	}
-	smokeFinished_ = false;
-	smokeFrame_ = 0;
-	smokeDebugFrame_ = 0;
-	smokeCaptureAttempts_ = 0;
-	smokeVisibleCaptures_ = 0;
-	smokeSavedPhotos_ = 0;
-	smokeVideoFrameCount_ = 0;
-	smokePhotoPaths_.clear();
-	smokeFirstVideoFrame_.clear();
-	smokeLastVideoFrame_.clear();
-	smokeFirstReplayFrame_.clear();
-	smokeLastReplayFrame_.clear();
-	smokeVideoWidth_ = 0;
-	smokeVideoHeight_ = 0;
-	smokeReplayFrameCount_ = 0;
-	smokeReplayDroppedFrames_ = 0;
-	smokePerformanceFrameCount_ = 0;
-	smokePerformanceTime_ = 0.0f;
-	smokeMaximumDeltaTime_ = 0.0f;
-	smokeReadbackMilliseconds_ = 0.0;
-	smokeVideoMilliseconds_ = 0.0;
-	smokeReplayMilliseconds_ = 0.0;
-	smokeVideoWorkerMilliseconds_ = 0.0;
-	smokeReadbackSamples_ = 0;
-	smokeVideoSamples_ = 0;
-	smokeReplaySamples_ = 0;
-	smokeVideoWorkerSamples_ = 0;
-	smokeMainVideoPath_.clear();
-	smokeReplayPath_.clear();
-	smokeTrackActiveVideo_ = false;
-	smokeLogPath_ = std::filesystem::path("logs") / "capture_manager_smoke.log";
+	InitializeSmokeState(
+		GetEnvironmentString("RIBONIN_CHALLENGE_CAPTURE_SMOKE") == "1",
+		GetEnvironmentString("RIBONIN_CHALLENGE_CAPTURE_PERF_BASELINE") == "1");
 	const std::string requestedFormat = GetEnvironmentString("RIBONIN_CHALLENGE_CAPTURE_VIDEO_FORMAT");
 	if (requestedFormat == "AVI" || requestedFormat == "avi") {
 		selectedVideoFormat_ = VideoFormat::Avi;
 	} else if (requestedFormat == "MP4" || requestedFormat == "mp4") {
 		selectedVideoFormat_ = VideoFormat::Mp4;
 	}
-	if (smokeEnabled_) {
-		std::ofstream log(smokeLogPath_, std::ios::trunc);
-		if (log) {
-			log << "START common capture smoke\n";
-		}
-	}
-#ifndef USE_IMGUI
-	// Releaseには撮影更新が無いため、Smokeを開始したまま無限待機させません。
-	if (smokeEnabled_) {
-		FinishSmoke(false, "Capture smoke requires a Development or Debug build with USE_IMGUI.");
-	}
-#endif
+	BeginSmokeRun();
 #ifdef USE_IMGUI
 	StartVideoEncoder();
 	StartReplayEncoder();
@@ -197,7 +155,7 @@ std::string CaptureManager::MakeTimestampString() const
 
 bool CaptureManager::CapturePixels(std::vector<unsigned char>& pixels, int& width, int& height) const
 {
-	return DirectXCommon::GetInstance()->CaptureGameTexturePixels(
+	return Engine::DirectXCommon::GetInstance()->CaptureGameTexturePixels(
 		pixels,
 		width,
 		height,
@@ -287,7 +245,7 @@ void CaptureManager::ProcessCompletedCaptures(bool waitForGpu)
 		return;
 	}
 	if (waitForGpu) {
-		DirectXCommon::GetInstance()->WaitForGPU();
+		Engine::DirectXCommon::GetInstance()->WaitForGPU();
 	}
 
 	while (!pendingCaptureRequests_.empty()) {
@@ -296,7 +254,7 @@ void CaptureManager::ProcessCompletedCaptures(bool waitForGpu)
 		int height = 0;
 		const auto readbackStart = std::chrono::steady_clock::now();
 		const bool captureReady =
-			DirectXCommon::GetInstance()->TryGetGameTextureCapturePixels(pixels, width, height);
+			Engine::DirectXCommon::GetInstance()->TryGetGameTextureCapturePixels(pixels, width, height);
 		if (!captureReady) {
 			break;
 		}
@@ -558,7 +516,7 @@ void CaptureManager::UpdateAfterDraw()
 		const std::string& performanceScene = Engine::SceneManager::GetInstance()->GetCurrentSceneName();
 		if (performanceScene == "DEBUG" || performanceScene == "STAGE1") {
 			++smokeDebugFrame_;
-			const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
+			const float deltaTime = Engine::DirectXCommon::GetInstance()->GetDeltaTime();
 			if (smokeDebugFrame_ > 8 && smokeDebugFrame_ < 69) {
 				++smokePerformanceFrameCount_;
 				smokePerformanceTime_ += deltaTime;
@@ -590,7 +548,7 @@ void CaptureManager::UpdateAfterDraw()
 		return;
 	}
 
-	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
+	const float deltaTime = Engine::DirectXCommon::GetInstance()->GetDeltaTime();
 	if (smokeEnabled_ &&
 		Engine::SceneManager::GetInstance()->GetCurrentSceneName() == "DEBUG" &&
 		smokeDebugFrame_ > 8 &&
@@ -634,7 +592,7 @@ void CaptureManager::UpdateAfterDraw()
 		return;
 	}
 
-	if (!DirectXCommon::GetInstance()->QueueGameTextureCapture(
+	if (!Engine::DirectXCommon::GetInstance()->QueueGameTextureCapture(
 		PostEffect::GetInstance()->IsEnabled())) {
 		if (request.recordingFrame || request.replayFrame) {
 			++droppedCaptureFrames_;
@@ -650,3 +608,4 @@ void CaptureManager::UpdateAfterDraw()
 	}
 #endif
 }
+} // namespace Engine

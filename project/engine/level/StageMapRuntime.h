@@ -9,7 +9,7 @@
 #include <vector>
 
 class Object3dRenderContext;
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
 namespace Engine { class Camera; }
 
 // LevelLoaderが読んだ通常3Dモデルを、ゲーム中のObject3dとして管理するクラスです。
@@ -25,7 +25,7 @@ public:
 		// JSON上のtagです。SceneがCameraBoundaryなどの役割で振り分けるために使います。
 		std::string tag;
 		// 画面に描画する3Dモデルです。
-		std::unique_ptr<Object3d> visual;
+		std::unique_ptr<Engine::Object3d> visual;
 		// モデルのTransformを反映して、実際に衝突判定へ使うOBB Colliderです。
 		ObbCollider collider{};
 		// trueならBOX Colliderが設定されています。
@@ -48,7 +48,7 @@ public:
 	};
 
 	// モデル名から完成済みObjectを返す、呼出し元の生成関数です。
-	using CreateObjectFunction = std::function<std::unique_ptr<Object3d>(const std::string& modelName)>;
+	using CreateObjectFunction = std::function<std::unique_ptr<Engine::Object3d>(const std::string& modelName)>;
 	// @brief 呼出し元のFactory関数で通常3D配置物を仮生成し、全件成功後だけ採用します。
 	// @param objectDataList JSON・CSVから分類された配置データです。nullptrの要素は失敗扱いです。
 	// @param createObject モデル名から完成済みObjectを作る有効な関数です。
@@ -62,7 +62,7 @@ public:
 	// @return 共通設定があり、全件を生成できた時だけtrueです。失敗時は旧配置を保持します。
 	bool Rebuild(
 		const std::vector<const LevelLoader::ObjectData*>& objectDataList,
-		Object3dCommon* object3dCommon);
+		Engine::Object3dCommon* object3dCommon);
 	// @brief 既存モデルを作り直さず、Editorで変更したTransformなどだけを反映します。
 	// @param objectDataList 実行中モデルのsourceNameと照合する配置データです。対応のないモデルは維持します。
 	void ApplyEdits(const std::vector<const LevelLoader::ObjectData*>& objectDataList);

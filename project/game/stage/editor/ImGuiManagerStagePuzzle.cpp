@@ -76,7 +76,11 @@ bool ImGuiManager::MirrorDebugWindow(
 		return false;
 	}
 
-	ImGui::Text("Planar Reflection Mirror");
+	// 鏡の詳細を必要な時だけ開き、通常の配置物一覧を画面下へ押し出しません。
+	if (!ImGui::CollapsingHeader("Planar Reflection Mirror")) {
+		ImGui::End();
+		return false;
+	}
 	if (hasReflectionCapture) {
 		ImGui::TextColored(
 			ImVec4(0.35f, 1.0f, 0.55f, 1.0f),

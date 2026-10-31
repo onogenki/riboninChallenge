@@ -6,7 +6,7 @@
 namespace Engine { class Camera; }
 class CarryableMirror;
 class FixedMirror;
-class Object3d;
+namespace Engine { class Object3d; }
 class Player;
 class StageLighting;
 class StageMapRuntime;
@@ -21,7 +21,7 @@ public:
 	{
 		Engine::Camera* activeCamera = nullptr;
 		const StageLighting& lighting;
-		const std::vector<std::unique_ptr<Object3d>>& sceneObjects;
+		const std::vector<std::unique_ptr<Engine::Object3d>>& sceneObjects;
 		StageMapRuntime& stageMapRuntime;
 		const std::vector<std::unique_ptr<FixedMirror>>& fixedMirrors;
 		FixedMirror* mirrorFloor = nullptr;

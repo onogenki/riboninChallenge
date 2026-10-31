@@ -11,6 +11,8 @@
 #include "MyMath.h"
 using namespace MyMath;
 
+namespace Engine
+{
 Object3d::Object3d() = default;
 
 Object3d::~Object3d()
@@ -19,7 +21,7 @@ Object3d::~Object3d()
 }
 
 // 一体分の行列・Camera・輪郭用Bufferが完成してから、このObjectを使用可能にします。
-bool Object3d::Initialize(Object3dCommon* object3dCommon)
+bool Object3d::Initialize(Engine::Object3dCommon* object3dCommon)
 {
 	if (!object3dCommon || !object3dCommon->GetDxCommon()) {
 		Logger::Log("Object3d initialization failed: shared drawing resources are unavailable.");
@@ -51,7 +53,7 @@ bool Object3d::Initialize(Object3dCommon* object3dCommon)
 // 一体のTransform履歴・Animation・描画行列を、フレームの経過時間で順に更新します。
 void Object3d::Update()
 {
-	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
+	const float deltaTime = Engine::DirectXCommon::GetInstance()->GetDeltaTime();
 	transformPlayback_.Update(transform_, deltaTime);
 
 	if (model_ && isAnimating_ && currentAnimation_.duration > 0.0f)
@@ -142,7 +144,7 @@ void Object3d::ClearParentWorldMatrix()
 // 一フレーム前のTransformを、現在のTransformへ戻す履歴として記録します。
 void Object3d::RecordTransformEdit(const Transform& before)
 {
-	RecordTransformEdit(before, DirectXCommon::GetInstance()->GetDeltaTime());
+	RecordTransformEdit(before, Engine::DirectXCommon::GetInstance()->GetDeltaTime());
 }
 
 // 指定秒数を使い、Transform編集の履歴を記録します。
@@ -187,7 +189,7 @@ void Object3d::Draw()
 		if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f) {
 			commandList->SetGraphicsRootDescriptorTable(
 				8,
-				TextureManager::GetInstance()->GetSrvHandleGPU(environmentTexturePath));
+				Engine::TextureManager::GetInstance()->GetSrvHandleGPU(environmentTexturePath));
 		}
 		model_->Draw(skinCluster_, textureSrvIndexOverride_);
 		return;
@@ -207,7 +209,7 @@ void Object3d::Draw()
 	if (!environmentTexturePath.empty() && GetEnvironmentCoefficient() > 0.0f) {
 		commandList->SetGraphicsRootDescriptorTable(
 			7,
-			TextureManager::GetInstance()->GetSrvHandleGPU(environmentTexturePath));
+			Engine::TextureManager::GetInstance()->GetSrvHandleGPU(environmentTexturePath));
 	}
 	model_->Draw(textureSrvIndexOverride_);
 }
@@ -253,7 +255,7 @@ void Object3d::DrawMirror(
 	}
 	commandList->SetGraphicsRootDescriptorTable(
 		2,
-		SrvManager::GetInstance()->GetGPUDescriptorHandle(reflectionTextureSrvIndex));
+		Engine::SrvManager::GetInstance()->GetGPUDescriptorHandle(reflectionTextureSrvIndex));
 	model_->DrawGeometry();
 }
 
@@ -268,13 +270,21 @@ void Object3d::SetModel(const std::string& filePath)
 // 読込成功した画像だけを適用し、生成側が欠損を見逃さないよう成否を返します。
 bool Object3d::SetTextureOverride(const std::string& texturePath)
 {
-	TextureManager* textureManager = TextureManager::GetInstance();
+	Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
 	if (!textureManager->LoadTexture(texturePath)) {
 		Logger::Log("Object3d: texture override load failed: " + texturePath);
 		return false;
 	}
 	textureSrvIndexOverride_ = textureManager->GetSrvIndex(texturePath);
 	return true;
+}
+
+// Debugの手持ち球が従来行っていた共有Modelの変更を明示し、他のModel編集経路は公開しません。
+void Object3d::SetSharedModelTexture(const std::string& texturePath)
+{
+	if (model_) {
+		model_->SetTexture(texturePath);
+	}
 }
 
 // 共用の材質ではなくObject専用の値を変更し、他のplane.objへ影響させません。
@@ -377,7 +387,7 @@ bool Object3d::InitializeAnimation()
 
 	if (isSkeletal_) {
 		constexpr uint32_t kSkinClusterDescriptorCount = 4;
-		if (!SrvManager::GetInstance()->CanAllocate(kSkinClusterDescriptorCount)) {
+		if (!Engine::SrvManager::GetInstance()->CanAllocate(kSkinClusterDescriptorCount)) {
 			skeleton_ = {};
 			skinCluster_ = {};
 			isSkeletal_ = false;
@@ -395,7 +405,7 @@ bool Object3d::InitializeAnimation()
 			isAnimating_ = false;
 			return false;
 		}
-		auto srvHeap = SrvManager::GetInstance()->GetDescriptorHeap();
+		auto srvHeap = Engine::SrvManager::GetInstance()->GetDescriptorHeap();
 		uint32_t descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		if (!model_->CreateSkinCluster(device, skeleton_, modelData, srvHeap, descriptorSize, skinCluster_)) {
@@ -419,7 +429,7 @@ void Object3d::ReleaseSkinClusterDescriptors()
 {
 	auto freeIndex = [](uint32_t& index) {
 		if (index != UINT32_MAX) {
-			SrvManager::GetInstance()->Free(index);
+			Engine::SrvManager::GetInstance()->Free(index);
 			index = UINT32_MAX;
 		}
 	};
@@ -457,3 +467,4 @@ float Object3d::GetEnvironmentCoefficient() const {
 	}
 	return 0.0f;
 }
+} // namespace Engine

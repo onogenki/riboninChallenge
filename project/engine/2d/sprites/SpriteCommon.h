@@ -21,7 +21,7 @@ public:
 	SpriteCommon& operator=(const SpriteCommon&) = delete;
 
 	// SceneからDirectX操作窓口を借り、共通描画設定を完成できた時だけtrueを返します。
-	bool Initialize(DirectXCommon* dxCommon);
+	bool Initialize(Engine::DirectXCommon* dxCommon);
 
 	// Sprite::Drawより先に共通Pipelineと三角形描画を設定します。
 	void SetCommonDrawSetting();
@@ -33,13 +33,13 @@ public:
 	ID3D12GraphicsCommandList* GetCommandList() const { return dxCommon_->GetCommandList(); }
 
 	// Sceneから借りているDirectX操作窓口を、所有権のないポインタで返します。
-	DirectXCommon* GetDxCommon() const { return dxCommon_; }
+	Engine::DirectXCommon* GetDxCommon() const { return dxCommon_; }
 
 private:
 	SpriteCommon() = default;
 	~SpriteCommon() = default;
 
-	DirectXCommon* dxCommon_ = nullptr;
+	Engine::DirectXCommon* dxCommon_ = nullptr;
 
 	// ルートシグネチャ
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;

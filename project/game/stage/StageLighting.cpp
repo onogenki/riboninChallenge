@@ -57,7 +57,7 @@ void StageLighting::ApplyLevel(const LevelLoader::LightingData* lighting)
 			continue;
 		}
 
-		Object3d::SpotLight spotLight{};
+		Engine::Object3d::SpotLight spotLight{};
 		spotLight.color = {
 			spotLightData.color.x,
 			spotLightData.color.y,
@@ -85,7 +85,7 @@ void StageLighting::UpdateLaserSpotLights(
 	spotLights_.fill({});
 	size_t lightIndex = 0;
 	// 最初にJSONで決めたキー・フィル・バックライトを入れ、残りの枠をLaser用に使います。
-	for (const Object3d::SpotLight& stageSpotLight : stageSpotLights_) {
+	for (const Engine::Object3d::SpotLight& stageSpotLight : stageSpotLights_) {
 		if (lightIndex >= spotLights_.size()) {
 			break;
 		}
@@ -112,7 +112,7 @@ void StageLighting::UpdateLaserSpotLights(
 			}
 
 			// Laserの始点・方向・遮蔽物までの長さを、そのまま円錐Lightへ使います。
-			Object3d::SpotLight& spotLight = spotLights_[lightIndex++];
+			Engine::Object3d::SpotLight& spotLight = spotLights_[lightIndex++];
 			spotLight.color = color;
 			spotLight.position = segment.start;
 			spotLight.direction = Normalize(segmentDirection);

@@ -37,6 +37,10 @@ struct LevelEditorResult
 	bool reloadRequested = false;
 	bool saveRequested = false;
 	bool dataChanged = false;
+	// 名前変更はRuntimeの名前対応を作り直すため、通常の値編集と区別します。
+	bool renameRequested = false;
+	std::string requestedName;
+	bool addBoxColliderRequested = false;
 	bool addSphereRequested = false;
 	bool addEventPairRequested = false;
 	bool addCameraAreaRequested = false;
@@ -58,22 +62,25 @@ public:
 	ImGuiManager& operator=(const ImGuiManager&) = delete;
 
 	// ImGuiの初期化とフレーム制御
-	void Initialize(WinApp* winApp, DirectXCommon* dxCommon, SrvManager* srvManager);
+	void Initialize(Engine::WinApp* winApp, Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager);
 	void Begin(const char* sceneName = nullptr);
 	void End();
-	void Draw(DirectXCommon* dxCommon);
+	void Draw(Engine::DirectXCommon* dxCommon);
 	void Finalize();
+	// StageがBegin前に現在番号を渡し、Scene欄で選んだ番号をEnd後に一度だけ受け取ります。
+	void SetStageSelection(int stageId);
+	int TakeRequestedStageId();
 
 	// 共通デバッグウィンドウ
 	void DemoWindow();
 	void FPSWindow();
 	int SpriteWindow(const std::vector<std::unique_ptr<Engine::Sprite>>& sprites, bool embedded = false, int forcedSpriteIndex = -1);
 	void ModelWindow(
-		std::vector<std::unique_ptr<Object3d>>& normalObjects,
-		std::vector<std::unique_ptr<Object3d>>& animationObjects,
-		Object3d::DirectionalLight& light,
-		Object3d::PointLight& pointLight,
-		Object3d::SpotLight& spotLight,
+		std::vector<std::unique_ptr<Engine::Object3d>>& normalObjects,
+		std::vector<std::unique_ptr<Engine::Object3d>>& animationObjects,
+		Engine::Object3d::DirectionalLight& light,
+		Engine::Object3d::PointLight& pointLight,
+		Engine::Object3d::SpotLight& spotLight,
 		bool embedded = false,
 		size_t protectedNormalObjectCount = 0,
 		size_t protectedAnimationObjectCount = 0,
@@ -178,13 +185,15 @@ private:
 	std::string layoutSceneName_;
 	int layoutResetFrames_ = 0;
 
-	WinApp* winApp_ = nullptr;
-	DirectXCommon* dxCommon_ = nullptr;
-	SrvManager* srvManager_ = nullptr;
+	Engine::WinApp* winApp_ = nullptr;
+	Engine::DirectXCommon* dxCommon_ = nullptr;
+	Engine::SrvManager* srvManager_ = nullptr;
 	ImVec2 gameViewImageMin_{};
 	ImVec2 gameViewImageSize_{};
 	ImDrawList* gameViewDrawList_ = nullptr;
 	SceneViewMode activeSceneViewMode_ = SceneViewMode::Game;
 	ImGuiID inspectorDockId_ = 0;
+	int stageSelectionId_ = 0;
+	int requestedStageId_ = 0;
 #endif
 };

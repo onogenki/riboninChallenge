@@ -44,7 +44,7 @@ void DebugScene::InitializeTimePlaybackSmokeFromEnvironment()
 		timePlaybackSmoke_,
 		DebugUiSmoke::IsEnabled(uiSmoke_),
 		modelFile,
-		CaptureManager::GetInstance()->MakeTimestampString(),
+		Engine::CaptureManager::GetInstance()->MakeTimestampString(),
 		MakeTimePlaybackSmokeContext());
 }
 
@@ -61,7 +61,7 @@ void DebugScene::InitializeUiSmokeFromEnvironment()
 	const bool isAnimationSceneTest = smokeMode == "walk-scene" || isHotReloadTest;
 	DebugUiSmoke::Start(
 		uiSmoke_,
-		CaptureManager::GetInstance()->MakeTimestampString(),
+		Engine::CaptureManager::GetInstance()->MakeTimestampString(),
 		isAnimationPreviewTest,
 		isAnimationSceneTest,
 		isHotReloadTest);
@@ -73,10 +73,10 @@ void DebugScene::UpdateAutomation()
 	DebugUiSmoke::Update(uiSmoke_, MakeUiSmokeContext());
 	debugParticleEffects_.UpdateFrame(
 		GetParticleEffectPosition(),
-		DirectXCommon::GetInstance()->GetDeltaTime());
+		Engine::DirectXCommon::GetInstance()->GetDeltaTime());
 
 	DebugTimePlaybackSmoke::Update(
 		timePlaybackSmoke_,
 		MakeTimePlaybackSmokeContext(),
-		DirectXCommon::GetInstance()->GetDeltaTime());
+		Engine::DirectXCommon::GetInstance()->GetDeltaTime());
 }

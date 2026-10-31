@@ -5,7 +5,7 @@
 #include <vector>
 
 class DebugEntityRegistry;
-class Object3d;
+namespace Engine { class Object3d; }
 namespace Engine { class Sprite; }
 
 // DebugSceneのInspector・Edit Viewで使う選択状態だけを管理する部品です。
@@ -32,8 +32,8 @@ public:
 	bool SelectObject(
 		bool isAnimationObject,
 		size_t index,
-		const std::vector<std::unique_ptr<Object3d>>& normalObjects,
-		const std::vector<std::unique_ptr<Object3d>>& animationObjects,
+		const std::vector<std::unique_ptr<Engine::Object3d>>& normalObjects,
+		const std::vector<std::unique_ptr<Engine::Object3d>>& animationObjects,
 		DebugEntityRegistry& entityRegistry);
 	// 指定Spriteを選択し、対応するECS Entityも選択します。範囲外ならfalseです。
 	bool SelectSprite(

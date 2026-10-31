@@ -33,24 +33,24 @@ void LoadingScene::Initialize()
 bool LoadingScene::InitializeLoadingSprite()
 {
 	const char* texturePath = "resources/debug/white.png";
-	if (!TextureManager::GetInstance()->LoadTexture(texturePath)) {
+	if (!Engine::TextureManager::GetInstance()->LoadTexture(texturePath)) {
 		Logger::Log(std::string("LoadingScene initialization failed: white texture could not be loaded: ") + texturePath);
 		return false;
 	}
-	spriteCommon = Engine::SpriteCommon::GetInstance();
-	if (!spriteCommon->Initialize(DirectXCommon::GetInstance())) {
+	spriteCommon_ = Engine::SpriteCommon::GetInstance();
+	if (!spriteCommon_->Initialize(Engine::DirectXCommon::GetInstance())) {
 		return false;
 	}
 
 	auto loadingSprite = std::make_unique<Engine::Sprite>();
-	if (!loadingSprite->Initialize(spriteCommon, texturePath)) {
+	if (!loadingSprite->Initialize(spriteCommon_, texturePath)) {
 		Logger::Log("LoadingScene initialization failed: white Sprite could not be prepared.");
 		return false;
 	}
 	loadingSprite->SetPosition({ 0.0f, 0.0f });
 	loadingSprite->SetAnchorPoint({ 0.0f, 0.0f });
 	// 最初のDrawまでUpdateが呼ばれなくても、その時点の画面サイズで白く覆います。
-	const DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	const Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
 	loadingSprite->SetSize({
 		static_cast<float>(dxCommon->GetClientWidth()),
 		static_cast<float>(dxCommon->GetClientHeight()),
@@ -79,7 +79,7 @@ void LoadingScene::Update()
 	}
 
 	// 全画面背景だけはSpriteの投影に使う実サイズへ合わせ、最大化時の赤い余白を防ぎます。
-	const DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	const Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
 	loadingSprite_->SetSize({
 		static_cast<float>(dxCommon->GetClientWidth()),
 		static_cast<float>(dxCommon->GetClientHeight()),
@@ -95,10 +95,10 @@ void LoadingScene::Draw()
 	}
 	// Spriteが画面端へ届かない一瞬も赤を出さないよう、Loadingだけ描画先全体を白で消去します。
 	const Vector4 whiteClearColor{ 1.0f, 1.0f, 1.0f, 1.0f };
-	SceneRenderPipeline::Begin(DirectXCommon::GetInstance(), &whiteClearColor);
-	spriteCommon->SetCommonDrawSetting();
+	SceneRenderPipeline::Begin(Engine::DirectXCommon::GetInstance(), &whiteClearColor);
+	spriteCommon_->SetCommonDrawSetting();
 	loadingSprite_->Draw();
-	SceneRenderPipeline::End(DirectXCommon::GetInstance(), nullptr, false);
+	SceneRenderPipeline::End(Engine::DirectXCommon::GetInstance(), nullptr, false);
 }
 
 // LoadingSceneは白背景だけを所有するため、それだけを解放します。

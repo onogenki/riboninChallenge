@@ -4,7 +4,7 @@
 #include "Sprite.h"
 
 // 新しく追加したモデルをEntityとして登録し、Inspector選択をそのEntityへ移します。
-void DebugEntityRegistry::RegisterModel(Object3d* object, const std::string& sourceFile, bool isAnimated)
+void DebugEntityRegistry::RegisterModel(Engine::Object3d* object, const std::string& sourceFile, bool isAnimated)
 {
 	selectedEntity_ = world_.CreateModelEntity(object, sourceFile, isAnimated);
 }
@@ -16,7 +16,7 @@ void DebugEntityRegistry::RegisterSprite(Engine::Sprite* sprite, const std::stri
 }
 
 // 初期配置やLevel再読込のモデルを、Inspector選択を変えずに登録します。
-void DebugEntityRegistry::RegisterInitialModel(Object3d* object, const std::string& sourceFile, bool isAnimated)
+void DebugEntityRegistry::RegisterInitialModel(Engine::Object3d* object, const std::string& sourceFile, bool isAnimated)
 {
 	world_.CreateModelEntity(object, sourceFile, isAnimated);
 }
@@ -29,11 +29,11 @@ void DebugEntityRegistry::RegisterInitialSprite(Engine::Sprite* sprite, const st
 
 // 現在のScene一覧にない古いEntityを外し、ECS Systemを更新します。
 void DebugEntityRegistry::Synchronize(
-	const std::vector<std::unique_ptr<Object3d>>& normalObjects,
-	const std::vector<std::unique_ptr<Object3d>>& animationObjects,
+	const std::vector<std::unique_ptr<Engine::Object3d>>& normalObjects,
+	const std::vector<std::unique_ptr<Engine::Object3d>>& animationObjects,
 	const std::vector<std::unique_ptr<Engine::Sprite>>& sprites)
 {
-	std::vector<Object3d*> currentObjects;
+	std::vector<Engine::Object3d*> currentObjects;
 	currentObjects.reserve(normalObjects.size() + animationObjects.size());
 	for (const auto& object : normalObjects) {
 		if (object) {
@@ -62,7 +62,7 @@ void DebugEntityRegistry::Synchronize(
 }
 
 // 選択した見た目Objectに対応するEntityをInspector選択にします。
-void DebugEntityRegistry::SelectObject(const Object3d* object)
+void DebugEntityRegistry::SelectObject(const Engine::Object3d* object)
 {
 	selectedEntity_ = world_.FindEntity(object);
 }

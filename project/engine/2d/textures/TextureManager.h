@@ -9,9 +9,11 @@
 #include "externals/DirectXTex/DirectXTex.h"
 
 // 前方宣言
-class DirectXCommon;
-class SrvManager;
+namespace Engine { class DirectXCommon; }
+namespace Engine { class SrvManager; }
 
+namespace Engine
+{
 // TextureとSRV番号を一元管理し、SpriteやModelへ読込済みTextureを渡します。
 class TextureManager
 {
@@ -22,7 +24,8 @@ public:
 	// @brief 初期化済みのDirectXとSRV管理を借り、Texture登録を始めます。
 	// @param dxCommon GPU資源を生成する共通部。TextureManagerより長く生存させます。
 	// @param srvManager SRV番号の所有者。Finalizeまで生存させます。
-	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
+	// Deviceまたは共有Heapが未準備なら例外を投げ、Textureの登録を始めません。
+	void Initialize(Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager);
 
 	// 所有する全TextureのSRVを返却し、登録を消します。
 	void Finalize();
@@ -61,8 +64,8 @@ private:
 	TextureManager(TextureManager&) = delete;
 	TextureManager& operator=(TextureManager&) = delete;
 
-	DirectXCommon* dxCommon_ = nullptr;
-	SrvManager* srvManager_ = nullptr;
+	Engine::DirectXCommon* dxCommon_ = nullptr;
+	Engine::SrvManager* srvManager_ = nullptr;
 
 	//テクスチャ1枚分のデータ
 	struct TextureData
@@ -86,4 +89,5 @@ private:
 	std::unordered_map<std::string, TextureData> textureDatas_;
 
 };
+} // namespace Engine
 

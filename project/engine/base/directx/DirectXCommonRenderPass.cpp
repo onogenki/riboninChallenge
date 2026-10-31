@@ -1,7 +1,9 @@
 #include "DirectXCommon.h"
 
-#include <cassert>
+#include <stdexcept>
 
+namespace Engine
+{
 // Scene、PostEffect、SwapChainを切り替えるフレーム描画処理をまとめる。
 // Device初期化やTexture Resource作成から分離し、描画順を追いやすくする。
 void DirectXCommon::PreDraw(const Vector4* clearColorOverride)
@@ -260,6 +262,7 @@ void DirectXCommon::PreDrawForSwapChain(bool usePostEffectTexture)
 }
 
 // 描画命令をGPUへ渡してPresentし、Fenceで次のバックバッファの安全な再利用を待ちます。
+// GPU送信や次フレームの準備に失敗した時は、壊れたCommand Listを再利用しないよう中断します。
 void DirectXCommon::PostDraw()
 {
 	//バックバッファの番号取得
@@ -283,18 +286,26 @@ void DirectXCommon::PostDraw()
 
 	// このフレームのコマンド結果だけを保持し、次の描画へ共有しません。
 	HRESULT hr = GetCommandList()->Close();
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		throw std::runtime_error("DirectXCommon: frame command list Close failed.");
+	}
 
 	//GPUにコマンドリストの実行を行わせる
 	Microsoft::WRL::ComPtr < ID3D12CommandList> commandLists[] = { GetCommandList() };
 	commandQueue_->ExecuteCommandLists(1, commandLists->GetAddressOf());
 	//GPUとOSに画面の交渉を行うように通知する
-	swapChain_->Present(1, 0);
+	hr = swapChain_->Present(1, 0);
+	if (FAILED(hr)) {
+		throw std::runtime_error("DirectXCommon: frame Present failed.");
+	}
 
 	//Fenceの値を更新
 	const UINT64 signalValue = ++signaledFenceValue_;
 	//GPUがここまでたどり着いたときに、Fenceの値を指定した値に代入するようにSignalを送る
-	commandQueue_->Signal(fence_.Get(), signalValue);
+	hr = commandQueue_->Signal(fence_.Get(), signalValue);
+	if (FAILED(hr)) {
+		throw std::runtime_error("DirectXCommon: frame fence Signal failed.");
+	}
 	frameFenceValues_[frameIndex_] = signalValue;
 	//Fenceの値が指定したSignal値にたどり着いているか確認する
 	//GetCompletedValueの初期値はFence作成時に渡した初期値
@@ -302,22 +313,32 @@ void DirectXCommon::PostDraw()
 	if (frameFenceValues_[frameIndex_] != 0 && fence_->GetCompletedValue() < frameFenceValues_[frameIndex_])
 	{
 		//指定したSignalにたどり着いていないので、たどり着くまで待つようにイベントを設定する
-		fence_->SetEventOnCompletion(frameFenceValues_[frameIndex_], fenceEvent_);
+		hr = fence_->SetEventOnCompletion(frameFenceValues_[frameIndex_], fenceEvent_);
+		if (FAILED(hr)) {
+			throw std::runtime_error("DirectXCommon: frame fence event setup failed.");
+		}
 		//イベント待つ
-		WaitForSingleObject(fenceEvent_, INFINITE);
+		if (WaitForSingleObject(fenceEvent_, INFINITE) != WAIT_OBJECT_0) {
+			throw std::runtime_error("DirectXCommon: frame fence wait failed.");
+		}
 	}
 
 	//次のフレーム用のコマンドリストを準備
 	hr = commandAllocators_[frameIndex_]->Reset();
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		throw std::runtime_error("DirectXCommon: frame command allocator Reset failed.");
+	}
 	hr = GetCommandList()->Reset(commandAllocators_[frameIndex_].Get(), nullptr);
-	assert(SUCCEEDED(hr));
+	if (FAILED(hr)) {
+		throw std::runtime_error("DirectXCommon: frame command list Reset failed.");
+	}
 	// 次のUpdate/Drawは新しいフレームとして扱い、描画回ごとのUpload領域を先頭から使います。
 	++frameSerial_;
 
 	//FPS固定
 	UpdateFixFPS();
 
+}
 }
 
 

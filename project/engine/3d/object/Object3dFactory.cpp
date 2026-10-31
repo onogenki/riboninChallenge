@@ -7,13 +7,15 @@
 #include "SkyBox.h"
 #include "TextureManager.h"
 
+namespace Engine
+{
 // モデルの読込とObject3d初期化を一箇所にまとめ、描画可能なObject3dを返します。
-std::unique_ptr<Object3d> Object3dFactory::Create(
-	Object3dCommon* object3dCommon,
+std::unique_ptr<Engine::Object3d> Object3dFactory::Create(
+	Engine::Object3dCommon* object3dCommon,
 	const std::string& modelName,
 	bool initializeAnimation)
 {
-	auto object = std::make_unique<Object3d>();
+	auto object = std::make_unique<Engine::Object3d>();
 	if (!InitializeObject(*object, object3dCommon, modelName, initializeAnimation)) {
 		return nullptr;
 	}
@@ -22,12 +24,12 @@ std::unique_ptr<Object3d> Object3dFactory::Create(
 
 // 必須DDSと四つのGPU BufferがそろったSkyBoxだけをSceneへ渡します。
 std::unique_ptr<Engine::SkyBox> Object3dFactory::CreateSkyBox(
-	DirectXCommon* directXCommon,
+	Engine::DirectXCommon* directXCommon,
 	Engine::Camera* camera,
 	const std::string& texturePath)
 {
 	if (!directXCommon || !camera || texturePath.empty() ||
-		!TextureManager::GetInstance()->LoadTexture(texturePath)) {
+		!Engine::TextureManager::GetInstance()->LoadTexture(texturePath)) {
 		return nullptr;
 	}
 
@@ -41,8 +43,8 @@ std::unique_ptr<Engine::SkyBox> Object3dFactory::CreateSkyBox(
 
 // モデル・一体分の描画データ・必要なSkinClusterがそろったObjectだけを渡します。
 bool Object3dFactory::InitializeObject(
-	Object3d& object,
-	Object3dCommon* object3dCommon,
+	Engine::Object3d& object,
+	Engine::Object3dCommon* object3dCommon,
 	const std::string& modelName,
 	bool initializeAnimation)
 {
@@ -65,7 +67,7 @@ bool Object3dFactory::InitializeObject(
 }
 
 // Skeletalモデルだけ、モデルと同名のAnimationを読み込んでLoop再生します。
-bool Object3dFactory::LoadAndPlayAnimation(Object3d& object, const std::string& modelName)
+bool Object3dFactory::LoadAndPlayAnimation(Engine::Object3d& object, const std::string& modelName)
 {
 	if (!object.IsSkeletal() || modelName.empty()) {
 		return false;
@@ -80,3 +82,4 @@ bool Object3dFactory::LoadAndPlayAnimation(Object3d& object, const std::string& 
 	object.SetIsLoop(true);
 	return true;
 }
+} // namespace Engine

@@ -18,7 +18,9 @@ public:
 
 	// 未登録IDなら現在の選択を変えずfalseを返します。
 	bool Select(int stageId);
-	// 有効なIDだけを次のUpdateへ予約し、無効なIDならfalseを返します。
+	// ファイル名が定義されたIDだけを次のUpdateへ予約します。ファイルの存在と読込成功はここでは確認しません。
+	// @param stageId 1〜5の番号です。現時点で完成データがあるのはStage1だけです。
+	// @return 番号を予約できた時だけtrueです。
 	bool Request(int stageId);
 	// Updateの先頭で予約を一度だけ取り出し、予約がなければ0を返します。
 	int TakeRequestedStageId();

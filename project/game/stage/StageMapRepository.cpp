@@ -26,7 +26,7 @@ bool StageMapRepository::SelectAndReload(
 	return false;
 }
 
-// JSON・CSVの両方を読めてから一時採用し、Sceneの生成が失敗したら旧データへ戻します。
+// JSONと、存在する場合はCSVを仮読込し、Sceneへの反映失敗時はRepositoryの旧データへ戻します。
 bool StageMapRepository::Reload(const ApplyLoadedData& applyLoadedData, std::string& status)
 {
 	const StageMapSelection::Definition* definition = selection_.GetDefinition();
@@ -72,16 +72,29 @@ bool StageMapRepository::Reload(const ApplyLoadedData& applyLoadedData, std::str
 	return true;
 }
 
-// 保存結果と監視時刻をそろえ、ゲーム内保存を外部変更として読み直しません。
+// 保存成功時だけ座標系と監視時刻を確定し、失敗時は編集中の座標系を戻します。
 bool StageMapRepository::Save(std::string& status)
 {
 	if (!levelData_) {
 		status = "Save failed. No map data is loaded.";
 		return false;
 	}
-	levelData_->coordinateSystem = "engine";
 	const StageMapSelection::Definition* definition = selection_.GetDefinition();
-	if (!definition || !LevelLoader::Save(definition->levelFileName, *levelData_)) {
+	if (!definition) {
+		status = "Save failed. Check the active stage JSON and its .tmp file.";
+		return false;
+	}
+	const std::string previousCoordinateSystem = levelData_->coordinateSystem;
+	levelData_->coordinateSystem = "engine";
+	bool saved = false;
+	try {
+		saved = LevelLoader::Save(definition->levelFileName, *levelData_);
+	} catch (...) {
+		levelData_->coordinateSystem = previousCoordinateSystem;
+		throw;
+	}
+	if (!saved) {
+		levelData_->coordinateSystem = previousCoordinateSystem;
 		status = "Save failed. Check the active stage JSON and its .tmp file.";
 		return false;
 	}

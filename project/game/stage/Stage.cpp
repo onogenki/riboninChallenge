@@ -86,7 +86,7 @@ void Stage::Initialize()
 		return;
 	}
 	// BGMの再生役だけを準備し、音声ファイルの読込はStage1画面の表示後まで遅らせます。
-	stageBgm_.Initialize(Audio::GetInstance());
+	stageBgm_.Initialize(Engine::Audio::GetInstance());
 	stageLighting_.InitializeDefaults();
 	if (!InitializeStageGimmicks()) {
 		Logger::Log(stageLogPrefix + "required stage gimmick model, texture or light renderer could not be prepared.");
@@ -105,22 +105,22 @@ void Stage::Initialize()
 		return;
 	}
 	// 仮Titleと本編のどちらでも、完成したCameraを使う夜空を一度だけ生成します。
-	skyBox_ = Object3dFactory::CreateSkyBox(
-		DirectXCommon::GetInstance(), cameraManager_->GetActiveCamera(), kSkyBoxTexturePath);
+	skyBox_ = Engine::Object3dFactory::CreateSkyBox(
+		Engine::DirectXCommon::GetInstance(), cameraManager_->GetActiveCamera(), kSkyBoxTexturePath);
 	if (!skyBox_) {
 		Logger::Log(stageLogPrefix + "SkyBox texture could not be loaded: " + kSkyBoxTexturePath);
 		PostQuitMessage(1);
 		return;
 	}
 	if (isTemporaryTitleActive_ &&
-		!stageTitleOverlay_->Initialize(Engine::SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
+		!stageTitleOverlay_->Initialize(Engine::SpriteCommon::GetInstance(), Engine::DirectXCommon::GetInstance())) {
 		// Titleの共通Pipelineが未完成なら描画へ進めず、素材欠損も同じ失敗として止めます。
 		Logger::Log("Temporary title initialization failed: Sprite pipeline or texture could not be prepared.");
 		PostQuitMessage(1);
 		return;
 	}
 	if (stagePauseOverlay_ &&
-		!stagePauseOverlay_->Initialize(Engine::SpriteCommon::GetInstance(), DirectXCommon::GetInstance())) {
+		!stagePauseOverlay_->Initialize(Engine::SpriteCommon::GetInstance(), Engine::DirectXCommon::GetInstance())) {
 		Logger::Log(stageLogPrefix + "pause Sprite pipeline or texture could not be prepared.");
 		PostQuitMessage(1);
 		return;
@@ -132,7 +132,7 @@ void Stage::Initialize()
 // Lightを先に準備し、描けない場合はCamera・Objectを作らず起動を止めます。
 bool Stage::InitializeRenderSystems()
 {
-	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
 	if (!lightPuzzle_.Initialize(dxCommon)) {
 		return false;
 	}
@@ -141,7 +141,7 @@ bool Stage::InitializeRenderSystems()
 
 	// Playerが部屋を見る通常Cameraを、まず作成します。
 	InitializeMainCamera(cameraManager_, mainCamera_, { 0.0f, 1.0f, -12.0f });
-	object3dCommon_ = Object3dCommon::GetInstance();
+	object3dCommon_ = Engine::Object3dCommon::GetInstance();
 	object3dCommon_->Initialize(dxCommon);
 	object3dCommon_->SetDefaultCamera(cameraManager_->GetActiveCamera());
 	sceneObjects_.Initialize(object3dCommon_);
@@ -152,7 +152,7 @@ bool Stage::InitializeRenderSystems()
 bool Stage::InitializeStageGimmicks()
 {
 	const StageLightPuzzle::Settings& puzzleSettings = lightPuzzle_.GetSettings();
-	DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+	Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
 
 	// 床はJSON読込後に配置を上書きするため、ここでは読込失敗時用の初期値を置きます。
 	floor_ = StageGimmickFactory::CreateFloor(sceneObjects_);
@@ -216,10 +216,10 @@ bool Stage::InitializeStageMap()
 	collisionWorld_.Rebuild({
 		floor_,
 		&fixedMirrors_,
-		carryableMirror_.get(),
-		&lightPuzzle_,
+		fixedMirrors_.empty() ? nullptr : carryableMirror_.get(),
+		fixedMirrors_.empty() ? nullptr : &lightPuzzle_,
 		&stageMapRuntime_,
-		lightDoor_ != nullptr,
+		!fixedMirrors_.empty() && lightDoor_ != nullptr,
 	});
 	return true;
 }
@@ -358,7 +358,7 @@ bool Stage::UpdatePauseState()
 		return false;
 	}
 	const bool isGameViewActive = ImGuiManager::GetInstance()->IsGameViewActive();
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	if (pauseState_ == PauseState::kPlaying) {
 		if (!isGameViewActive || !input->TriggerKey(DIK_TAB)) {
 			return false;
@@ -388,15 +388,15 @@ void Stage::Update()
 	}
 	if (stagePauseOverlay_) {
 		stagePauseOverlay_->Update(
-			static_cast<float>(DirectXCommon::GetInstance()->GetClientWidth()),
-			static_cast<float>(DirectXCommon::GetInstance()->GetClientHeight()));
+			static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientWidth()),
+			static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientHeight()));
 	}
 	if (UpdatePauseState()) {
 		return;
 	}
 	// 提出用TitleではStageの描画だけを準備し、Player・Camera追従・BGMは進めません。
 	if (isTemporaryTitleActive_) {
-		DirectXCommon* dxCommon = DirectXCommon::GetInstance();
+		Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
 		const float deltaTime = dxCommon->GetDeltaTime();
 		stageTitleOverlay_->Update(
 			deltaTime,
@@ -413,8 +413,8 @@ void Stage::Update()
 		stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
 		const bool startRequested =
 			ImGuiManager::GetInstance()->IsGameViewActive() &&
-			(Input::GetInstance()->TriggerKey(DIK_RETURN) ||
-				Input::GetInstance()->IsPadButtonPressed(0, 3));
+			(Engine::Input::GetInstance()->TriggerKey(DIK_RETURN) ||
+				Engine::Input::GetInstance()->IsPadButtonPressed(0, 3));
 		if (startRequested) {
 			Engine::SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_SELECT");
 		}
@@ -430,11 +430,11 @@ void Stage::Update()
 	ApplyRequestedStageChange();
 	UpdateStageMapHotReload();
 	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
-		stageMapRuntime_.UpdatePaths(DirectXCommon::GetInstance()->GetDeltaTime());
+		stageMapRuntime_.UpdatePaths(Engine::DirectXCommon::GetInstance()->GetDeltaTime());
 	}
 
 	// ---------- プレイヤーの移動と重力 ----------
-	const float deltaTime = DirectXCommon::GetInstance()->GetDeltaTime();
+	const float deltaTime = Engine::DirectXCommon::GetInstance()->GetDeltaTime();
 	const bool wasLightDeathPlaying = lightDeath_.IsPlaying();
 	if (wasLightDeathPlaying) {
 		UpdateLightDeath(deltaTime);
@@ -451,28 +451,35 @@ void Stage::Update()
 				lightPuzzle_.GetDoorOpenAmount(),
 			},
 			deltaTime);
-		UpdateMirrorGameplay();
-	}
-	UpdateLightPuzzle(deltaTime, !wasLightDeathPlaying);
-	// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
-	hazardLights_.Update(
-		deltaTime,
-		player_ && !wasLightDeathPlaying ? &player_->GetSphere() : nullptr,
-		[this](const std::vector<LaserSegment>& sourceSegments)
-		{
-			return ReflectHazardLightSegments(sourceSegments);
-		});
-	// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
-	stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
-	// 接触判定より先に警告の方向と範囲を更新し、死亡演出へそのまま引き継ぎます。
-	if (player_ && !wasLightDeathPlaying) {
-		stageLightWarning_.Update(*player_, lightPuzzle_, hazardLights_, deltaTime);
-	}
-	if (!wasLightDeathPlaying && !isStageStartPlaying &&
-		(lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit())) {
-		if (player_) {
-			lightDeath_.Begin(*player_, stageLightWarning_);
+		if (!fixedMirrors_.empty()) {
+			UpdateMirrorGameplay();
 		}
+	}
+	if (!fixedMirrors_.empty()) {
+		UpdateLightPuzzle(deltaTime, !wasLightDeathPlaying);
+		// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
+		hazardLights_.Update(
+			deltaTime,
+			player_ && !wasLightDeathPlaying ? &player_->GetSphere() : nullptr,
+			[this](const std::vector<LaserSegment>& sourceSegments)
+			{
+				return ReflectHazardLightSegments(sourceSegments);
+			});
+		// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
+		stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
+		// 接触判定より先に警告の方向と範囲を更新し、死亡演出へそのまま引き継ぎます。
+		if (player_ && !wasLightDeathPlaying) {
+			stageLightWarning_.Update(*player_, lightPuzzle_, hazardLights_, deltaTime);
+		}
+		if (!wasLightDeathPlaying && !isStageStartPlaying &&
+			(lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit())) {
+			if (player_) {
+				lightDeath_.Begin(*player_, stageLightWarning_);
+			}
+		}
+	} else {
+		// 設計開始時のStageでは前StageのLaser光だけを残さず、共通の床と配置物を表示します。
+		stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
 	}
 
 	// ---------- カメラとデバッグ UI の更新 ----------
@@ -483,6 +490,8 @@ void Stage::Update()
 		UpdateStageCamera(deltaTime, isStageStartPlaying);
 	}
 	UpdateReflectionCameras();
+	// 左のScene欄へ現在番号だけを渡し、切替要求はImGui描画後に予約します。
+	ImGuiManager::GetInstance()->SetStageSelection(GetStageId());
 	ImGuiManager::GetInstance()->Begin("Stage1");
 	// Gameplay中もPlayerの球Colliderを表示し、Laser接触を黄色で確認できるようにする
 	if (player_ && !lightDeath_.IsPlaying()) {
@@ -495,6 +504,13 @@ void Stage::Update()
 	DrawStagePuzzleDebugUi();
 	DrawStageEditorUi();
 	ImGuiManager::GetInstance()->End();
+	const int nextStageId = ImGuiManager::GetInstance()->TakeRequestedStageId();
+	if (nextStageId >= 1 && nextStageId != GetStageId()) {
+		// 切替前の編集中データを現在StageのJSONへ保存し、失敗したら番号を変えません。
+		if (SaveStageMap()) {
+			RequestStage(nextStageId);
+		}
+	}
 
 	PrepareStageRenderObjects();
 }
@@ -522,32 +538,34 @@ void Stage::Draw()
 		return;
 	}
 	// ---------- 固定鏡の反射Textureを先に作成 ----------
-	SrvManager::GetInstance()->PreDraw();
+	Engine::SrvManager::GetInstance()->PreDraw();
 	StageReflectionRenderer::Context reflectionContext{};
-	reflectionContext.directXCommon = DirectXCommon::GetInstance();
+	reflectionContext.directXCommon = Engine::DirectXCommon::GetInstance();
 	reflectionContext.object3dCommon = object3dCommon_;
 	reflectionContext.activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	reflectionContext.sceneObjects = &sceneObjects_.GetObjects();
 	reflectionContext.stageMapRuntime = &stageMapRuntime_;
 	reflectionContext.fixedMirrors = &fixedMirrors_;
-	reflectionContext.mirrorFloor = mirrorFloor_.get();
-	reflectionContext.carryableMirror = carryableMirror_.get();
+	reflectionContext.mirrorFloor = fixedMirrors_.empty() ? nullptr : mirrorFloor_.get();
+	reflectionContext.carryableMirror = fixedMirrors_.empty() ? nullptr : carryableMirror_.get();
 	reflectionContext.player = player_.get();
 	reflectionContext.lightPuzzle = &lightPuzzle_;
 	reflectionContext.hazardLights = &hazardLights_;
 	StageReflectionRenderer::DrawOne(reflectionContext, reflectionUpdateCursor_);
 
 	// ---------- ゲーム画面への描画 ----------
-	DirectXCommon::GetInstance()->PreDraw();
+	Engine::DirectXCommon::GetInstance()->PreDraw();
 	StageSceneRenderer::Context sceneRendererContext{};
 	sceneRendererContext.object3dCommon = object3dCommon_;
 	sceneRendererContext.activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	sceneRendererContext.skyBox = skyBox_.get();
 	sceneRendererContext.sceneObjects = &sceneObjects_.GetObjects();
+	sceneRendererContext.floor = floor_;
+	sceneRendererContext.drawStagePuzzle = !fixedMirrors_.empty();
 	sceneRendererContext.stageMapRuntime = &stageMapRuntime_;
 	sceneRendererContext.fixedMirrors = &fixedMirrors_;
-	sceneRendererContext.mirrorFloor = mirrorFloor_.get();
-	sceneRendererContext.carryableMirror = carryableMirror_.get();
+	sceneRendererContext.mirrorFloor = fixedMirrors_.empty() ? nullptr : mirrorFloor_.get();
+	sceneRendererContext.carryableMirror = fixedMirrors_.empty() ? nullptr : carryableMirror_.get();
 	sceneRendererContext.player = player_.get();
 	sceneRendererContext.lightPuzzle = &lightPuzzle_;
 	sceneRendererContext.hazardLights = &hazardLights_;
@@ -569,7 +587,7 @@ void Stage::Draw()
 
 	// PostEffect・SwapChain・ImGui・Presentは、全Scene共通のPipelineへ任せます。
 	SceneRenderPipeline::End(
-		DirectXCommon::GetInstance(),
+		Engine::DirectXCommon::GetInstance(),
 		cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr);
 	// 次のUpdateからBGMを読み込めるよう、最初の本編画面が出たことを記録します。
 	stageBgm_.MarkFrameDrawn();
@@ -585,10 +603,10 @@ bool Stage::UpdateStagePlayer(float deltaTime)
 	collisionWorld_.Rebuild({
 		floor_,
 		&fixedMirrors_,
-		carryableMirror_.get(),
-		&lightPuzzle_,
+		fixedMirrors_.empty() ? nullptr : carryableMirror_.get(),
+		fixedMirrors_.empty() ? nullptr : &lightPuzzle_,
 		&stageMapRuntime_,
-		lightDoor_ != nullptr,
+		!fixedMirrors_.empty() && lightDoor_ != nullptr,
 	});
 	const bool isGameViewActive = ImGuiManager::GetInstance()->IsGameViewActive();
 	const bool isStageStartPlaying =
@@ -618,10 +636,10 @@ bool Stage::UpdateStagePlayer(float deltaTime)
 
 	// Mouse左右クリックで携帯Mirrorを構えている間は、Playerの移動・Jumpを弱めます。
 	const bool isMirrorGuarding =
-		carryableMirror_ &&
+		!fixedMirrors_.empty() && carryableMirror_ &&
 		carryableMirror_->IsCarried() &&
-		(Input::GetInstance()->IsMouseButtonPressed(0) ||
-			Input::GetInstance()->IsMouseButtonPressed(1));
+		(Engine::Input::GetInstance()->IsMouseButtonPressed(0) ||
+			Engine::Input::GetInstance()->IsMouseButtonPressed(1));
 	player_->SetMirrorGuardMode(isMirrorGuarding);
 	// 現在画面に映しているCameraの正面を渡し、WASDを画面基準の移動へ変換します。
 	Vector3 cameraForward{ 0.0f, 0.0f, 1.0f };
@@ -759,7 +777,7 @@ void Stage::UpdateMainCamera()
 	}
 
 	// 通常時のCameraは、矢印キー一回につき一段階だけ位置を変更する
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	bool isCameraStepInput = false;
 	if (input->TriggerKey(DIK_LEFT)) {
 		isCameraStepInput |= cameraController_->TryStepOrbit(1, collisionWorld_.GetCameraBoundaryObbs());
@@ -779,7 +797,7 @@ void Stage::UpdateMainCamera()
 
 	// Playerの進行方向だけを渡し、先読みと自動リセンターに使用する
 	cameraController_->Update(
-		DirectXCommon::GetInstance()->GetDeltaTime(),
+		Engine::DirectXCommon::GetInstance()->GetDeltaTime(),
 		player_->GetPosition(),
 		player_->GetMoveDirection(),
 		isCameraStepInput,
@@ -817,6 +835,8 @@ void Stage::ApplyStageStartSettings(
 		// 持てるMirrorの置き場所は、ほかのStage物と同じくJSONで変更します。
 		carryableMirror_->SetDroppedPosition(carryableMirrorData->translation);
 	}
+	// Stage間で未指定の開始演出値を引き継がないよう、各読込の既定値へ戻します。
+	stageStartSettings_ = {};
 	const LevelLoader::LevelData* levelData = stageMapRepository_.GetLevelData();
 	if (levelData && levelData->hasStageStart) {
 		stageStartSettings_.duration = levelData->stageStart.duration;
@@ -890,8 +910,8 @@ bool Stage::ApplyStageMapData(bool rebuildRuntimeObjects)
 		additionalObjects.push_back(&blockData);
 	}
 
-	// Stage1で必須の床と鏡がなければ、途中まで生成した状態を残さず何も変更しない
-	if (!floorData || mirrorDataList.empty()) {
+	// 床はPlayerの足場として必須です。固定鏡は設計を始めたばかりのStageでは空も許します。
+	if (!floorData) {
 		return false;
 	}
 
@@ -920,6 +940,8 @@ bool Stage::ApplyStageMapData(bool rebuildRuntimeObjects)
 
 	// 失敗し得る生成が終わってから、Sceneが所有する状態をまとめて更新します。
 	ApplyStageStartSettings(playerStartData, carryableMirrorData, mapChipData.playerStartChip);
+	// Lighting未指定のStageへ、直前Stageの色や明るさを持ち越しません。
+	stageLighting_.InitializeDefaults();
 	stageLighting_.ApplyLevel(levelData->hasLighting ? &levelData->lighting : nullptr);
 	ApplyFloorData(*floorData);
 
@@ -931,13 +953,15 @@ bool Stage::ApplyStageMapData(bool rebuildRuntimeObjects)
 	}
 	// Inspector・JSONで変えた基準角度をPuzzleにも渡し、次の更新で元へ戻るのを防ぎます。
 	// プレイ中の充電による回転量は保持し、Levelデータとは分けて扱います。
-	StageLightPuzzle::Settings puzzleSettings = lightPuzzle_.GetSettings();
-	puzzleSettings.largeMirrorBaseYaw = mirrorDataList.front()->rotation.y;
-	lightPuzzle_.SetSettings(puzzleSettings);
-	fixedMirrors_.front()->SetOrientation(
-		fixedMirrors_.front()->GetPitch(),
-		puzzleSettings.largeMirrorBaseYaw +
-		puzzleSettings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount());
+	if (!mirrorDataList.empty()) {
+		StageLightPuzzle::Settings puzzleSettings = lightPuzzle_.GetSettings();
+		puzzleSettings.largeMirrorBaseYaw = mirrorDataList.front()->rotation.y;
+		lightPuzzle_.SetSettings(puzzleSettings);
+		fixedMirrors_.front()->SetOrientation(
+			fixedMirrors_.front()->GetPitch(),
+			puzzleSettings.largeMirrorBaseYaw +
+			puzzleSettings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount());
+	}
 
 	if (rebuildRuntimeObjects) {
 		stageMapRuntime_ = std::move(rebuiltMapRuntime);

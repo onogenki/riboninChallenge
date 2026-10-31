@@ -103,7 +103,7 @@ namespace
 // Factoryへの生成依頼を既存APIに渡し、配置物の採用手順を一つに保ちます。
 bool StageMapRuntime::Rebuild(
 	const std::vector<const LevelLoader::ObjectData*>& objectDataList,
-	Object3dCommon* object3dCommon)
+	Engine::Object3dCommon* object3dCommon)
 {
 	if (!object3dCommon) {
 		return false;
@@ -112,7 +112,7 @@ bool StageMapRuntime::Rebuild(
 		objectDataList,
 		[object3dCommon](const std::string& modelName)
 		{
-			return Object3dFactory::Create(object3dCommon, modelName);
+			return Engine::Object3dFactory::Create(object3dCommon, modelName);
 		});
 }
 

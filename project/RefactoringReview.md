@@ -2,6 +2,189 @@
 
 各節は調査した時点の記録です。後から原因が分かった項目は、日付と検証内容を照合して新しい結論を優先します。
 
+旧52点レビューの28項目を現行作業ツリーと照合した一覧は`ReviewStatus.md`を参照してください。
+
+## 撮影APIの画素順を説明と一致させる（2026-10-29）
+
+- 原因：`DirectXCommon::CaptureGameTexturePixels()`と`TryGetGameTextureCapturePixels()`はGPUのRGBAをCPU側のBGRAへ並べ替えるが、ヘッダと同期読戻しの実装コメントにはRGBAと書かれていた。`CaptureManager::SavePixelsAsPng()`はBGRA形式で保存しており、画面の色ではなく公開説明が誤っていた。
+- 変更：公開APIと実装コメントをBGRAへ訂正し、`CaptureManager`の撮影・BMP・一枚AVI・保存先・録画状態の引数と戻り値を実装に合わせて説明した。画素変換、保存処理、ファイル名、画面の見た目は変更していない。
+- `ImGuiManager`のStage専用UIを`StagePuzzleDebugUi`へ単純移動する案も調べたが、現在はInspectorの表示状態`showModelWindow_`とDock位置`inspectorDockId_`を`ImGuiManager`が所有する。移動だけでは新しい可変状態の公開が必要になり、UIのBegin/Endと配置を壊す可能性があるため、現段階では変更しない。
+- 実際に確認したこと：Development x64 Solutionビルド成功。今回の撮影Smokeは終了コード0・新しいログの`SUCCESS`でDebug写真16/16枚可視、動画・リプレイも保存した。今回のDebug画像を開いて通常モデル・歩行Animationモデル・Lightを確認した。
+- 未確認：同期読戻し`CapturePixels()`と一枚AVI保存`SaveSingleFrameAvi()`は現行自作ソースからの呼出しが見つからず、APIを実行していない。外部レビューの再採点も未実施。
+
+## CaptureManagerの所属をEngineへ揃える（2026-10-29）
+
+- 原因：GPU読戻しと写真・動画・リプレイ保存を所有する共通部品`CaptureManager`がグローバル名前空間に残り、Debug側Contextの型名からエンジン部品であることを判断しにくかった。
+- 変更：宣言と4実装ファイルを`Engine`へ移し、`Framework`・`ImGuiManager`・Debug側の所有しない参照を`Engine::CaptureManager`と明示した。`Framework::Initialize()`→Scene描画後の`SceneManager::Draw()`→`Framework::Finalize()`の呼出し位置、写真・動画・リプレイの保存先、GPU読戻しの処理内容は変えていない。Singletonという共有状態自体は残る。
+- 実際に確認したこと：Development／Release x64 Solutionビルド成功。今回の起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1を描画。撮影SmokeはTitle→Debugで写真16/16枚可視・動画・リプレイ保存、Stage1で写真12/12枚可視、どちらも終了コード0・新しい`SUCCESS`ログ。今回のTitleとStage1の画像を開き、Stage1のPlayer・背景・Lightを確認した。主プロジェクトのcpp/h登録284件とfiltersは一致し、ワイルドカードIncludeは0件。新しいクラッシュダンプはなかった。
+- 未確認：今回の変更後のVisual Studio F5での手入力と白フェードの目視、外部レビューの再採点。
+
+## 旧レビューの死骸判定を再確認する（2026-10-29）
+
+- 元レビューの「Compute Skinning Pipelineは未使用」は現行コードでは当てはまらない。`Object3dCommon::Initialize()`がShaderとPipelineを作り、`Object3d::Draw()`が`SetSkinningComputeSetting()`を呼び、`Model::DispatchSkinning()`がDispatchする。骨付きモデルの壁越し描画で変形済み頂点を使うため、削除しない。
+- `BaseScene::IsFinished()`は公開済みAPIとして保持する。`TitleScene::IsFinished()`は基底と同じ`false`を返すだけで、現行の`SceneManager`は読まないため重複したoverrideを外した。TitleのScene切替は従来どおり`ChangeScene()`の明示予約で行う。
+- `Vector2`・`Vector3`・`Vector4`・`Matrix4x4`の用途コメントは現行ヘッダに既にある。元レビューのクラスコメント不足を理由に同じ説明を追加しない。外部レビューの最新採点は未確認。
+- 実際に確認したこと：Development x64 Solutionビルド成功。今回の起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1を描画。撮影Smokeは終了コード0・16/16枚可視で、今回のTitle画像を開いて表示を確認した。
+- 未確認：今回の変更後のVisual Studio F5での手入力と白フェードの目視、外部レビューの再採点。
+
+## FileHotReloadの所属をEngineへ揃える（2026-10-29）
+
+- 原因：更新時刻だけを監視する共有部品`FileHotReload`がグローバル名前空間にあり、利用する`DebugLevelRuntime`と`StageMapFileMonitor`からエンジン部品であることを型名だけで判断できなかった。
+- 変更：`FileHotReload`の宣言と実装を`Engine`へ移し、両所有先のメンバー型を明示した。`SetFilePath()`・`ConsumeChange()`・`Synchronize()`の処理内容、監視順、JSON/CSVのパスは変えていない。
+- 実際に確認したこと：Development x64 Solutionと`LevelApiSmoke`がビルド成功。`LevelApiSmoke`はJSON/CSV同時変更と一度だけの通知を含め`SUCCESS: failures=0`。今回の起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1を描画。Debug画面の撮影Smokeも終了コード0・16/16枚可視で、今回の画像を開きモデルとライトを確認した。主プロジェクトのcpp/h登録284件とfiltersは一致し、ワイルドカードIncludeは0件。旧レビューにある綴り誤りも現行自作ソース・主プロジェクト・Solutionには見つからなかった。
+- 未確認：Visual Studio F5での今回の変更後の手入力、監視対象ファイルを実際のゲーム画面で編集して反映する操作、外部レビューの再採点。
+
+## WinAppの初期化失敗をFrameworkへ返す（2026-10-29）
+
+- 原因：`WinApp::Initialize()`はCOM・Window Class・Window Handleの準備結果を返さず、`CreateWindow()`失敗後も`Framework::Initialize()`が無効なHandleをDirectXとInputへ渡し得た。初期化途中でも`Finalize()`が無条件で`timeEndPeriod(1)`と`CloseWindow()`を呼んでいた。
+- 変更：`WinApp::Initialize()`はCOM・Window Class・Handleがそろった時だけ`true`を返し、失敗箇所をログに残す。Window生成失敗時は登録したClassを解除する。`Framework`は`false`を既存の終了コード1経路へ渡してScene開始を止める。タイマー精度の解除とWindowの終了操作は開始済みの対象に限る。正常時のWindow名・最大化・表示モード・処理順は変更しない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功。今回の起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1の描画順を確認。Stage1撮影Smokeも終了コード0・12枚可視で、今回の画像を開きPlayer・床・Lightを確認した。
+- 未確認：COM・RegisterClass・CreateWindowの実際の故障時動作、最新変更後のVisual Studio F5でのWindow表示・手入力・BGM聴感、外部レビューの再採点。
+
+## 元レビューの未使用APIと公開可変ゲッターを再照合（2026-10-29）
+
+- `MatrixScreenPrintf()`と旧`GameViewCapture`は現行の自作ソースにない。`D3DResourceLeakChecker`は診断用クラスとして残る。`WinApp::Update()`は現行の呼出元がない空の公開APIだが、既存API維持の方針から今回削除しない。
+- `MyMath::DotVector4()`・`LengthVector4()`・`NormalizeVector4()`・`LerpVector4()`はヘッダで公開され、ゲーム本編からの呼出しは見つからない。4次元演算は数学ユーティリティの一組として実装されているため、未使用だけを理由に公開APIから削除しない。
+- `MapChipType::Checkpoint`と`Goal`は`MapChipField::GetType()`がCSVの`C`と`L`から返す。現在の`StageMapChipFactory`には対応する生成登録がないため、Stage本編の完成ギミックとは数えない。Stage1～5の配置・操作が決まる前に代替物を生成しない。
+- `Object3d::GetTransform()`・`GetSkeleton()`、`Player::GetMovementSettings()`、`Sprite::GetTransform()`は現行ヘッダでconst参照。古い表の「Spriteは可変参照」という記録を訂正した。今回はコード・素材・配置を変更していない。
+
+## Stageの責務を現行コードで再確認（2026-10-29）
+
+- 元レビューは旧`Stage1`の行数と一クラスへの集中を指摘した。現行の`Stage.cpp`は約896行、`Stage.h`は約225行あるが、行数だけでは責務の重複を示せない。
+- `Stage::Initialize()`は描画系→ギミック→マップ→Player/Camera→SkyBox/案内を順に準備し、各失敗で起動を止める。実体の生成は`StageGimmickFactory`・`StageMirrorFactory`・`Object3dFactory`、JSON/CSVと変更監視は`StageMapRepository`・`StageMapRuntime`が担当する。
+- `Stage::Update()`はPause・Title・本編を分け、Player→Mirror/Light→Camera→描画準備の順を決める。危険Lightの軌道と接触は`StageHazardLights`、照明値は`StageLighting`、死亡演出は`StageLightDeath`、BGMは`StageBgmPlayback`、Collider一覧は`StageCollisionWorld`が所有する。`PrepareStageRenderObjects()`は`StageRenderContext`、`Draw()`は専用Rendererと共通`SceneRenderPipeline`へ渡す。
+- `Stage::ApplyStageMapData()`には所有中の床・鏡・Camera等を適用する中心処理が残る。この状態を別クラスへ一括で移すと多数のStage内部参照を渡し直すため、現段階では移譲しない。Stage1～5を共通`Stage`で扱う既定方針を維持する。今回はコード・素材・配置を変更していない。
+
+## Object3dの共有Model操作を明示する（2026-10-29）
+
+- 原因：`Object3d::GetModel()`の可変ポインタは、現行コードでは`DebugAnimationPreview::Initialize()`が手持ち球の共有`Model`にTextureを設定するためだけに使われていた。このポインタは他の材質・頂点も外部から自由に変更でき、共有範囲が呼び出し側から見えにくかった。
+- 変更：`Object3d::SetSharedModelTexture()`へ従来の`Model::SetTexture()`呼び出しを移し、`GetModel()`は読み取り専用ポインタだけを返す。`SetTextureOverride()`には切り替えず、同じ`sphere.obj`を借りる別個体への従来の影響と手持ち球の画像を維持する。新しいcpp/hはない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功。今回のDevelopment撮影SmokeはTitle→Debugで終了コード0・16枚可視・動画とReplayを復号して`SUCCESS`、画像で人型Animationモデルと手持ち球を確認した。Stage1撮影Smokeも終了コード0・12枚可視でPlayer・床・Lightを画像確認。通常起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1の順を確認した。
+- 未確認：最新変更後のVisual Studio F5での手入力とBGM聴感、外部レビューの再採点。共有Textureの変更がDebug以外へ及ぶ設計そのものは維持している。
+
+## Audio初期化の失敗判定とWinApp API説明（2026-10-28）
+
+- 原因：`Audio::Initialize()`はXAudio2・MasteringVoice・Media Foundationのどれに失敗しても`void`で戻り、`Framework::Initialize()`が成功として後続のInput・Scene準備へ進んでいた。`WinApp.h`の公開APIは、`ProcessMessage()`の戻り値やDirectXより先にWindowを作る理由が宣言だけでは分かりにくかった。
+- 変更：`Audio::Initialize()`を成功時だけ`true`を返す`bool`にし、失敗時は従来の部分資源解放後に`false`を返す。`Framework`は`false`を既存の初期化中断経路へ渡し、Sceneを開始しない。`AudioApiSmoke`も初期化と再初期化の結果を確認する。`WinApp`は公開APIに既存書式の日本語コメントを追加した。正常時の音量・再生・Window/Scene順は変更しない。
+- 実際に確認したこと：Development x64と最後のDebug x64ソリューションビルド成功。独立`AudioApiSmoke`は両構成とも32項目PASS・`SUCCESS: failures=0`・終了コード0。今回のDevelopment実行は終了コード0・新しい`startup_route_smoke.log`の`SUCCESS`でLoading→Title→StageSelect→Stage1を描画した。
+- 未確認：XAudio2・MasteringVoice・Media Foundationの実際の故障時動作、最新変更後のVisual Studio F5での手入力とBGM聴感、外部レビューの再採点。
+
+## WinAppをEngine名前空間へ移す（2026-10-28）
+
+- 原因：Windowsウィンドウを所有する`WinApp`はエンジン層の型だが、グローバル名前空間に残っていた。旧レビューの`CaptureManagerSmoke::UpdateSmokeBeforeCapture()`約210行という指摘は現行コードでは該当せず、Scene別の短い関数に分割済みと確認した。
+- 変更：`WinApp`の宣言と実装を`Engine`へ移し、所有者`Framework`とImGui利用側の型参照を更新した。`Input`と`DirectXCommon`は同じ名前空間内で既存の参照を維持する。Window生成、メッセージ処理、表示モード、処理順は変更していない。cpp/hの追加・移動はない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功。今回のDevelopment実行は終了コード0・新しい`startup_route_smoke.log`の`SUCCESS`でLoading→Title→StageSelect→Stage1の順を確認した。Stage1撮影Smokeも終了コード0・12枚すべて可視で、今回の画像を開き床・Player・Lightを確認した。
+- 未確認：変更後のVisual Studio F5による実際のウィンドウ表示と手入力・聴感、外部レビューの再採点。
+
+## Audio再生部品をEngine名前空間へ移す（2026-10-28）
+
+- 原因：共通音声本体の`Audio`と、BGM・SEを分ける`AudioMixer`・`BgmPlayer`・`SoundEffectPlayer`がエンジン層にありながらグローバル名前空間に残っていた。
+- 変更：音声4クラスと内部音源データの`SoundData`を`Engine`へ移し、`Framework`・`Stage`・`StageBgmPlayback`・独立`AudioApiSmoke`の型参照を更新した。`Framework`の初期化→Update→解放、Stage初回描画後のBGM開始、MixerのBGM/SE音量、素材・見た目・操作は変更していない。cpp/hの追加・移動はない。
+- 実際に確認したこと：Development x64とDebug x64のソリューションビルド成功。両構成の`AudioApiSmoke`は各32項目PASS、`SUCCESS: failures=0`、終了コード0。今回のDevelopment x64ゲーム実行は終了コード0・新しい`startup_route_smoke.log`の`SUCCESS`でLoading→Title→StageSelect→Stage1の描画順を確認した。新しいクラッシュダンプと残留プロセスはなかった。
+- 未確認：変更後のVisual Studio F5での実際の聴感と手入力による画面遷移。外部レビューの再採点。
+
+## InputとInputDeviceをEngine名前空間へ移す（2026-10-28）
+
+- 原因：キーボード・マウス・ゲームパッドの一フレーム分の状態を管理する`Input`と操作機器種別の`InputDevice`はエンジン層の型だが、グローバル名前空間に残っていた。
+- 変更：両型の宣言・実装を`Engine`へ移し、利用側15ファイルの型参照と一箇所の前方宣言を更新した。`Framework`がWinAppの後で初期化して毎フレーム更新する順、DirectInputの取得・Trigger判定・マウス補助入力・ゲームパッド再検索、キー割当と操作案内は変えていない。新しいcpp/hはない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功。DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回のDevelopment実行は終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1の描画順とStage1のCamera等のGameplay Smokeを確認した。撮影Smokeは終了コード0・12枚可視で、今回のStage1画像を開きPlayer・部屋・Lightを確認した。ユーザーが今回変更後のVisual Studio Development x64 F5で、Enterの画面遷移、Stage1移動・Camera矢印キー・Tabポーズ・Backspaceが従来どおりと確認した。
+- 未確認：ゲームパッドの実機操作、外部レビューの再採点。
+
+## TextureManager初期化をDevelopmentでも失敗判定する（2026-10-28）
+
+- 原因：`TextureManager::Initialize()`は`dxCommon`をDebugの`assert`でしか検査せず、Deviceと`SrvManager`の共有Heapは未確認だった。無効な引数ならDevelopmentでは後のTexture読込失敗へ遅れて現れ、初期化原因が分かりにくい。
+- 変更：借用ポインタを保存する前にDeviceと共有Heapの存在を確認し、未準備なら`std::invalid_argument`を投げる。`Framework::Initialize()`は既にGPU初期化を`try`で囲み、失敗時にScene開始を止める。通常の初期化順、Texture登録・再読込・解放順、素材・Camera・Light設定は変えていない。変更した関数に判定が必要な理由を日本語で記載した。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功。DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回のDevelopment実行は終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1の描画順、撮影12枚すべて可視を確認した。Stage1画像を開きPlayer・部屋・Lightを確認した。Debug Sceneの`walk-scene` Smokeも終了コード0・新しいログの`SUCCESS`で、frame30・frame90画像を開き背景・通常モデル・Animationモデルを確認した。
+- 未確認：Deviceまたは共有Heapを意図的に未準備にした失敗経路の実行試験、今回変更後のVisual Studio Development x64 F5手入力、外部レビューの再採点。
+
+## TextureManagerをEngine名前空間へ移す（2026-10-28）
+
+- 原因：画像データとSRV番号を一元管理する`TextureManager`はエンジン層の型だが、対応する`Engine::DirectXCommon`・`Engine::SrvManager`と異なりグローバル名前空間に残っていた。
+- 変更：`TextureManager`の宣言・実装を`Engine`名前空間へ移し、利用側26ファイルの型参照を更新した。`Framework`がSrvManagerの後で初期化する順、画像読込・再読込・SRV番号・解放順、DDSパス、モデル・Camera・Light設定は変えていない。新しいcpp/hはない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルドが成功し、DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回のDevelopment実行は終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1の描画順、Stage1の鏡・Light・Camera等のGameplay Smoke、撮影12枚すべて可視を確認した。Stage1画像を開きPlayer・部屋・Lightを確認した。Debug Sceneの`walk-scene` Smokeも終了コード0・新しいログの`SUCCESS`で、frame30・frame90画像を開き背景・通常モデルとAnimationモデルを確認した。
+- 未確認：今回変更後のVisual Studio Development x64 F5による手入力、DDSの全方向を回した表示、Stage2〜5の実データでの画面、外部レビューの再採点。
+- 追記：ユーザーが`Engine::TextureManager`変更後のDevelopment x64 F5でLoading→Title→StageSelect→Stage1とDDS背景・Light・鏡・白フェード・Camera操作を正常と確認した。これは後続のInput変更前の確認である。
+
+## 旧レビューの残項目を現行作業ツリーで再監査する（2026-10-28）
+
+- 元レビューの具体的な誤記`Adapater`・`paletter`・`RasiterZerState`・`enviromentColor`・`Charenge`は、現行のcpp/h/HLSL/主プロジェクト/Solutionに大文字小文字を区別した検索では残っていない。`paletteResource`は正しい単語の後に`Resource`が続く識別子であり、大小文字を無視した`paletter`検索だけでは誤検知する。
+- 主プロジェクトのClCompile149件・ClInclude135件・None6件は、filters側の件数・各物理パスの親フォルダと全件一致した。`ClCompile`・`ClInclude`のワイルドカードIncludeは0件。旧レビューのVisual Studioフィルタ不一致は、現行設定では再現しない。
+- 直下のファイル数は`engine/debug`28件、`game/stage`37件、`resources/shaders`40件。前二者は異なる役割のcpp/hが対になり、Shaderは現在の読込パスと結び付く。件数だけを減らす移動は役割を明確にするとは限らないため、具体的な所有者変更が必要な時に再配置する。
+- `Stage::UpdateMainCamera()`は矢印/R入力を`CameraController`へ渡すゲーム側の対応、`StageCameraEvents`はJSONのEvent Camera・Camera Area、`CameraController`は追従・壁回避を担当する。現時点では入力対応だけの新クラスを増やさず、Stage2〜5で独立した操作規則が生じた時に責任を再検討する。
+- `Stage::Draw()`に残る二種類のContext代入は、所有中の対象を反射用と通常画面用のRendererへ渡す依存一覧である。行列とLightの描画準備は`StageRenderContext::Prepare()`、実際の描画は各Rendererが担当する。同じ参照を別の大きなContextへ詰め直すだけの移動は行わない。
+- `ImGuiManager`・`CaptureManager`などのグローバル型とSingleton、`Logger`の共有Path、C++20設定、未使用だが公開されているAPIは残る。名前空間変更だけではSingletonの共有状態は減らない。依存注入やC++23移行は、実際の所有・初期化・解放順と必要機能を決めてから行う。最新のInput変更後のDevelopment x64 F5操作はユーザーが正常と確認した。Audio・WinApp変更後のF5操作と聴感、外部レビューの再採点は未確認で、現時点の点数は不明。
+
+## SrvManagerの無効な初期化とHandle解放を止める（2026-10-28）
+
+- 原因：`SrvManager::Initialize()`はnullまたはDevice未準備のDirectX操作窓口を受け取ると、そのまま参照していた。`Free(D3D12_CPU_DESCRIPTOR_HANDLE)`はHeap先頭からの距離を範囲確認せず`uint32_t`へ変換するため、遠いHandleの番号が折り返して実在する枠に見える可能性があった。現行のゲーム内呼出しは番号による`Free(uint32_t)`で、Handle版の不正解放を実際に観測したわけではない。
+- 変更：`Initialize()`はDeviceの存在を先に確認して例外で止め、Handle版`Free()`は一枠の幅と最大枠数を確認してから番号へ変換する。通常の初期化・割当・解放順、Heap容量512、公開API、素材・Camera・Light設定は維持した。変更した関数には失敗を止める理由を日本語で記載した。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功。DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回のDevelopment実行は終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1、Stage1の鏡・Light・Camera等、撮影12枚すべて可視を確認した。Stage1画像を開きPlayer・部屋・Lightを確認した。Debug Sceneの`walk-scene` Smokeも終了コード0・新しいログの`SUCCESS`で、frame30・frame90画像を開き通常モデルとAnimationモデルを確認した。
+- 未確認：意図的なnull Deviceと範囲外Handleを渡す失敗経路の実行試験、今回変更後のVisual Studio Development x64 F5手入力、外部レビューの再採点。
+
+## SrvManagerをDirectXCommonと同じEngine名前空間へ移す（2026-10-28）
+
+- 原因：SRV/UAVの番号と共有Descriptor Heapを管理する`SrvManager`はエンジン層の型だが、対応する`Engine::DirectXCommon`と異なりグローバル名前空間に残っていた。`DirectXCommon.h`も`::SrvManager`と明示していた。
+- 変更：`SrvManager`の宣言・実装を`Engine`名前空間へ移し、利用側25ファイルの型参照と四箇所の前方宣言を更新した。`Framework`がDirectXCommonの直後に初期化し、Texture・Model・Particle・Scene描画が同じHeapを借りる順、割当・解放の動作と設定値は変えていない。新しいcpp/hはない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功。DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回のDevelopment実行は終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1の描画順、Stage1の鏡・Light・Camera等のGameplay Smoke、撮影12枚すべて可視を確認した。Stage1画像を開き、Player・部屋・Lightを確認した。Debug Sceneの`walk-scene` Smokeも終了コード0・新しいログの`SUCCESS`で、frame30・frame90画像を開きAnimationモデルと通常モデルを確認した。
+- 未確認：この変更後のVisual Studio Development x64 F5による手入力、Stage2〜5の実データでの画面、外部レビューの再採点。
+
+## 共通描画APIと旧レビューの未使用判定を再確認する（2026-10-28）
+
+- 原因：旧レビューは`Object3dCommon`のComputeスキニングPipelineを未使用の初期化とし、公開APIの引数・戻り値の説明不足も挙げていた。Pipelineを削除する前に現在の呼出し経路を確認する必要がある。
+- 調査：`Object3d::DrawOccludedSilhouette()`は骨付きモデルで`Object3dCommon::SetSkinningComputeSetting()`を呼び、`Model::DispatchSkinning()`からCompute Shaderを実行する。従ってこのPipelineは壁越しシルエットの実際の描画経路で使われ、未使用として削除しない。旧レビューの空関数`MatrixScreenPrintf()`は現行`MyMath.h/.cpp`に存在しない。
+- 変更：`Object3dCommon.h`の主要な公開APIへ、日本語の`@brief`・`@param`・`@return`で共有インスタンス、非所有ポインタ、初期化前のnull、失敗時の例外を記載した。関数本体・呼出順・Pipeline・モデル・Texture・Camera・Light設定は変更していない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルドが成功し、Visual Studio設定由来の警告・エラーはなかった。今回のDevelopment実行は終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1を描画した。
+- 未確認：外部レビューによる再採点と、このコメント変更後のDevelopment x64 F5手入力。
+
+## Object3dCommonをEngine名前空間へ移す（2026-10-28）
+
+- 原因：通常モデル・骨付きモデル・鏡・SkyBoxの共通描画Pipelineを所有する`Object3dCommon`はエンジン層の型だが、生成対象の`Engine::Object3d`や`Engine::Object3dFactory`と異なりグローバル名前空間に残っていた。
+- 変更：宣言と四つの実装ファイルを`Engine`名前空間へ移し、利用側44ファイルの型参照と23箇所の前方宣言を更新した。Sceneから共通設定を借り、Factoryが個体を生成し、描画時にPipelineを使う順序は維持した。GPU資源・Cameraの所有、素材・Lightの設定値、新しいcpp/hは変更していない。
+- 実際に確認したこと：Development x64とDebug x64のビルドが成功し、DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回のDevelopment実行では終了コード0と新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1の描画順、Stage1の鏡・Light・Camera等のGameplay Smoke、撮影12枚すべて可視を確認した。今回のStage1画像を開き、Player・部屋・Lightを確認した。Debug Sceneの`walk-scene` Smokeも終了コード0・新しいログの`SUCCESS`で、frame30・frame90画像を開きAnimationモデルと通常モデルを確認した。
+- 未確認：この変更後のVisual Studio Development x64 F5による手入力、Stage2〜5の実データでの画面、外部レビューの再採点。
+
+## 旧レビューの定数化とStage責任を再照合する（2026-10-28）
+
+- 旧レビューで例示された`GPUParticle.cpp`の0.15・-0.5、`ParticleManager.cpp`の15.0・1.2・0.5、`PostEffect.cpp`の0.5・0.03、`DirectXCommon.cpp`のRTV確保数は、現行コードでは用途名付きの定数またはSwapChain枚数からの計算になっている。数値を別の値へ変える必要はない。
+- `Stage.cpp`は959行、`Stage.h`は249行だが、`Stage::Update()`はPause→マップ更新→Player→鏡とLight→Camera→描画準備の進行を決め、生成はFactory、描画準備はRenderContext、描画はRendererへ渡している。`Stage::ApplyStageMapData()`はIndexとFactoryが仮生成した後の採用順を扱うため、Sceneから機械的に取り除くと更新順と失敗時の状態が変わり得る。
+- `Stage::UpdateMainCamera()`にはキーから通常Camera操作への対応が残る。Stage1〜5で共通の操作として現在の`Stage`が扱っており、既存`StageCameraEvents`はJSONのEvent CameraとCamera Areaを担当する。行数だけを減らす移動やEvent専用クラスへの混在はせず、操作の独立した所有者が必要になった時に分離を判断する。
+- 今回は調査のみで、コード・数値・更新順を変更していない。外部レビューの再採点とStage2〜5の実データでの画面は未確認。
+
+## 3D Object生成APIの所有権と失敗条件を明記する（2026-10-28）
+
+- 原因：`Object3dFactory`の生成・既存Object初期化と`Object3dCollection`の生成・解放では、呼び出し側へ所有権が移る場合と非所有ポインタを貸す場合がある。元レビューの公開関数コメント指摘に対し、この違いと失敗条件を関数宣言だけで追えるようにする。
+- 変更：Factoryの四つの公開関数とCollectionの主要APIへ日本語の`@brief`・`@param`・`@return`を付け、共通描画設定・Cameraは借用、Factoryの生成結果は呼び出し元所有、Collectionの戻り値はCollection所有で`Clear()`時に無効となることを記載した。関数本体、引数、戻り値、生成・描画順、素材の設定は変更していない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功し、DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回の起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1を描画した。ワイルドカードInclude、`git diff --check`の指摘、新しいクラッシュダンプはなかった。`BaseScene::IsFinished()`はSceneManagerに呼ばれず、TitleSceneのoverrideも常にfalseであることを参照検索と実装で確認した。ただし公開仮想APIなので、既存API維持の方針に従い削除は保留した。元レビューでコメント不足とされた`MyMath::Inverse()`と`DirectXCommonCapture.cpp`は、現行コードでは行列式・失敗時の零行列、GPU行ピッチ・状態復元・Fence順の理由が既に説明されており、重複コメントは加えない。
+- 未確認：このコメント変更後のVisual Studio Development x64 F5での手入力、外部レビューの再採点。
+
+## Object3dFactoryをObject3dと同じEngine名前空間へ移す（2026-10-28）
+
+- 原因：`Engine::Object3d`を生成・初期化する`Object3dFactory`だけがグローバルに残り、同じエンジンの生成対象との所属が分かれていた。`Object3d`のprivate初期化へアクセスするfriend宣言にもグローバル修飾が必要だった。
+- 変更：Factoryの宣言・実装を`Engine`へ移し、利用側15ファイルの参照を更新した。friendは同じ名前空間の型として指定する。SceneがFactoryへ生成を依頼し、完成した個体を所有する従来の順序、モデル・Texture・Camera・Lightの値は変えていない。新しいcpp/hはない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功し、DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回の起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1を描画した。Stage1 Gameplay Smokeは終了コード0・新しいログの`SUCCESS`で鏡・Light・Camera等を通した。撮影Smokeは終了コード0・12枚可視で、今回のStage1画像を開きPlayer・部屋・Lightを確認した。Debug Sceneの`walk-scene` Smokeも終了コード0・新しいログの`SUCCESS`で、frame30・frame90画像を開きAnimationモデルと通常モデルを確認した。ワイルドカードInclude、`git diff --check`の指摘、今回の実行から新しいクラッシュダンプはなかった。
+- 未確認：この変更後のVisual Studio Development x64 F5での手入力、Stage2〜5の実データでの画面、外部レビューの再採点。
+
+## Object3dをEngine名前空間へ移す（2026-10-28）
+
+- 原因：一体分のTransform・Animation・Light描画データを所有する`Object3d`はエンジン層の型だが、グローバル名前空間に置かれていた。Factory・Scene・Rendererが同じ型を参照するため、型宣言だけでなく利用側も合わせる必要があった。
+- 変更：`Object3d`の宣言と実装を`Engine`名前空間へ移し、利用側66ファイルの型参照と21箇所の前方宣言を更新した。グローバルに残る`Object3dFactory`とのfriend関係は明示的に維持した。個体の所有、Factoryによる初期化、Sceneの更新、Rendererの描画、設定値・素材は変更していない。新しいcpp/hはない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功し、DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回の起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1を描画した。Stage1 Gameplay Smokeも終了コード0・新しいログの`SUCCESS`で鏡・Light・Camera等を通した。撮影Smokeは終了コード0・12枚可視で、今回のStage1画像を開きPlayer・部屋・Lightを確認した。Debug Sceneの`walk-scene` Smokeも終了コード0・新しいログの`SUCCESS`で、frame30・frame90画像を開きAnimationモデルと通常モデルの描画を確認した。ワイルドカードInclude、`git diff --check`の指摘、今回の実行から新しいクラッシュダンプはなかった。
+- 未確認：この変更後のVisual Studio Development x64 F5での手入力、Stage2〜5の実データでの画面、外部レビューの再採点。
+
+## DirectXCommonをEngine名前空間へ移す（2026-10-28）
+
+- 原因：DirectX 12資源と描画先・フレーム同期を所有する`DirectXCommon`はエンジン層の型なのに、グローバル名前空間に置かれていた。エンジン層とゲーム層の両方から使うため、型の宣言と利用箇所を合わせて整理する必要があった。
+- 変更：`DirectXCommon`の宣言と四つの実装ファイルを`Engine`名前空間へ移し、利用側73ファイルの型参照と20箇所の前方宣言を更新した。`SrvManager`との引数関係はグローバル型を明示し、互換別名は追加しない。GPU資源の所有、初期化・描画・解放順、公開関数の動作、モデル・Texture・Camera・Lightの設定値は変更していない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルドが成功し、DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回のDevelopment実行では終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1の描画順、Stage1の鏡・Light・Camera等のGameplay Smoke、撮影12枚すべて可視を確認した。今回撮影したStage1画像を開き、Player・部屋・Lightを確認した。Debug Sceneの`walk-scene` Smokeも終了コード0・新しいログの`SUCCESS`で、frame30・frame90の画像を開きAnimationモデルと通常モデルの描画を確認した。ユーザーが今回の変更後のVisual Studio Development x64 F5でLoading→Title→StageSelect→Stage1、背景・Light・鏡・白フェード・Camera操作を従来どおりと確認した。ワイルドカードIncludeと`git diff --check`の指摘はなかった。
+- 未確認：Stage2〜5の実データでの画面、外部レビューの再採点。
+
+## CameraをEngine名前空間へ移す（2026-10-28）
+
+- 原因：Scene・描画・Mirror・Particleで共通に使う`Camera`本体はエンジン層の型なのに、グローバル名前空間へ置かれていた。現行の型利用はエンジン層とゲーム層の93ファイルにまたがるため、前方宣言と公開APIも含めて一型ずつ整理する必要があった。
+- 変更：`Camera`の定義と実装を`Engine`名前空間へ移し、71ファイルの型参照を`Engine::Camera`へ、35箇所の前方宣言を対応する名前空間へ変更した。グローバル互換別名は置かない。Sceneによる所有、CameraManagerの非所有登録、行列計算、更新順、位置・画角・Light・素材の値は変更しない。
+- 実際に確認したこと：Development x64と最後のDebug x64ビルド成功し、DebugビルドにVisual Studio設定由来の警告・エラーはなかった。今回の起動経路Smokeは終了コード0・新しいログの`SUCCESS`でLoading→Title→StageSelect→Stage1を描画した。Stage1 Gameplay Smokeも終了コード0・新しいログの`SUCCESS`で鏡・Light・Camera段階操作・壁回避・補間等を通した。撮影Smokeは終了コード0・新しいログの`SUCCESS`で12枚を可視と判定したが、後で写真ファイルが見つからなかったため目視確認の根拠にはしない。Debug Sceneの`walk-scene` Smokeは終了コード0・新しいログの`SUCCESS`で、今回のframe30・frame90画像を開きAnimationモデルの人物、通常モデルの球と地形、Lightを確認した。ユーザーがこの変更後のVisual Studio Development x64 F5でLoading→Title→StageSelect→Stage1、背景・Light・鏡・白フェード・Camera操作を従来どおりと確認した。ワイルドカードInclude、不正な二重修飾、`git diff --check`の指摘、新しいクラッシュダンプはなかった。
+- 未確認：Stage2〜5の実データでの画面と外部レビューの再採点。
+
 ## StageマップAPIの引数と失敗条件を明記する（2026-10-28）
 
 - 原因：元レビューの「公開関数の引数・戻り値が分かりにくい」という指摘に対し、Stage1〜5で共有する`StageMapRepository`の読込・保存と`StageMapRuntime`の仮生成・更新には、処理概要だけのコメントが残っていた。
@@ -127,9 +310,10 @@
 | 重複キャプチャ・文字列変換 | 旧`GameViewCapture`は現行ソースに存在せず、`Audio.cpp`は`StringUtility::ConvertString()`を使う | 全撮影経路の同等性は変更時に引き続き実画面で確認する |
 | 巨大なSmoke関数 | `Stage1GameplaySmoke::Initialize()`は検証関数へ委譲し、`CaptureManager::UpdateSmokeBeforeCapture()`はScene別関数へ振り分ける | 検証の責任が異なる時だけ追加分割する |
 | カプセル化・const参照 | `Object3d`・`Player`の指摘Getterはconst参照、`Sprite::GetTransform()`も読み取り専用。`ParticleManager`の指摘文字列引数もconst参照 | `Object3dFactory`のfriendは未完成個体の初期化だけに限定して残す |
+| レビュー例のマジックナンバー | Particleの初期値、PostEffectの閾値、RTV確保数は用途名付き定数またはSwapChain枚数からの計算へ変更済み | 新しい数値を追加する時は意味を確認して定数化する |
 | フォルダ集中 | `game/stage`直下は37件、描画専用の6件は`game/stage/render`へ移動済み。PreviewとSmokeも専用フォルダへ移動済み | 行数だけで移動せず、役割・所有・VS登録を合わせて再編する |
-| Stageの単一責任 | `Stage.cpp`は959行、`Stage.h`は249行。MapRepository、照明、Light Puzzle、死亡演出、ギミック生成等は専用所有者へ移譲済み | Sceneに残るCamera・編集・マップ反映の責任をさらに分ける |
-| エンジンの名前空間 | Particle、Sprite、Model、SceneManager、SkyBox、CameraController、CameraManagerは`Engine`へ移した | `Object3d`、Camera、DirectXCommon等はグローバルのまま |
+| Stageの単一責任 | `Stage.cpp`は959行、`Stage.h`は249行。MapRepository、照明、Light Puzzle、死亡演出、ギミック生成等は専用所有者へ移譲済み | Sceneに残る入力・採用順は、役割と更新順を維持できる時だけ追加移譲する |
+| エンジンの名前空間 | Particle、Sprite、Model、SceneManager、SkyBox、CameraController、CameraManager、Camera、DirectXCommon、SrvManager、TextureManager、Input、WinApp、Audio再生部品、Object3d、Object3dFactory、Object3dCommonは`Engine`へ移した | その他の型は所有者・利用範囲を確認して個別に判断する |
 | グローバル状態・C++設定 | `Logger.cpp`の`gLogPath`と複数Singletonが残り、三構成とも`stdcpp20` | 所有者と呼出順を設計してから依存注入を検討し、C++23は実際のコンパイラ対応と必要な機能を検証する |
 
 ### 残項目の適用判断（2026-10-28）
@@ -137,10 +321,9 @@
 - Visual Studioの`.vcxproj.filters`にあるClCompile・ClInclude・Noneの286登録を物理パスの親フォルダと一件ずつ照合し、フィルター階層との不一致は0件だった。従来の「主プロジェクト280件とfilters280件が一致」は登録数だけの確認なので、今回の照合を物理配置一致の根拠とする。
 - `CameraManager`の現在の利用では、`StageCameraEvents::Rebuild()`が`Clear()`で古いEvent Camera登録を外してから再登録する。現行`stage1.json`のEvent Camera名も`EventCamera1`〜`EventCamera4`で重複しない。この経路で古いCameraが残る証拠はない。後続の小幅な修正で、公開APIとして同名かつ使用中のCameraを直接再登録した場合も有効ポインタを切り替え、独立Cameraを使うSmokeで検証した。
 - `Logger::gLogPath`はファイルスコープの共有状態として残る。`Framework::Initialize()`が起動時に一度`SetLogPath()`を呼び、エンジン・ゲーム各層の多数の`Log()`が使う。単にクラスの静的メンバへ移しても共有状態は減らないため、所有者と初期化・終了順を決めるまでは変更しない。
-- Stage1のポーズは`PauseState`の三状態を`Stage1::UpdatePauseState()`が一か所で扱う。Scene切替では既に`BaseScene`と`Engine::SceneManager`を使う。ポーズだけに派生Stateを増やすと現在の責任と更新順がかえって追いにくくなるため、状態ごとの固有処理が増えるまでは導入しない。
+- Stageのポーズは`PauseState`の三状態を`Stage::UpdatePauseState()`が一か所で扱う。Scene切替では既に`BaseScene`と`Engine::SceneManager`を使う。ポーズだけに派生Stateを増やすと現在の責任と更新順がかえって追いにくくなるため、状態ごとの固有処理が増えるまでは導入しない。
 - `Stage1GameplaySmoke::Initialize()`は反射・Collider・Cameraの検証関数へ委譲し、`CaptureManager::UpdateSmokeBeforeCapture()`はScene別の関数へ振り分けている。元レビューの行数を現在の関数へそのまま当てはめない。
-- `Object3d`・`Camera`・`DirectXCommon`はまだグローバル名前空間に残る。特に`Object3d`はStage・Debug・描画・Factoryの多数のAPIに渡るため、名前空間だけを目的に一括変更せず、利用者と実画面の確認範囲を決めてから扱う。
-- 現行の利用範囲を数えると`Object3d`は82ファイル、`Camera`は93ファイル、`DirectXCommon`は86ファイルに現れる。ゲーム層だけでも順に26・36・31ファイルで公開型を参照する。既に移した小規模なRendererとは違い、三型をまとめて名前空間へ移すと前方宣言・Factory・Scene・描画のAPIが同時に変わるため、得点だけを目的に一括変更しない。移す場合も一型ずつ、Debug／Developmentの通常経路とモデル・鏡・Lightの実画面を確認する。
+- `Object3d`・`Camera`・`DirectXCommon`は移動前に順に82・93・86ファイルへ現れた。三型を一括変更せず、一型ずつ`Engine`へ移し、型参照・前方宣言とDebug／Developmentの通常経路、モデル・鏡・Lightの実画面を確認した。`Object3dFactory`も後から同じ名前空間へ移した。実行結果と未確認事項は各節に記録する。
 - 三つの構成は現行の`stdcpp20`で同じ機能をビルドしている。C++23へ設定値だけを変えても設計品質の改善を証明できず、実際に必要な機能とコンパイラ対応を確認するまでは移行しない。外部レビューの再採点は未実施なので、現時点の数値評価は不明である。
 
 ポリモーフィズムとState Patternは利用目的を先に確認し、点数のためだけにColliderへ不要な仮想関数や各フレーム用Stateクラスを増やしません。現在の外部評点は不明です。
@@ -245,7 +428,7 @@
 | VSフィルタと実ファイルの一致 | 主プロジェクトの登録302件とfiltersの302件が一致。重複・差分・物理パスとのフィルタ階層違い・ソースIncludeのワイルドカードは各0件 | 今後のファイル追加でも同じ検査を続ける |
 | 文字列変換と撮影の二重管理 | `Audio.cpp`は`StringUtility::ConvertString()`を呼び、旧`GameViewCapture`の自作ファイルは現行ツリーにない | 撮影全経路の同等性は、変更時の実画面と保存結果で引き続き確認する |
 | 巨大なSmoke関数 | `Stage1GameplaySmoke::Initialize()`は入力保存と検証関数の呼出し、`CaptureManager::UpdateSmokeBeforeCapture()`はScene別関数への振分けになっている | 個々の検証関数を行数だけで再分割しない |
-| カプセル化 | `Object3d::GetTransform()`・`GetSkeleton()`、`Player::GetMovementSettings()`はconst参照。`Object3dFactory`のfriend指定は、生成途中の初期化関数だけをFactoryへ開くため残す | `Sprite::GetTransform()`は可変参照の既存公開APIで、現行コードに呼出しは見つからない。互換性を判断する前に削除しない |
+| カプセル化 | `Object3d::GetTransform()`・`GetSkeleton()`、`Player::GetMovementSettings()`、`Sprite::GetTransform()`はconst参照。`Object3dFactory`のfriend指定は、生成途中の初期化関数だけをFactoryへ開くため残す | 共有Modelの変更範囲は別途判断する |
 | Stageの責任と命名規則 | Map選択・ファイル監視・照明・Light Puzzleは専用クラスが存在し、Spriteや主要描画クラスのメンバ名は末尾`_`へ整理済み | Stage全体の責任と全クラスの命名規則を一律に完了とする根拠はまだない |
 
 残る広域の評価項目は、フォルダ名の表記ゆれ、公開APIコメントの網羅性、グローバル状態、エンジン全体の名前空間、C++23への移行などです。現行設定はC++20です。これらは変更範囲や既存APIへの影響が大きいため、100点という数字だけを理由に一括変更しません。新しい外部評価と実際の利用箇所を照らし、必要と判断できた変更を個別に行います。
@@ -461,8 +644,8 @@
 | 20 | 名前空間 | 自作ヘッダ内の`using namespace`は検索で0件。`Logger.h`は不要なDirectX依存と名前空間後の余分なセミコロンを除去。エンジンクラス自体の名前空間化は未判断 | 一部 |
 | 21 | モダンC++ | `auto`・lambda・`unique_ptr`・`span`などを使用。ゲーム本体と独立テストの`.vcxproj`はC++20で、C++23移行は未実施 | 一部 |
 | 22 | コードの死骸 | 空のリークチェッカー、`TitleScene`の常にfalseの状態変数、粒子グループの未使用`textureSrvIndex`を削除。`D3DResourceLeakChecker`は診断用の公開クラスとして保持し、無検討に自動挿入しない | 一部 |
-| 23 | 未使用コード | `BaseScene::IsFinished()`と`TitleScene::IsFinished()`は既存APIとして保持し、後者の戻り値は従来どおりfalse。`D3DResourceLeakChecker`は診断用として保持。利用方針は上記で判断したが、他の未使用コードは継続監査 | 一部 |
-| 24 | カプセル化 | Manager内部型をprivateに整理。`Model::GetModelData()`は読み取りだけと確認してconst参照へ変更。`Framework`の終了状態・SceneFactory所有をprivateにし、Gameは目的別関数で操作。`BaseScene`のprotected状態変数をなくし、各SceneがCameraをprivateで所有する。Debugの手持ち球だけは共有ModelのTextureを変更しており、個体別上書きへの変更は見た目への影響を確認してから判断する | 一部 |
+| 23 | 未使用コード | `BaseScene::IsFinished()`と`TitleScene::IsFinished()`は既存APIとして保持し、後者の戻り値は従来どおりfalse。`D3DResourceLeakChecker`は診断用として保持。4次元数学関数は公開ユーティリティとして保持し、CSVのCheckpoint/Goalは将来のStage用データとして生成登録を増やさない。ほかの未使用コードは継続監査 | 一部 |
+| 24 | カプセル化 | Manager内部型をprivateに整理。`Model::GetModelData()`は読み取りだけと確認してconst参照へ変更。`Framework`の終了状態・SceneFactory所有をprivateにし、Gameは目的別関数で操作。`BaseScene`のprotected状態変数をなくし、各SceneがCameraをprivateで所有する。`Object3d::GetModel()`を読み取り専用にし、Debugの共有Texture変更は名前で分かる専用関数へ限定した。個体別上書きへの変更は見た目への影響を確認してから判断する | 一部 |
 | 25 | クラス分割・移譲 | Scene生成はFactory、描画準備はRenderContext、描画はPipelineへ分担。提出用TitleのSprite生成・所有・更新は既存の`StageTitleOverlay`を専用ファイルに分離。Modelは資源所有、ModelManagerは共有・再読込、Object3dは個体状態と確認し、行数だけの再分割は不要。他領域は継続監査 | 一部 |
 | 26 | ポリモーフィズム | `Framework`→`Game`、`BaseScene`→各Scene、`AbstractSceneFactory`→`SceneFactory`は仮想関数の呼び分けと基底のvirtualデストラクタを確認。`Collider`は共有状態の継承であり、仮想関数の呼び分け例には数えない | 済 |
 | 27 | Stateパターン | `SceneManager`が現在の`BaseScene`を所有してUpdate/Drawを委譲し、Loading・Title・Stage1などが次Sceneを予約する構成がScene単位のState Pattern。Title内の演出列挙型とStageStartは短い固定順なので別Stateクラスを増やさない | 判断済 |
@@ -794,7 +977,7 @@
 
 ## 共有画像と粒子初期化の次の修正範囲（2026-10-08）
 
-- 共有画像：`DebugAnimationPreview::Initialize()`の手持ち球は`GetModel()->SetTexture("Resources/debug/monsterBall.png")`を呼ぶ。`Object3dFactory::Create()`は`ModelManager`から名前で共有Modelを受け、`ModelManager`の一覧はFramework終了まで残る。したがってDebugを経由すると、手持ち球以外に後から作る`debug/sphere.obj`も同じ材質画像を使い得る。`sphere.obj`の元画像は`Model::Initialize()`が設定する`uvChecker.png`。一個体だけの画像指定なら既存の`Object3d::SetTextureOverride()`を使えるが、他の球の見た目が現在と変わるため、画像変更の範囲を確認してから別修正にする。モデル・Texture・配置はこの調査では変更していない。
+- 共有画像：`DebugAnimationPreview::Initialize()`の手持ち球は現在`SetSharedModelTexture("Resources/debug/monsterBall.png")`を呼び、内部で従来と同じ`Model::SetTexture()`を実行する。`Object3dFactory::Create()`は`ModelManager`から名前で共有Modelを受け、`ModelManager`の一覧はFramework終了まで残る。したがってDebugを経由すると、手持ち球以外に後から作る`debug/sphere.obj`も同じ材質画像を使い得る。`sphere.obj`の元画像は`Model::Initialize()`が設定する`uvChecker.png`。一個体だけの画像指定なら既存の`Object3d::SetTextureOverride()`を使えるが、他の球の見た目が現在と変わるため、画像変更の範囲を確認してから別修正にする。モデル・Texture・配置はこの整理では変更していない。
 - GPU初期化：`GPUParticle::Initialize()`は7枠の確認後に5つのCompute用Buffer、7つのSRV/UAV、Shader・Pipeline、描画用Bufferを順に作り、`InitializeParticles()`で初めてGPU命令を出す。現行`CreateParticleBufferResource()`・Pipeline生成はHRESULTを`assert`だけで判定し、`DirectXCommon::CreateBufferResource()`と`CompileShader()`も失敗後に空の資源を返し得る。`ParticleManager::Initialize()`にも同じ失敗経路があり、`Framework::Initialize()`は結果を受け取らない。単一箇所にnullptr判定を足すだけではDevelopmentでの安全な失敗終了にはならず、生成結果、部分生成の解放、Run開始判定を一続きで扱う必要がある。通常成功経路のビルドだけで検証済みとはしない。
 
 ## 粒子グループの置換と失敗時の所有（2026-10-09）

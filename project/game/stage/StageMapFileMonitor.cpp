@@ -1,12 +1,10 @@
 #include "StageMapFileMonitor.h"
 
-// Stage切替の読込成功後だけ監視先を変え、失敗したStageのファイルを見ないようにします。
+// Stage切替の読込成功後だけ監視先を変え、SetFilePathが記録した基準時刻を重ねて更新しません。
 void StageMapFileMonitor::Start(const std::string& levelFilePath, const std::string& mapChipFilePath)
 {
 	jsonFile_.SetFilePath(levelFilePath);
 	mapChipFile_.SetFilePath(mapChipFilePath);
-	jsonFile_.Synchronize();
-	mapChipFile_.Synchronize();
 }
 
 // JSONとCSVを毎回この順に確認し、同時保存でも次フレームへ変更を持ち越さないようにします。

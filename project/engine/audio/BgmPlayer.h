@@ -3,6 +3,8 @@
 #include "Audio.h"
 #include <string>
 
+namespace Engine {
+
 // SceneがBGMを一曲だけ管理するための部品です。
 // Audio本体は効果音を含む実際の再生を担当し、このクラスはBGMのループ・音量・フェードだけを担当します。
 class BgmPlayer
@@ -44,3 +46,5 @@ private:
 	// 曲固有の音量へAudioMixerのBGM全体音量を掛け、実際のVoiceへ設定します。
 	void ApplyMixedVolume();
 };
+
+} // namespace Engine

@@ -11,7 +11,7 @@ using namespace MyMath;
 
 // Modelと白い板画像をそろえ、欠損時は代替画像の鏡をStageへ渡さないようにします。
 bool CarryableMirror::Initialize(
-	Object3dCommon* object3dCommon,
+	Engine::Object3dCommon* object3dCommon,
 	const std::string& modelName,
 	const Vector3& startPosition,
 	float width,
@@ -20,7 +20,7 @@ bool CarryableMirror::Initialize(
 	width_ = (std::max)(width, 0.1f);
 	height_ = (std::max)(height, 0.1f);
 	// 値として所有するMirrorモデルも、Factoryの共通初期化経路を使います。
-	if (!Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
+	if (!Engine::Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
 		return false;
 	}
 	// 持てるMirrorは景色を映さないLaser用の鏡です。白画像が欠けたままUVチェッカーで代用せず、生成失敗を伝えます。

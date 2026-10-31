@@ -24,7 +24,7 @@ public:
 
 	struct ViewportObject {
 		std::string label;
-		Object3d* object = nullptr;
+		Engine::Object3d* object = nullptr;
 	};
 
 	struct ViewportState {
@@ -109,11 +109,11 @@ public:
 		// インスペクターが直接編集するシーンデータとUI制御用の設定。
 		const char* description = nullptr;
 		std::vector<std::unique_ptr<Engine::Sprite>>* sprites = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* normalObjects = nullptr;
-		std::vector<std::unique_ptr<Object3d>>* animationObjects = nullptr;
-		Object3d::DirectionalLight* directionalLight = nullptr;
-		Object3d::PointLight* pointLight = nullptr;
-		Object3d::SpotLight* spotLight = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* normalObjects = nullptr;
+		std::vector<std::unique_ptr<Engine::Object3d>>* animationObjects = nullptr;
+		Engine::Object3d::DirectionalLight* directionalLight = nullptr;
+		Engine::Object3d::PointLight* pointLight = nullptr;
+		Engine::Object3d::SpotLight* spotLight = nullptr;
 		size_t addedSpriteCount = 0;
 		size_t protectedSpriteCount = 0;
 		size_t protectedNormalObjectCount = 0;

@@ -3,7 +3,7 @@
 #include <memory>
 #include <vector>
 
-class DirectXCommon;
+namespace Engine { class DirectXCommon; }
 namespace Engine { class Sprite; }
 namespace Engine { class SpriteCommon; }
 
@@ -15,7 +15,7 @@ public:
 	~GameOverOverlay();
 
 	// 三枚をそろえてから描画へ渡し、案内が欠けた画面を表示しないようにします。
-	bool Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon);
+	bool Initialize(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon);
 	// 画像の透明余白を除き、見出しを上、操作案内を下に並べます。
 	void Update(float clientWidth, float clientHeight);
 	// Scene終了時に、この画面が所有するSpriteだけを解放します。

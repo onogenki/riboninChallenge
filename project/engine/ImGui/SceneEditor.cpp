@@ -183,7 +183,7 @@ namespace {
 
 #endif
 
-	bool BuildEditorWorldBounds(const Object3d& object, Vector3& minimum, Vector3& maximum)
+	bool BuildEditorWorldBounds(const Engine::Object3d& object, Vector3& minimum, Vector3& maximum)
 	{
 		const Engine::Model* model = object.GetModel();
 		if (!model || model->GetModelData().vertices.empty()) {
@@ -428,7 +428,7 @@ void SceneEditor::DrawModelShelf(ShelfState& state, const ShelfCallbacks& callba
 			const ImVec2 imageSize(textureWidth * imageScale, textureHeight * imageScale);
 			const ImVec2 imageMin(previewMin.x + (previewWidth - imageSize.x) * 0.5f, previewMin.y + (previewHeight - imageSize.y) * 0.5f);
 			const ImVec2 imageMax(imageMin.x + imageSize.x, imageMin.y + imageSize.y);
-			D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = TextureManager::GetInstance()->GetSrvHandleGPU(entry.textureFilePath);
+			D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = Engine::TextureManager::GetInstance()->GetSrvHandleGPU(entry.textureFilePath);
 			drawList->PushClipRect(previewMin, previewMax, true);
 			drawList->AddImage(ImTextureRef(static_cast<ImTextureID>(textureHandle.ptr)), imageMin, imageMax);
 			drawList->PopClipRect();
@@ -558,7 +558,7 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 	// Transform切替とCamera編集は、Viewport本体とは別の小さな操作パネルへ任せます。
 	const bool toolbarHovered = DrawViewportToolbar(state, options, rectX, rectY);
 
-	Object3d* selectedObject = state.selectedIndex >= 0
+	Engine::Object3d* selectedObject = state.selectedIndex >= 0
 		? options.objects[state.selectedIndex].object
 		: nullptr;
 	bool gizmoHovered = false;
@@ -716,7 +716,7 @@ void SceneEditor::DrawViewportEditor(ViewportState& state, const ViewportOptions
 		float bestScore = (std::numeric_limits<float>::max)();
 		int bestIndex = -1;
 		for (int index = 0; index < static_cast<int>(options.objects.size()); ++index) {
-			Object3d* object = options.objects[index].object;
+			Engine::Object3d* object = options.objects[index].object;
 			Vector3 boundsMin{};
 			Vector3 boundsMax{};
 			if (!object || !BuildEditorWorldBounds(*object, boundsMin, boundsMax)) {

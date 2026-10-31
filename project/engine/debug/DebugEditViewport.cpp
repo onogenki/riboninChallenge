@@ -24,7 +24,7 @@ void DebugEditViewport::DrawModelViewport(const Context& context)
 	SceneEditor::ViewportOptions options{};
 	options.camera = context.camera;
 	for (size_t index = 0; index < context.normalObjects->size(); ++index) {
-		Object3d* object = (*context.normalObjects)[index].get();
+		Engine::Object3d* object = (*context.normalObjects)[index].get();
 		const std::string modelName = object && !object->GetModelName().empty()
 			? object->GetModelName()
 			: "Model";
@@ -32,7 +32,7 @@ void DebugEditViewport::DrawModelViewport(const Context& context)
 	}
 	const size_t animationOffset = options.objects.size();
 	for (size_t index = 0; index < context.animationObjects->size(); ++index) {
-		Object3d* object = (*context.animationObjects)[index].get();
+		Engine::Object3d* object = (*context.animationObjects)[index].get();
 		const std::string modelName = object && !object->GetModelName().empty()
 			? object->GetModelName()
 			: "Animation Model";

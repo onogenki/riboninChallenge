@@ -131,7 +131,7 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 			Finish(state, false, "The scene animation path was replaced or the added model was removed.");
 			return;
 		}
-		const Object3d* addedObject = context.animationObjects->at(state.animationObjectIndex).get();
+		const Engine::Object3d* addedObject = context.animationObjects->at(state.animationObjectIndex).get();
 		if (!addedObject || addedObject->GetModelName() != state.modelFile ||
 			!addedObject->IsSkeletal() || !addedObject->IsAnimating() || addedObject->GetAnimationDuration() <= 0.0f) {
 			Finish(state, false, "Added walk.gltf has no active skeletal animation.");
@@ -149,7 +149,7 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 			const std::string handTextureBeforeReload =
 				handModel->GetModelData().materials.front().textureFilePath;
 			Engine::ModelManager::GetInstance()->ReloadAllLoadedModels();
-			TextureManager::GetInstance()->ReloadAllLoadedTextures();
+			Engine::TextureManager::GetInstance()->ReloadAllLoadedTextures();
 			if (addedObject->GetModel() != modelBeforeReload ||
 				addedObject->GetEnvironmentCoefficient() != environmentBeforeReload ||
 				handModel->GetModelData().materials.empty() ||
@@ -192,7 +192,7 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 		return;
 	}
 
-	Object3d* addedObject = context.normalObjects->back().get();
+	Engine::Object3d* addedObject = context.normalObjects->back().get();
 	const size_t addedObjectIndex = context.normalObjects->size() - 1;
 	MyMath::AABB addedAabb{};
 	if (!addedObject || !context.buildWorldAabb(*addedObject, addedAabb)) {
@@ -230,7 +230,7 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 		previewAfterFailure.isModelPreviewMode || previewAfterFailure.isTexturePreviewMode ||
 		selectionAfterFailure.selectedObjectIndex != addedObjectIndex ||
 		!selectionAfterFailure.hasSelectedObject || selectionAfterFailure.hasSelectedSprite ||
-		TextureManager::GetInstance()->Contains(kMissingTexture)) {
+		Engine::TextureManager::GetInstance()->Contains(kMissingTexture)) {
 		Finish(state, false, "A missing UI texture changed the scene, preview, or texture registry.");
 		return;
 	}
@@ -247,7 +247,7 @@ void DebugUiSmoke::Update(State& state, const Context& context)
 		existingSprite->GetSize().y != originalSize.y ||
 		existingSprite->GetTextureSize().x != originalTextureSize.x ||
 		existingSprite->GetTextureSize().y != originalTextureSize.y ||
-		TextureManager::GetInstance()->Contains(kMissingTexture)) {
+		Engine::TextureManager::GetInstance()->Contains(kMissingTexture)) {
 		Finish(state, false, "A missing texture changed an existing Sprite or created a texture registration.");
 		return;
 	}
@@ -339,7 +339,7 @@ void DebugUiSmoke::UpdateAfterDraw(State& state, const Context& context)
 	}
 	if (state.isAnimationSceneTest) {
 		// 保存成功と画面上の可視性は別なので、ログは描画確認用画像を作れた事実だけを記録します。
-		const Object3d& addedObject = *context.animationObjects->at(state.animationObjectIndex);
+		const Engine::Object3d& addedObject = *context.animationObjects->at(state.animationObjectIndex);
 		const Vector3& position = addedObject.GetTranslate();
 		const std::string captureMessage = "scene=DEBUG model=" + state.modelFile +
 			" frame=" + std::to_string(state.frame) +

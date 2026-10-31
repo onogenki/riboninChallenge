@@ -27,7 +27,7 @@ bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device
 		return false;
 	}
 	SkinCluster skinCluster{};
-	SrvManager* srvManager = SrvManager::GetInstance();
+	Engine::SrvManager* srvManager = Engine::SrvManager::GetInstance();
 	// 途中失敗時は、Map先・Buffer・取得済みDescriptorを同じ所有者から片付けます。
 	auto fail = [&](const char* message) {
 		Logger::Log(message);
@@ -50,7 +50,7 @@ bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device
 	};
 	//マネージャから次使っていい番号をもらう
 	uint32_t srvIndex = srvManager->Allocate();
-	if (srvIndex == SrvManager::kInvalidSrvIndex) {
+	if (srvIndex == Engine::SrvManager::kInvalidSrvIndex) {
 		return fail("Model: no palette SRV available for SkinCluster.");
 	}
 	skinCluster.paletteSrvIndex = srvIndex;
@@ -81,7 +81,7 @@ bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device
 	device->CreateShaderResourceView(skinCluster.paletteResource.Get(), &paletteSrvDesc, skinCluster.paletteSrvHandle.first);
 
 	uint32_t inputVertexSrvIndex = srvManager->Allocate();
-	if (inputVertexSrvIndex == SrvManager::kInvalidSrvIndex) {
+	if (inputVertexSrvIndex == Engine::SrvManager::kInvalidSrvIndex) {
 		return fail("Model: no input vertex SRV available for SkinCluster.");
 	}
 	skinCluster.inputVertexSrvIndex = inputVertexSrvIndex;
@@ -109,7 +109,7 @@ bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device
 	skinCluster.influenceBufferView.StrideInBytes = sizeof(VertexInfluence);
 
 	uint32_t influenceSrvIndex = srvManager->Allocate();
-	if (influenceSrvIndex == SrvManager::kInvalidSrvIndex) {
+	if (influenceSrvIndex == Engine::SrvManager::kInvalidSrvIndex) {
 		return fail("Model: no influence SRV available for SkinCluster.");
 	}
 	skinCluster.influenceSrvIndex = influenceSrvIndex;
@@ -147,7 +147,7 @@ bool Model::CreateSkinCluster(const Microsoft::WRL::ComPtr<ID3D12Device>& device
 	skinCluster.outputVertexBufferView.StrideInBytes = sizeof(VertexData);
 
 	uint32_t outputVertexUavIndex = srvManager->Allocate();
-	if (outputVertexUavIndex == SrvManager::kInvalidSrvIndex) {
+	if (outputVertexUavIndex == Engine::SrvManager::kInvalidSrvIndex) {
 		return fail("Model: no output vertex UAV available for SkinCluster.");
 	}
 	skinCluster.outputVertexUavIndex = outputVertexUavIndex;
@@ -261,8 +261,8 @@ void Model::Draw(const SkinCluster& skinCluster, uint32_t textureSrvIndexOverrid
 	{
 		const MaterialData& material = modelData_.materials[mesh.materialIndex];
 		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
-			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
-			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+			? Engine::SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
+			: Engine::TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
 		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
 	}
@@ -320,8 +320,8 @@ void Model::DrawSkinned(const SkinCluster& skinCluster, uint32_t textureSrvIndex
 	{
 		const MaterialData& material = modelData_.materials[mesh.materialIndex];
 		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
-			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
-			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+			? Engine::SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
+			: Engine::TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
 		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
 	}

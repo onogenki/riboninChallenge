@@ -10,7 +10,7 @@
 #include <algorithm>
 
 // 棚の情報を使ってObject3dを生成し、必要なAnimationだけを設定します。
-std::unique_ptr<Object3d> DebugSceneContent::CreateObject(
+std::unique_ptr<Engine::Object3d> DebugSceneContent::CreateObject(
 	const Context& context,
 	const std::string& fileName,
 	bool playAnimation)
@@ -29,13 +29,13 @@ std::unique_ptr<Object3d> DebugSceneContent::CreateObject(
 		return nullptr;
 	}
 
-	auto object = Object3dFactory::Create(context.object3dCommon, fileName, playAnimation);
+	auto object = Engine::Object3dFactory::Create(context.object3dCommon, fileName, playAnimation);
 	if (!object) {
 		return nullptr;
 	}
 
 	if (object->IsSkeletal() && modelIt->hasAnimation && playAnimation) {
-		Object3dFactory::LoadAndPlayAnimation(*object, fileName);
+		Engine::Object3dFactory::LoadAndPlayAnimation(*object, fileName);
 	}
 
 	return object;
@@ -68,7 +68,7 @@ bool DebugSceneContent::AddModel(
 
 	object->SetTranslate(spawnPosition);
 	const bool isAnimated = object->IsSkeletal();
-	Object3d* addedObject = object.get();
+	Engine::Object3d* addedObject = object.get();
 	if (isAnimated) {
 		context.animationObjects->push_back(std::move(object));
 		if (context.selectObject) {
@@ -109,7 +109,7 @@ bool DebugSceneContent::AddTexture(
 		return false;
 	}
 	// 読み込みに失敗したSpriteをSceneへ登録すると、次のUpdateで画像情報を取得できなくなります。
-	if (!TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
+	if (!Engine::TextureManager::GetInstance()->LoadTexture(textureFilePath)) {
 		return false;
 	}
 	auto sprite = std::make_unique<Engine::Sprite>();

@@ -10,12 +10,12 @@ class ModelCommon
 {
 public:
 	// Modelを作る前に、ModelManagerからDirectX操作窓口を受け取ります。
-	void Initialize(DirectXCommon* dxCommon);
+	void Initialize(Engine::DirectXCommon* dxCommon);
 	// ModelのGPU資源生成に使う、所有権のないDirectX操作窓口を返します。
-	DirectXCommon* GetDxCommon() const { return dxCommon_; }
+	Engine::DirectXCommon* GetDxCommon() const { return dxCommon_; }
 
 private:
-	DirectXCommon* dxCommon_ = nullptr;
+	Engine::DirectXCommon* dxCommon_ = nullptr;
 };
 
 }

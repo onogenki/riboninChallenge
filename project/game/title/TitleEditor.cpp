@@ -123,7 +123,7 @@ void TitleEditor::DrawInspector(const Context& context)
 		if (index >= context.sprites->size() || index < context.baseSpriteCount) {
 			return;
 		}
-		DirectXCommon::GetInstance()->WaitForGPU();
+		Engine::DirectXCommon::GetInstance()->WaitForGPU();
 		context.sprites->erase(context.sprites->begin() + static_cast<std::ptrdiff_t>(index));
 		if (context.sprites->empty()) {
 			ClearSelection();
@@ -145,7 +145,7 @@ void TitleEditor::DrawModelViewport(const Context& context)
 	SceneEditor::ViewportOptions options{};
 	options.camera = context.camera;
 	for (size_t index = 0; index < context.normalObjects->size(); ++index) {
-		Object3d* object = (*context.normalObjects)[index].get();
+		Engine::Object3d* object = (*context.normalObjects)[index].get();
 		const std::string name = object && !object->GetModelName().empty()
 			? object->GetModelName()
 			: "Title Model";
@@ -153,7 +153,7 @@ void TitleEditor::DrawModelViewport(const Context& context)
 	}
 	const size_t animationOffset = options.objects.size();
 	for (size_t index = 0; index < context.animationObjects->size(); ++index) {
-		Object3d* object = (*context.animationObjects)[index].get();
+		Engine::Object3d* object = (*context.animationObjects)[index].get();
 		const std::string name = object && !object->GetModelName().empty()
 			? object->GetModelName()
 			: "Title Animation";

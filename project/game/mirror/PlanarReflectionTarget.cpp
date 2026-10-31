@@ -12,8 +12,8 @@ PlanarReflectionTarget::~PlanarReflectionTarget()
 }
 
 bool PlanarReflectionTarget::Initialize(
-	DirectXCommon* dxCommon,
-	SrvManager* srvManager,
+	Engine::DirectXCommon* dxCommon,
+	Engine::SrvManager* srvManager,
 	uint32_t width,
 	uint32_t height)
 {

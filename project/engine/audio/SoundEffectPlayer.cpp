@@ -3,6 +3,8 @@
 #include "Audio.h"
 #include "AudioMixer.h"
 
+namespace Engine {
+
 // SoundEffectPlayerは再生装置を作らず、共通Audioへ効果音の再生を依頼します。
 void SoundEffectPlayer::Initialize(Audio* audio)
 {
@@ -48,3 +50,5 @@ void SoundEffectPlayer::Clear()
 {
 	effectFilePaths_.clear();
 }
+
+} // namespace Engine

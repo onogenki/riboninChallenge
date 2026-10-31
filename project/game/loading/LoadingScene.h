@@ -25,7 +25,7 @@ public:
 
 private:
 	// 白背景の描画設定はManagerから借り、LoadingSceneだけで使います。
-	Engine::SpriteCommon* spriteCommon = nullptr;
+	Engine::SpriteCommon* spriteCommon_ = nullptr;
 
 	// 白画像が読めた時だけ、画面全体を覆うSpriteを作ります。
 	bool InitializeLoadingSprite();

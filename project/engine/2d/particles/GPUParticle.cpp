@@ -17,7 +17,7 @@ namespace
 }
 
 // 粒子のGPU資源を順に作り、Sceneが後から固定画像を準備できる状態にします。
-void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
+void GPUParticle::Initialize(Engine::DirectXCommon* dxCommon, Engine::SrvManager* srvManager)
 {
 	// 未完成のDescriptorを使ってGPU命令へ進まないよう、必要な依存と7枠を先に確認します。
 	if (!dxCommon || !dxCommon->GetDevice() || !dxCommon->GetCommandList() || !srvManager ||
@@ -39,7 +39,7 @@ void GPUParticle::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 // Debug Scene開始時に固定画像を読み、失敗時は未登録SRVをDrawで取得しないようにします。
 bool GPUParticle::PrepareTexture()
 {
-	isTextureReady_ = TextureManager::GetInstance()->LoadTexture(kParticleTexturePath);
+	isTextureReady_ = Engine::TextureManager::GetInstance()->LoadTexture(kParticleTexturePath);
 	if (!isTextureReady_) {
 		Logger::Log("GPUParticle: particle texture could not be loaded: " + std::string(kParticleTexturePath));
 	}
@@ -96,13 +96,13 @@ void GPUParticle::CreateParticleDescriptors()
 	activeParticleIndicesUavIndex_ = srvManager_->Allocate();
 	drawArgumentsUavIndex_ = srvManager_->Allocate();
 	// 一つでも確保できなければDescriptorを登録せず、取得済み番号はFinalizeで返します。
-	if (particleSrvIndex_ == SrvManager::kInvalidSrvIndex ||
-		activeParticleIndicesSrvIndex_ == SrvManager::kInvalidSrvIndex ||
-		particleUavIndex_ == SrvManager::kInvalidSrvIndex ||
-		freeListIndexUavIndex_ == SrvManager::kInvalidSrvIndex ||
-		freeListUavIndex_ == SrvManager::kInvalidSrvIndex ||
-		activeParticleIndicesUavIndex_ == SrvManager::kInvalidSrvIndex ||
-		drawArgumentsUavIndex_ == SrvManager::kInvalidSrvIndex) {
+	if (particleSrvIndex_ == Engine::SrvManager::kInvalidSrvIndex ||
+		activeParticleIndicesSrvIndex_ == Engine::SrvManager::kInvalidSrvIndex ||
+		particleUavIndex_ == Engine::SrvManager::kInvalidSrvIndex ||
+		freeListIndexUavIndex_ == Engine::SrvManager::kInvalidSrvIndex ||
+		freeListUavIndex_ == Engine::SrvManager::kInvalidSrvIndex ||
+		activeParticleIndicesUavIndex_ == Engine::SrvManager::kInvalidSrvIndex ||
+		drawArgumentsUavIndex_ == Engine::SrvManager::kInvalidSrvIndex) {
 		throw std::runtime_error("GPUParticle: seven SRV/UAV slots could not be allocated");
 	}
 	srvManager_->CreateSRVforStructuredBuffer(particleSrvIndex_, particleResource_.Get(), kMaxParticles, sizeof(Particle));
@@ -351,7 +351,7 @@ void GPUParticle::Draw(const Engine::Camera* camera)
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 	commandList->SetGraphicsRootConstantBufferView(kGraphicsRootParameterPerView, perViewResource_->GetGPUVirtualAddress());
 	srvManager_->SetGraphicsRootDescriptorTable(kGraphicsRootParameterParticle, particleSrvIndex_);
-	commandList->SetGraphicsRootDescriptorTable(kGraphicsRootParameterTexture, TextureManager::GetInstance()->GetSrvHandleGPU(kParticleTexturePath));
+	commandList->SetGraphicsRootDescriptorTable(kGraphicsRootParameterTexture, Engine::TextureManager::GetInstance()->GetSrvHandleGPU(kParticleTexturePath));
 	commandList->SetGraphicsRootConstantBufferView(kGraphicsRootParameterDirectionalLight, directionalLightResource_->GetGPUVirtualAddress());
 	commandList->ExecuteIndirect(drawCommandSignature_.Get(), 1, drawArgumentsResource_.Get(), 0, nullptr, 0);
 }
@@ -368,13 +368,13 @@ void GPUParticle::Finalize()
 		srvManager_->Free(activeParticleIndicesUavIndex_);
 		srvManager_->Free(drawArgumentsUavIndex_);
 	}
-	particleSrvIndex_ = SrvManager::kInvalidSrvIndex;
-	activeParticleIndicesSrvIndex_ = SrvManager::kInvalidSrvIndex;
-	particleUavIndex_ = SrvManager::kInvalidSrvIndex;
-	freeListIndexUavIndex_ = SrvManager::kInvalidSrvIndex;
-	freeListUavIndex_ = SrvManager::kInvalidSrvIndex;
-	activeParticleIndicesUavIndex_ = SrvManager::kInvalidSrvIndex;
-	drawArgumentsUavIndex_ = SrvManager::kInvalidSrvIndex;
+	particleSrvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	activeParticleIndicesSrvIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	particleUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	freeListIndexUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	freeListUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	activeParticleIndicesUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
+	drawArgumentsUavIndex_ = Engine::SrvManager::kInvalidSrvIndex;
 	particleResource_.Reset();
 	freeListIndexResource_.Reset();
 	freeListResource_.Reset();

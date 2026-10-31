@@ -12,6 +12,7 @@ void Stage::DrawStageEditorUi()
 	// Stage1はゲームデータを所有し、Edit Viewの表示・操作順は編集専用部品へ任せます。
 	StageEditor::Context editorContext{};
 	editorContext.isEditViewActive = ImGuiManager::GetInstance()->IsEditViewActive();
+	editorContext.stageId = GetStageId();
 	editorContext.mapFilePath = stageMapRepository_.GetJsonFilePath();
 	editorContext.levelData = stageMapRepository_.GetLevelData();
 	editorContext.playerPosition = player_ ? player_->GetPosition() : Vector3{};
@@ -31,7 +32,7 @@ void Stage::DrawStageEditorUi()
 	editorContext.cameraController = cameraController_.get();
 	editorContext.fixedMirrors = &fixedMirrors_;
 	editorContext.mirrorFloor = mirrorFloor_.get();
-	editorContext.carryableMirror = carryableMirror_.get();
+	editorContext.carryableMirror = fixedMirrors_.empty() ? nullptr : carryableMirror_.get();
 	editorContext.mapRuntime = &stageMapRuntime_;
 	editorContext.stageCameraEvents = &stageCameraEvents_;
 	editorContext.applyLevelData = [this](bool rebuildRuntimeObjects)
@@ -59,6 +60,10 @@ void Stage::DrawStageEditorUi()
 // Debug UIへ鏡・Light Puzzleの値を渡し、鏡が変わった時だけStage JSON用データへ同期します。
 void Stage::DrawStagePuzzleDebugUi()
 {
+	// 固定鏡のない設計開始Stageでは、表示されないStage1パズルの調整UIを出しません。
+	if (fixedMirrors_.empty()) {
+		return;
+	}
 	if (ImGuiManager::GetInstance()->IsEditViewActive()) {
 		StagePuzzleDebugUi::MirrorContext mirrorContext{};
 		mirrorContext.fixedMirror =

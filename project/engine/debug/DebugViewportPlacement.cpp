@@ -90,7 +90,7 @@ bool DebugViewportPlacement::TryGetWorldPosition(
 
 // Game ViewのMouse位置から、Spriteが使う画面ピクセル座標を作ります。
 bool DebugViewportPlacement::TryGetSpritePosition(
-	DirectXCommon* directXCommon,
+	Engine::DirectXCommon* directXCommon,
 	float screenX,
 	float screenY,
 	Vector2& outPosition)

@@ -8,6 +8,8 @@
 #pragma comment(lib,"dinput8.lib")
 #pragma comment(lib,"dxguid.lib")
 
+namespace Engine
+{
 std::unique_ptr <Input> Input::instance_ = nullptr;
 
 namespace {
@@ -380,3 +382,4 @@ float Input::GetPadRightAxisY(int padIndex) {
 	}
 	return 0.0f;
 }
+} // namespace Engine

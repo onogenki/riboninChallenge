@@ -7,7 +7,7 @@
 
 namespace Engine { class SkyBox; }
 namespace Engine { class CameraManager; }
-class Object3dCommon;
+namespace Engine { class Object3dCommon; }
 namespace Engine { class SpriteCommon; }
 
 // TitleのSprite表示、段階的な3D準備、演出とScene切替を順に進めます。
@@ -28,14 +28,11 @@ public:
 	// 毎フレーム、Titleの3Dモデル・Sprite・ImGuiを描画します。
 	void Draw() override;
 
-	// 既存の状態照会APIです。現行の切替はChangeSceneで予約するため、常にfalseを返します。
-	bool IsFinished() const override { return false; }
-
 private:
 	// TitleScene専用のCameraを所有し、描画共通設定はManagerから借ります。
 	std::unique_ptr<Engine::CameraManager> cameraManager_;
 	std::unique_ptr<Engine::Camera> mainCamera_;
-	Object3dCommon* object3dCommon_ = nullptr;
+	Engine::Object3dCommon* object3dCommon_ = nullptr;
 	Engine::SpriteCommon* spriteCommon_ = nullptr;
 
 	// ---------- 初期化の補助関数 ----------
@@ -86,11 +83,11 @@ private:
 	// ---------- Title全体のライト ----------
 
 	// 太陽光のように、Title全体へ同じ方向から当てる光です。
-	Object3d::DirectionalLight directionalLight_{};
+	Engine::Object3d::DirectionalLight directionalLight_{};
 	// 指定した一点から周囲へ広がる光です。
-	Object3d::PointLight pointLight_{};
+	Engine::Object3d::PointLight pointLight_{};
 	// 円すい状の範囲だけを照らす光です。
-	Object3d::SpotLight spotLight_{};
+	Engine::Object3d::SpotLight spotLight_{};
 
 	// ---------- Titleの進行状態 ----------
 	enum class PreparationStep

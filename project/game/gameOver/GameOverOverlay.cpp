@@ -21,13 +21,13 @@ GameOverOverlay::GameOverOverlay() = default;
 GameOverOverlay::~GameOverOverlay() = default;
 
 // 三枚の画像を読み込み、すべてのSpriteができた時だけSceneへ渡します。
-bool GameOverOverlay::Initialize(Engine::SpriteCommon* spriteCommon, DirectXCommon* directXCommon)
+bool GameOverOverlay::Initialize(Engine::SpriteCommon* spriteCommon, Engine::DirectXCommon* directXCommon)
 {
 	Finalize();
 	if (!spriteCommon || !directXCommon || !spriteCommon->Initialize(directXCommon)) {
 		return false;
 	}
-	TextureManager* textureManager = TextureManager::GetInstance();
+	Engine::TextureManager* textureManager = Engine::TextureManager::GetInstance();
 	if (!textureManager->LoadTexture(kGameOverTexture) ||
 		!textureManager->LoadTexture(kEnterRetryTexture) ||
 		!textureManager->LoadTexture(kBackToStageSelectTexture)) {

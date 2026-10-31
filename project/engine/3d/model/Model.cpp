@@ -79,7 +79,7 @@ bool Model::Initialize(ModelCommon* modelCommon, const std::string& directoryPat
 				return false;
 			}
 		}
-		if (!TextureManager::GetInstance()->LoadTexture(material.textureFilePath)) {
+		if (!Engine::TextureManager::GetInstance()->LoadTexture(material.textureFilePath)) {
 			Logger::Log("Model: texture load failed: " + material.textureFilePath);
 			ResetGpuResources();
 			return false;
@@ -109,8 +109,8 @@ void Model::Draw(uint32_t textureSrvIndexOverride)
 	{
 		const MaterialData& material = modelData_.materials[mesh.materialIndex];
 		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandle = textureSrvIndexOverride != UINT32_MAX
-			? SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
-			: TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
+			? Engine::SrvManager::GetInstance()->GetGPUDescriptorHandle(textureSrvIndexOverride)
+			: Engine::TextureManager::GetInstance()->GetSrvHandleGPU(material.textureFilePath);
 		commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandle);
 		commandList->DrawIndexedInstanced(mesh.indexCount, 1, mesh.indexOffset, 0, 0);
 	}
@@ -131,7 +131,7 @@ void Model::DrawGeometry()
 // 画像を読み込めた時だけ全材質を差し替え、再読込時にも使える明示指定として記録します。
 void Model::SetTexture(const std::string& filePath)
 {
-	if (!TextureManager::GetInstance()->LoadTexture(filePath)) {
+	if (!Engine::TextureManager::GetInstance()->LoadTexture(filePath)) {
 		Logger::Log("Model: texture load failed: " + filePath);
 		return;
 	}
@@ -149,7 +149,7 @@ bool Model::CopyRuntimeSettingsFrom(const Model& previous)
 		return false;
 	}
 	if (previous.runtimeTextureOverride_ &&
-		!TextureManager::GetInstance()->Contains(*previous.runtimeTextureOverride_)) {
+		!Engine::TextureManager::GetInstance()->Contains(*previous.runtimeTextureOverride_)) {
 		return false;
 	}
 

@@ -14,8 +14,8 @@ using namespace MyMath;
 
 // 人型・歩行モデル・手持ちWeaponを作り、Animation確認を始める準備をします。
 bool DebugAnimationPreview::Initialize(
-	Object3dCommon* object3dCommon,
-	std::vector<std::unique_ptr<Object3d>>& animationObjects)
+	Engine::Object3dCommon* object3dCommon,
+	std::vector<std::unique_ptr<Engine::Object3d>>& animationObjects)
 {
 	if (!object3dCommon) {
 		return false;
@@ -24,9 +24,9 @@ bool DebugAnimationPreview::Initialize(
 	walkAnimation_ = Engine::Model::LoadAnimationFile("./resources", "debug/walk.gltf");
 	humanAnimation_ = Engine::Model::LoadAnimationFile("./resources", "debug/human.gltf");
 
-	auto humanObject = Object3dFactory::Create(object3dCommon, "debug/human.gltf", true);
-	auto handWeapon = Object3dFactory::Create(object3dCommon, "debug/sphere.obj");
-	auto walkObject = Object3dFactory::Create(object3dCommon, "debug/walk.gltf", true);
+	auto humanObject = Engine::Object3dFactory::Create(object3dCommon, "debug/human.gltf", true);
+	auto handWeapon = Engine::Object3dFactory::Create(object3dCommon, "debug/sphere.obj");
+	auto walkObject = Engine::Object3dFactory::Create(object3dCommon, "debug/walk.gltf", true);
 	if (!humanObject || !handWeapon || !walkObject) {
 		return false;
 	}
@@ -38,7 +38,7 @@ bool DebugAnimationPreview::Initialize(
 	humanObject->PlayAnimation(humanAnimation_);
 	humanObject->SetIsLoop(false);
 
-	handWeapon->GetModel()->SetTexture("Resources/debug/monsterBall.png");
+	handWeapon->SetSharedModelTexture("Resources/debug/monsterBall.png");
 	handWeapon->SetScale({ 1.5f, 1.5f, 1.5f });
 	handWeapon->SetTranslate({ 0.0f, 0.25f, 0.0f });
 
@@ -60,7 +60,7 @@ bool DebugAnimationPreview::Initialize(
 void DebugAnimationPreview::Update(const Context& context)
 {
 	Vector3 moveDirection{};
-	Input* input = Input::GetInstance();
+	Engine::Input* input = Engine::Input::GetInstance();
 	if (context.acceptsGameInput && input->PushKey(DIK_W)) {
 		moveDirection.z += 1.0f;
 	}

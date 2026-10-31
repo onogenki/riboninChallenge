@@ -13,20 +13,20 @@
 #include "SrvManager.h"
 
 // RenderTextureへSceneを描画する前に、共通のDirectXとSRV設定を行います。
-void SceneRenderPipeline::Begin(DirectXCommon* directXCommon, const Vector4* clearColorOverride)
+void SceneRenderPipeline::Begin(Engine::DirectXCommon* directXCommon, const Vector4* clearColorOverride)
 {
 	if (!directXCommon) {
 		return;
 	}
 
 	directXCommon->PreDraw(clearColorOverride);
-	SrvManager::GetInstance()->PreDraw();
+	Engine::SrvManager::GetInstance()->PreDraw();
 }
 
 // Sceneごとの重複したDrawループをなくし、3D一覧の描画条件を一か所へそろえます。
 void SceneRenderPipeline::DrawObjects(
-	Object3dCommon* object3dCommon,
-	const std::vector<std::unique_ptr<Object3d>>& objects,
+	Engine::Object3dCommon* object3dCommon,
+	const std::vector<std::unique_ptr<Engine::Object3d>>& objects,
 	ObjectDrawFilter filter)
 {
 	if (!object3dCommon) {
@@ -34,7 +34,7 @@ void SceneRenderPipeline::DrawObjects(
 	}
 
 	object3dCommon->SetCommonDrawSetting();
-	for (const std::unique_ptr<Object3d>& object : objects) {
+	for (const std::unique_ptr<Engine::Object3d>& object : objects) {
 		if (!object) {
 			continue;
 		}
@@ -70,7 +70,7 @@ void SceneRenderPipeline::DrawSprites(
 
 // Scene描画後のPostEffect・SwapChain・ImGui・Presentを共通の順番で実行します。
 void SceneRenderPipeline::End(
-	DirectXCommon* directXCommon,
+	Engine::DirectXCommon* directXCommon,
 	const Engine::Camera* activeCamera,
 	bool drawImGui)
 {

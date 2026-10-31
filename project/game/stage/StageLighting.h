@@ -21,16 +21,16 @@ public:
 	void UpdateLaserSpotLights(const StageLightPuzzle& lightPuzzle, const StageHazardLights& hazardLights);
 
 	// RenderContextが描画値を一括転送するため、内部のLightを変更できない参照で渡します。
-	const Object3d::DirectionalLight& GetDirectionalLight() const { return directionalLight_; }
-	const Object3d::PointLight& GetPointLight() const { return pointLight_; }
-	const std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount>& GetSpotLights() const { return spotLights_; }
+	const Engine::Object3d::DirectionalLight& GetDirectionalLight() const { return directionalLight_; }
+	const Engine::Object3d::PointLight& GetPointLight() const { return pointLight_; }
+	const std::array<Engine::Object3d::SpotLight, Engine::Object3d::kMaximumSpotLightCount>& GetSpotLights() const { return spotLights_; }
 
 private:
 	// 三灯照明は最大3本に固定し、残りのSpotLight枠をLaser演出へ残します。
 	static constexpr size_t kStageLightingSpotLightCount = 3;
 
-	Object3d::DirectionalLight directionalLight_{};
-	Object3d::PointLight pointLight_{};
-	std::vector<Object3d::SpotLight> stageSpotLights_;
-	std::array<Object3d::SpotLight, Object3d::kMaximumSpotLightCount> spotLights_{};
+	Engine::Object3d::DirectionalLight directionalLight_{};
+	Engine::Object3d::PointLight pointLight_{};
+	std::vector<Engine::Object3d::SpotLight> stageSpotLights_;
+	std::array<Engine::Object3d::SpotLight, Engine::Object3d::kMaximumSpotLightCount> spotLights_{};
 };

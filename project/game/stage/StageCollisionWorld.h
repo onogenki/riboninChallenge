@@ -6,7 +6,7 @@
 
 class CarryableMirror;
 class FixedMirror;
-class Object3d;
+namespace Engine { class Object3d; }
 class StageLightPuzzle;
 class StageMapRuntime;
 
@@ -18,7 +18,7 @@ public:
 	struct Context
 	{
 		// 見た目と判定を共有するStageの床です。所有しません。
-		Object3d* floor = nullptr;
+		Engine::Object3d* floor = nullptr;
 		// Playerを止める固定Mirror一覧です。所有しません。
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;
 		// 持っていない時だけPlayerを止める小型Mirrorです。所有しません。
