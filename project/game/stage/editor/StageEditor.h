@@ -2,6 +2,7 @@
 
 #include "LevelLoader.h"
 #include "StageEditViewport.h"
+#include "StageEditHistory.h"
 #include "StageLevelEditor.h"
 #include <cstddef>
 #include <functional>
@@ -70,8 +71,10 @@ public:
 	bool SynchronizeFirstMirror(LevelLoader::LevelData& levelData, const FixedMirror& fixedMirror, float baseYaw);
 	// JSONのオブジェクト数が変わった時だけ、編集対象の番号を有効範囲へ戻します。
 	void ClampSelectedObjectIndex(std::size_t objectCount);
-	// Stage切替時だけInspector・Viewport・Shelfの前Stage選択を消します。
-	void ResetForStage(std::size_t objectCount);
+	// Stage切替時だけInspector・Viewport・Shelfの前Stage選択と履歴を消します。
+	void ResetForStage(const LevelLoader::LevelData& levelData);
+	// JSON再読込後に旧データの履歴を消し、現在Stageの状態から記録を始めます。
+	void ResetHistory(const LevelLoader::LevelData& levelData);
 
 private:
 	// 現在のPlayerと通常Cameraの角度、次回のPlayerStartを別々に表示します。
@@ -91,6 +94,7 @@ private:
 	// Model追加・削除とViewport操作を担当する既存の小さなUI部品です。
 	StageLevelEditor levelEditor_{};
 	StageEditViewport editViewport_{};
+	StageEditHistory editHistory_{};
 	// Edit Viewだけが使う状態は、Sceneのゲーム進行データと分けて所有します。
 	bool autoMapReload_ = true;
 	std::string mapReloadStatus_ = "Not loaded yet.";

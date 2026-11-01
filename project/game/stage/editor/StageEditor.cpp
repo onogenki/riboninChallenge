@@ -46,7 +46,7 @@ bool StageEditor::SynchronizeFirstMirror(
 	return syncMirrorData(levelData.objects);
 }
 
-// Edit ViewだけでPlayer、Collider、Level、Viewportを順に表示し、ゲーム進行中に編集操作を混ぜません。
+// Edit ViewだけでPlayer、Collider、Level、Viewportを順に表示し、最後にJSON編集を一手順として記録します。
 void StageEditor::Draw(Context& context)
 {
 	if (!context.isEditViewActive) {
@@ -70,6 +70,11 @@ void StageEditor::Draw(Context& context)
 	// Viewportを先に描画してからModel ShelfとDropを処理し、従来のUI順序を維持します。
 	levelEditor_.DrawModelShelf(levelEditorContext);
 	levelEditor_.HandleShelfDropOnEditView(levelEditorContext);
+	bool isEditingContinuously = false;
+#ifdef USE_IMGUI
+	isEditingContinuously = ImGui::IsAnyItemActive() || editViewport_.IsDraggingTransform();
+#endif
+	editHistory_.Observe(*context.levelData, selectedObjectIndex_, isEditingContinuously);
 }
 
 // 現在位置と通常Cameraの目標角度は即時反映、PlayerStartはJSON保存後の次回開始位置として編集します。
@@ -193,7 +198,7 @@ void StageEditor::DrawCollision(const Context& context) const
 	StagePuzzleDebugUi::DrawCollision(collisionContext);
 }
 
-// StageLevelEditorへ、現在Stageが所有するJSONと保存・再構築操作を渡し、選択番号は編集UI内で保持します。
+// StageLevelEditorへ現在Stageのメモリと再構築操作だけを渡し、JSON保存はこの編集UIで受けます。
 StageLevelEditor::Context StageEditor::MakeLevelEditorContext(Context& context)
 {
 	StageLevelEditor::Context levelEditorContext{};
@@ -203,7 +208,6 @@ StageLevelEditor::Context StageEditor::MakeLevelEditorContext(Context& context)
 	levelEditorContext.playerPosition = context.playerPosition;
 	levelEditorContext.selectedObjectIndex = &selectedObjectIndex_;
 	levelEditorContext.applyLevelData = context.applyLevelData;
-	levelEditorContext.saveLevelData = context.saveLevelData;
 	levelEditorContext.setStatus = [this](const std::string& message)
 	{
 		mapReloadStatus_ = message;
@@ -211,7 +215,7 @@ StageLevelEditor::Context StageEditor::MakeLevelEditorContext(Context& context)
 	return levelEditorContext;
 }
 
-// JSONの追加・削除・保存とLighting反映を行い、操作結果と再読込設定を編集UI内で一元管理します。
+// JSONの追加・削除・保存と履歴復元を受け、失敗時に現在Stageを維持して編集を続けます。
 bool StageEditor::DrawLevelControls(
 	Context& context,
 	const StageLevelEditor::Context& levelEditorContext)
@@ -227,7 +231,28 @@ bool StageEditor::DrawLevelControls(
 			context.mapFilePath,
 			mapReloadStatus_,
 			context.levelData,
-			selectedObjectIndex_);
+			selectedObjectIndex_,
+			editHistory_.CanUndo(),
+			editHistory_.CanRedo());
+	if (levelEditorResult.undoRequested || levelEditorResult.redoRequested) {
+		const auto apply = [&context]()
+		{
+			return context.applyLevelData && context.applyLevelData(true);
+		};
+		const bool restored = levelEditorResult.undoRequested
+			? editHistory_.Undo(*context.levelData, selectedObjectIndex_, apply)
+			: editHistory_.Redo(*context.levelData, selectedObjectIndex_, apply);
+		if (restored) {
+			ClampSelectedObjectIndex(context.levelData->objects.size());
+			editViewport_.Finalize();
+			setStatus(levelEditorResult.undoRequested
+				? "Undid one Stage map edit in memory. Press Save Map to keep it."
+				: "Redid one Stage map edit in memory. Press Save Map to keep it.");
+		} else {
+			setStatus("History restore failed. Current Stage map was kept.");
+		}
+		return true;
+	}
 	if (levelEditorResult.reloadRequested) {
 		if (context.reloadMap) {
 			context.reloadMap();
@@ -248,20 +273,20 @@ bool StageEditor::DrawLevelControls(
 				? "Edited in memory. Press Save Map to keep it."
 				: "Edit could not be applied. Check required Floor/Mirror data.");
 		}
-		if (levelEditorResult.addSphereRequested && levelEditor_.AddSphere(levelEditorContext)) {
-			context.saveLevelData();
+		if (levelEditorResult.addSphereRequested) {
+			levelEditor_.AddSphere(levelEditorContext);
 		}
-		if (levelEditorResult.addEventPairRequested && levelEditor_.AddEventPair(levelEditorContext)) {
-			context.saveLevelData();
+		if (levelEditorResult.addEventPairRequested) {
+			levelEditor_.AddEventPair(levelEditorContext);
 		}
-		if (levelEditorResult.addCameraAreaRequested && levelEditor_.AddCameraArea(levelEditorContext)) {
-			context.saveLevelData();
+		if (levelEditorResult.addCameraAreaRequested) {
+			levelEditor_.AddCameraArea(levelEditorContext);
 		}
-		if (levelEditorResult.addPathSphereRequested && levelEditor_.AddPathSphere(levelEditorContext)) {
-			context.saveLevelData();
+		if (levelEditorResult.addPathBoxRequested) {
+			levelEditor_.AddPathBox(levelEditorContext);
 		}
-		if (levelEditorResult.removeSelectedRequested && levelEditor_.RemoveSelectedObject(levelEditorContext)) {
-			context.saveLevelData();
+		if (levelEditorResult.removeSelectedRequested) {
+			levelEditor_.RemoveSelectedObject(levelEditorContext);
 		}
 		if (levelEditorResult.saveRequested && context.saveLevelData) {
 			context.saveLevelData();
@@ -316,17 +341,26 @@ void StageEditor::ClampSelectedObjectIndex(std::size_t objectCount)
 		: std::clamp(selectedObjectIndex_, 0, static_cast<int>(objectCount) - 1);
 }
 
-// Stageを切り替えた後のUIが、同じ番号にいた前Stageの別モデルを選択しないよう消します。
-void StageEditor::ResetForStage(std::size_t objectCount)
+// Stageを切り替えた後のUIが前Stageの選択と履歴を使わないよう、新しいJSONから始めます。
+void StageEditor::ResetForStage(const LevelLoader::LevelData& levelData)
 {
-	selectedObjectIndex_ = objectCount == 0 ? -1 : 0;
+	selectedObjectIndex_ = levelData.objects.empty() ? -1 : 0;
 	editViewport_.Finalize();
 	levelEditor_.ResetForStage();
+	ResetHistory(levelData);
 }
 
-// Stage1終了時に、編集UIが保持するModel ShelfとViewportの選択状態を破棄します。
+// 外部保存による再読込では履歴の基準を新しいJSONへ替え、選択状態は保持します。
+void StageEditor::ResetHistory(const LevelLoader::LevelData& levelData)
+{
+	editHistory_.Clear();
+	editHistory_.Observe(levelData, selectedObjectIndex_, false);
+}
+
+// Stage1終了時にModel Shelf・Viewport・履歴が持つ前Sceneの状態を破棄します。
 void StageEditor::Finalize()
 {
 	editViewport_.Finalize();
 	levelEditor_.Finalize();
+	editHistory_.Clear();
 }

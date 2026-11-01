@@ -98,7 +98,7 @@ private:
 
 	// Tabで停止し、停止中のBackspace・その他のキーを一か所で判定します。
 	bool UpdatePauseState();
-	// 開始演出・自動確認・通常入力のいずれかでPlayerを更新し、開始演出中ならtrueを返します。
+	// Colliderを同期し、Game Viewでだけ開始演出・自動確認・Player入力を進めます。
 	bool UpdateStagePlayer(float deltaTime);
 	// 接触後の一秒だけPlayerを上昇・透過させ、復帰かGame Overを決定します。
 	void UpdateLightDeath(float deltaTime);

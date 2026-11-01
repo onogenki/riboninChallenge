@@ -441,6 +441,7 @@
     <ClCompile Include="game\stage\debug\StagePuzzleDebugUi.cpp" />
     <ClCompile Include="game\stage\editor\ImGuiManagerStagePuzzle.cpp" />
     <ClCompile Include="game\stage\editor\StageEditor.cpp" />
+	<ClCompile Include="game\stage\editor\StageEditHistory.cpp" />
     <ClCompile Include="game\stage\editor\StageEditViewport.cpp" />
     <ClCompile Include="game\stage\editor\StageLevelEditor.cpp" />
     <ClCompile Include="game\stage\Stage.cpp" />
@@ -485,6 +486,7 @@
     <ClInclude Include="game\stage\debug\Stage1GameplaySmoke.h" />
     <ClInclude Include="game\stage\debug\StagePuzzleDebugUi.h" />
     <ClInclude Include="game\stage\editor\StageEditor.h" />
+	<ClInclude Include="game\stage\editor\StageEditHistory.h" />
     <ClInclude Include="game\stage\editor\StageEditViewport.h" />
     <ClInclude Include="game\stage\editor\StageLevelEditor.h" />
     <ClInclude Include="game\stage\Stage.h" />

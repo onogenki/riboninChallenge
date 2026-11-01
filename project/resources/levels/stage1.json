@@ -596,8 +596,8 @@
                     6.0
                 ]
             ],
-            "file_name": "debug/sphere.obj",
-            "name": "PathSphere1",
+            "file_name": "debug/box.obj",
+            "name": "PathBox1",
             "object_type": "PATH_OBJECT",
             "path_loop": true,
             "path_speed": 1.0,
@@ -782,8 +782,21 @@
             "type": "CAMERA"
         },
         {
-            "file_name": "stageObj/floor/floor.obj",
-            "name": "EditorModel1",
+            "collider": {
+                "center": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "size": [
+                    10.0,
+                    1.0,
+                    10.0
+                ],
+                "type": "BOX"
+            },
+            "file_name": "stageObj/floor/woodFloor.obj",
+            "name": "floor1",
             "object_type": "STATIC",
             "tag": "EditorAdded",
             "transform": {
@@ -793,14 +806,14 @@
                     0.0
                 ],
                 "scaling": [
+                    2.4000000953674316,
                     1.0,
-                    1.0,
-                    1.0
+                    8.899999618530273
                 ],
                 "translation": [
                     24.0,
-                    0.20000004768371582,
-                    32.579349517822266
+                    -2.499000072479248,
+                    39.400001525878906
                 ]
             },
             "type": "MESH"

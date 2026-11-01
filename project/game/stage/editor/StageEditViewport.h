@@ -37,6 +37,8 @@ public:
 
 	// JSON由来の床・鏡・通常モデルをViewportへ並べ、選択・Transform編集を反映します。
 	void Draw(const Context& context);
+	// カスタムギズモのドラッグも、Inspector数値編集と同じ一手順へまとめるため通知します。
+	bool IsDraggingTransform() const { return viewportState_.isDragging; }
 	// Scene終了時に、前回のギズモ選択状態を破棄します。
 	void Finalize();
 

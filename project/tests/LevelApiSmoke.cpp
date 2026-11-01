@@ -6,6 +6,7 @@
 #include "StageMapFileMonitor.h"
 #include "StageMapSelection.h"
 #include "StageMapRepository.h"
+#include "StageEditHistory.h"
 
 #include <chrono>
 #include <filesystem>
@@ -85,17 +86,30 @@ namespace
 		return selection.GetStageId() == 5 && selection.GetDefinition() == activeDefinition;
 	}
 
-	// Stage IDごとに別のJSONを読み、右Inspectorへ渡す一覧に前Stageの配置物が混ざらないことを確認します。
+	// Stageごとに別JSONを読み、未保存の追加は切替後に消え、保存済み配置物だけが戻ることを確認します。
 	bool CheckStageJsonIsolation()
 	{
 		StageMapRepository repository;
 		std::string status;
+		std::size_t savedStage1ObjectCount = 0;
 		for (int stageId = 1; stageId <= 5; ++stageId) {
 			if (!repository.SelectAndReload(stageId, []() { return true; }, status) ||
 				repository.GetStageId() != stageId || !repository.GetLevelData()) {
 				return false;
 			}
 			const LevelLoader::LevelData& levelData = *repository.GetLevelData();
+			const std::unique_ptr<LevelLoader::LevelData> savedData =
+				LevelLoader::Load("stage" + std::to_string(stageId));
+			if (!savedData || levelData.objects.size() != savedData->objects.size()) {
+				return false;
+			}
+			for (std::size_t index = 0; index < levelData.objects.size(); ++index) {
+				if (levelData.objects[index].name != savedData->objects[index].name ||
+					levelData.objects[index].fileName != savedData->objects[index].fileName ||
+					levelData.objects[index].hasCollider != savedData->objects[index].hasCollider) {
+					return false;
+				}
+			}
 			StageMapObjectIndex index;
 			index.Build(levelData);
 			if (!index.GetFloor() || !index.GetPlayerStart()) {
@@ -105,18 +119,22 @@ namespace
 				if (levelData.objects.size() <= 2) {
 					return false;
 				}
+				savedStage1ObjectCount = levelData.objects.size();
+				LevelLoader::ObjectData unsavedModel{};
+				unsavedModel.name = "UnsavedSmokeModel";
+				unsavedModel.type = "MESH";
+				unsavedModel.fileName = "debug/floor.obj";
+				repository.GetLevelData()->objects.push_back(std::move(unsavedModel));
 				continue;
 			}
-			const std::string expectedFloorName = "Stage" + std::to_string(stageId) + "Floor";
-			if (levelData.objects.size() != 2 || index.GetFloor()->name != expectedFloorName ||
-				!index.GetFixedMirrors().empty() || !index.GetRuntimeObjects().empty()) {
-				return false;
-			}
 		}
-		return true;
+		// Saveを呼ばなければStage1へ戻しても仮追加はなく、既存配置の件数は変わりません。
+		return repository.SelectAndReload(1, []() { return true; }, status) &&
+			repository.GetLevelData() &&
+			repository.GetLevelData()->objects.size() == savedStage1ObjectCount;
 	}
 
-	// Inspectorで改名・BOX追加した通常モデルを、Stage JSONへ保存して再読込しても保てるか確認します。
+	// 明示保存した改名・BOXは残り、保存しない追加と判定変更は再読込で消えるか確認します。
 	bool CheckModelMetadataJsonRoundTrip()
 	{
 		const std::string fileName = "SmokeMetadata_" +
@@ -149,6 +167,19 @@ namespace
 				reloaded.collider.type == "BOX" &&
 				MatchesVector3(reloaded.collider.center, { 1.0f, 0.0f, -2.0f }) &&
 				MatchesVector3(reloaded.collider.size, { 4.0f, 0.5f, 6.0f });
+		}
+		if (passed) {
+			// 編集中のLevelDataだけを変え、Saveなしの再読込で元の1件が残るか確認します。
+			LevelLoader::LevelData unsavedData = *loaded;
+			unsavedData.objects.front().collider.size = { 9.0f, 9.0f, 9.0f };
+			LevelLoader::ObjectData unsavedModel{};
+			unsavedModel.name = "UnsavedModel";
+			unsavedModel.type = "MESH";
+			unsavedModel.fileName = "debug/floor.obj";
+			unsavedData.objects.push_back(std::move(unsavedModel));
+			const std::unique_ptr<LevelLoader::LevelData> discarded = LevelLoader::Load(fileName);
+			passed = discarded && discarded->objects.size() == 1 &&
+				MatchesVector3(discarded->objects.front().collider.size, { 4.0f, 0.5f, 6.0f });
 		}
 		std::error_code cleanupError;
 		std::filesystem::remove(jsonPath, cleanupError);
@@ -397,6 +428,118 @@ namespace
 		}
 		return passed && restoredDirectory && cleanedUp;
 	}
+
+	// Playerを除くモデル操作とEvent対を一手順ずつ戻し、Redoと反映失敗の契約を確認します。
+	bool CheckStageEditHistory()
+	{
+		// 追加と削除を続けた場合も、削除のUndo後には古い追加履歴を残しません。
+		LevelLoader::LevelData oneStepLevel{};
+		int oneStepSelection = -1;
+		StageEditHistory oneStepHistory;
+		oneStepHistory.Observe(oneStepLevel, oneStepSelection, false);
+		LevelLoader::ObjectData addedModel{};
+		addedModel.name = "AddedModel";
+		addedModel.type = "MESH";
+		oneStepLevel.objects.push_back(addedModel);
+		oneStepSelection = 0;
+		oneStepHistory.Observe(oneStepLevel, oneStepSelection, false);
+		oneStepLevel.objects.clear();
+		oneStepSelection = -1;
+		oneStepHistory.Observe(oneStepLevel, oneStepSelection, false);
+		const auto oneStepApply = []() { return true; };
+		const bool onlyRedoAfterUndo = oneStepHistory.Undo(
+			oneStepLevel, oneStepSelection, oneStepApply) &&
+			oneStepLevel.objects.size() == 1 && !oneStepHistory.CanUndo() &&
+			oneStepHistory.CanRedo();
+		const bool onlyUndoAfterRedo = oneStepHistory.Redo(
+			oneStepLevel, oneStepSelection, oneStepApply) &&
+			oneStepLevel.objects.empty() && oneStepHistory.CanUndo() &&
+			!oneStepHistory.CanRedo();
+
+		LevelLoader::LevelData levelData{};
+		LevelLoader::ObjectData playerStart{};
+		playerStart.name = "PlayerStart";
+		playerStart.tag = "PlayerStart";
+		levelData.objects.push_back(playerStart);
+		LevelLoader::ObjectData model{};
+		model.name = "Wall";
+		model.type = "MESH";
+		model.fileName = "debug/box.obj";
+		LevelLoader::ObjectData nestedPlayerStart{};
+		nestedPlayerStart.name = "NestedPlayerStart";
+		nestedPlayerStart.tag = "PlayerStart";
+		model.children.push_back(nestedPlayerStart);
+		levelData.objects.push_back(model);
+		int selectedIndex = 1;
+		StageEditHistory history;
+		history.Observe(levelData, selectedIndex, false);
+		levelData.objects[0].translation.x = 5.0f;
+		levelData.objects[1].children[0].translation.x = 7.0f;
+		history.Observe(levelData, selectedIndex, false);
+		const bool playerIgnored = !history.CanUndo();
+
+		for (int step = 1; step <= 3; ++step) {
+			levelData.objects[1].translation.x = static_cast<float>(step);
+			history.Observe(levelData, selectedIndex, true);
+		}
+		history.Observe(levelData, selectedIndex, false);
+		const auto apply = []() { return true; };
+		const bool draggedOnce = history.CanUndo() &&
+			history.Undo(levelData, selectedIndex, apply) &&
+			levelData.objects[1].translation.x == 0.0f &&
+			levelData.objects[0].translation.x == 5.0f &&
+			levelData.objects[1].children[0].translation.x == 7.0f &&
+			!history.CanUndo() && history.CanRedo();
+		const bool dragRedone = history.Redo(levelData, selectedIndex, apply) &&
+			levelData.objects[1].translation.x == 3.0f;
+
+		LevelLoader::ObjectData trigger{};
+		trigger.name = "EventTrigger";
+		trigger.objectType = "EVENT_TRIGGER";
+		LevelLoader::ObjectData camera{};
+		camera.name = "EventCamera";
+		camera.objectType = "EVENT_CAMERA";
+		camera.hasCameraFocus = true;
+		levelData.objects.push_back(trigger);
+		levelData.objects.push_back(camera);
+		selectedIndex = 2;
+		history.Observe(levelData, selectedIndex, false);
+		const bool pairUndone = history.Undo(levelData, selectedIndex, apply) &&
+			levelData.objects.size() == 2 && selectedIndex == 1;
+		const bool pairRedone = history.Redo(levelData, selectedIndex, apply) &&
+			levelData.objects.size() == 4 && selectedIndex == 2;
+
+		levelData.objects[3].cameraFocus.z = 8.0f;
+		history.Observe(levelData, selectedIndex, false);
+		const bool cameraValueUndone = history.Undo(levelData, selectedIndex, apply) &&
+			levelData.objects[3].cameraFocus.z == 0.0f;
+		levelData.objects.erase(levelData.objects.begin() + 1);
+		selectedIndex = 1;
+		history.Observe(levelData, selectedIndex, false);
+		const bool removalUndone = history.Undo(levelData, selectedIndex, apply) &&
+			levelData.objects.size() == 4 && levelData.objects[1].name == "Wall";
+		const bool removalRedone = history.Redo(levelData, selectedIndex, apply) &&
+			levelData.objects.size() == 3 && levelData.objects[1].name == "EventTrigger";
+		const bool removalRestored = history.Undo(levelData, selectedIndex, apply) &&
+			levelData.objects.size() == 4;
+		levelData.objects[1].translation.y = 2.0f;
+		history.Observe(levelData, selectedIndex, false);
+		const bool newEditClearsRedo = !history.CanRedo();
+
+		const int previousSelection = selectedIndex;
+		const size_t previousCount = levelData.objects.size();
+		const bool failedRestoreKeptMap = !history.Undo(
+			levelData, selectedIndex, []() { return false; }) &&
+			levelData.objects.size() == previousCount &&
+			levelData.objects[1].translation.y == 2.0f &&
+			selectedIndex == previousSelection && history.CanUndo();
+		history.Clear();
+		return onlyRedoAfterUndo && onlyUndoAfterRedo && playerIgnored &&
+			draggedOnce && dragRedone && pairUndone &&
+			pairRedone && cameraValueUndone && removalUndone && removalRedone &&
+			removalRestored && newEditClearsRedo &&
+			failedRestoreKeptMap && !history.CanUndo() && !history.CanRedo();
+	}
 }
 
 // CSVの番号別処理とレベルJSONの失敗契約を、Sceneを起動せずに確認します。
@@ -491,11 +634,13 @@ int main()
 	check(CheckStageMapSelection(),
 		"Stage IDs 1-5 map to files; invalid IDs preserve selection and requests run once");
 	check(CheckStageJsonIsolation(),
-		"Stage 1-5 load separate JSON objects without carrying Stage1 models into the next Inspector");
+		"Stage 1-5 keep saved objects and discard an unsaved addition when switching away and back");
 	check(CheckModelMetadataJsonRoundTrip(),
-		"renamed model and BOX collider survive JSON save and reload");
+		"saved model and BOX survive reload while unsaved model and collider edits disappear");
 	check(CheckStageMapFileMonitor(),
 		"JSON and CSV changes reload once, including simultaneous saves; saving JSON synchronizes its timestamp");
+	check(CheckStageEditHistory(),
+		"Stage edit history keeps one undo/redo step, groups drags, ignores PlayerStart, and rolls back failures");
 	std::cout << (failures == 0 ? "SUCCESS" : "FAILURE") << ": failures=" << failures << '\n';
 	return failures == 0 ? 0 : 1;
 }
