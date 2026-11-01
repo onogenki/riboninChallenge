@@ -114,7 +114,7 @@ namespace {
 		return std::isfinite(screen.x) && std::isfinite(screen.y);
 	}
 
-	// Edit View左上のTransform切替とCamera編集を表示し、操作中ならtrueを返します。
+	// Edit View左上のTransform切替と選択モデル名を表示し、操作中ならtrueを返します。
 	bool DrawViewportToolbar(
 		SceneEditor::ViewportState& state,
 		const SceneEditor::ViewportOptions& options,
@@ -150,6 +150,14 @@ namespace {
 		drawToolButton("Scale", SceneEditor::TransformTool::Scale);
 		if (state.selectedIndex >= 0) {
 			ImGui::Text("Selected: %s", options.objects[state.selectedIndex].label.c_str());
+			const std::string& modelPath = options.objects[state.selectedIndex].object->GetModelName();
+			const size_t lastSeparator = modelPath.find_last_of("/\\");
+			const std::string modelName = modelPath.substr(
+				lastSeparator == std::string::npos ? 0 : lastSeparator + 1);
+			ImGui::Text("Model: %s", modelName.empty() ? "(none)" : modelName.c_str());
+			if (!modelPath.empty() && ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("%s", modelPath.c_str());
+			}
 		} else {
 			ImGui::TextDisabled("Left click an object to select it.");
 		}

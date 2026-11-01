@@ -16,6 +16,7 @@
     <ClCompile Include="..\game\stage\StageMapFileMonitor.cpp"><Filter>GameStage</Filter></ClCompile>
     <ClCompile Include="..\game\stage\StageMapSelection.cpp"><Filter>GameStage</Filter></ClCompile>
     <ClCompile Include="..\game\stage\StageMapRepository.cpp"><Filter>GameStage</Filter></ClCompile>
+	<ClCompile Include="..\game\stage\editor\StageEditHistory.cpp"><Filter>GameStage</Filter></ClCompile>
     <ClInclude Include="..\engine\level\LevelLoader.h"><Filter>LevelData</Filter></ClInclude>
     <ClInclude Include="..\engine\level\MapChipField.h"><Filter>LevelData</Filter></ClInclude>
     <ClInclude Include="..\engine\level\MapChipRegistry.h"><Filter>LevelData</Filter></ClInclude>
@@ -25,5 +26,6 @@
     <ClInclude Include="..\game\stage\StageMapFileMonitor.h"><Filter>GameStage</Filter></ClInclude>
     <ClInclude Include="..\game\stage\StageMapSelection.h"><Filter>GameStage</Filter></ClInclude>
     <ClInclude Include="..\game\stage\StageMapRepository.h"><Filter>GameStage</Filter></ClInclude>
+	<ClInclude Include="..\game\stage\editor\StageEditHistory.h"><Filter>GameStage</Filter></ClInclude>
   </ItemGroup>
 </Project>

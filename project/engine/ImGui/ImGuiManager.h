@@ -36,6 +36,8 @@ struct LevelEditorResult
 {
 	bool reloadRequested = false;
 	bool saveRequested = false;
+	bool undoRequested = false;
+	bool redoRequested = false;
 	bool dataChanged = false;
 	// 名前変更はRuntimeの名前対応を作り直すため、通常の値編集と区別します。
 	bool renameRequested = false;
@@ -44,7 +46,7 @@ struct LevelEditorResult
 	bool addSphereRequested = false;
 	bool addEventPairRequested = false;
 	bool addCameraAreaRequested = false;
-	bool addPathSphereRequested = false;
+	bool addPathBoxRequested = false;
 	bool removeSelectedRequested = false;
 };
 
@@ -95,7 +97,9 @@ public:
 		const std::string& filePath,
 		const std::string& status,
 		LevelLoader::LevelData* levelData,
-		int& selectedObjectIndex);
+		int& selectedObjectIndex,
+		bool canUndo,
+		bool canRedo);
 	// Stage1の環境光とキー・フィル・バックライトを、実行中に調整するUIです。
 	// 値が変更されたフレームだけtrueを返し、保存処理は呼び出し側へ任せます。
 	bool StageLightingWindow(LevelLoader::LightingData& lighting);

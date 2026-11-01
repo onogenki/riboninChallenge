@@ -380,7 +380,7 @@ bool Stage::UpdatePauseState()
 	return true;
 }
 
-// Pauseで早期終了するフレームも案内を更新し、PlayerやCameraの更新順は変えません。
+// PauseとEdit Viewではゲーム進行を止め、編集表示と描画準備の順番を保ちます。
 void Stage::Update()
 {
 	if (!isStageReady_) {
@@ -397,12 +397,13 @@ void Stage::Update()
 	// 提出用TitleではStageの描画だけを準備し、Player・Camera追従・BGMは進めません。
 	if (isTemporaryTitleActive_) {
 		Engine::DirectXCommon* dxCommon = Engine::DirectXCommon::GetInstance();
-		const float deltaTime = dxCommon->GetDeltaTime();
+		const bool isGameViewActive = ImGuiManager::GetInstance()->IsGameViewActive();
+		const float deltaTime = isGameViewActive ? dxCommon->GetDeltaTime() : 0.0f;
 		stageTitleOverlay_->Update(
 			deltaTime,
 			static_cast<float>(dxCommon->GetClientWidth()),
 			static_cast<float>(dxCommon->GetClientHeight()));
-		// Pink/Yellowの危険Lightは本編と同じ軌道・反射・SpotLightを使い、Cameraだけ固定します。
+		// Edit Viewでは時刻を進めず、Pink/Yellowの危険Lightをその位置に止めます。
 		hazardLights_.Update(
 			deltaTime,
 			nullptr,
@@ -412,7 +413,7 @@ void Stage::Update()
 			});
 		stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
 		const bool startRequested =
-			ImGuiManager::GetInstance()->IsGameViewActive() &&
+			isGameViewActive &&
 			(Engine::Input::GetInstance()->TriggerKey(DIK_RETURN) ||
 				Engine::Input::GetInstance()->IsPadButtonPressed(0, 3));
 		if (startRequested) {
@@ -429,57 +430,64 @@ void Stage::Update()
 	// ---------- Stage1マップのホットリロード ----------
 	ApplyRequestedStageChange();
 	UpdateStageMapHotReload();
-	if (ImGuiManager::GetInstance()->IsGameViewActive()) {
+	const bool isGameViewActive = ImGuiManager::GetInstance()->IsGameViewActive();
+	if (isGameViewActive) {
 		stageMapRuntime_.UpdatePaths(Engine::DirectXCommon::GetInstance()->GetDeltaTime());
 	}
 
-	// ---------- プレイヤーの移動と重力 ----------
+	// ---------- Game Viewだけでプレイヤー・ライト・ギミックの時間を進める ----------
 	const float deltaTime = Engine::DirectXCommon::GetInstance()->GetDeltaTime();
-	const bool wasLightDeathPlaying = lightDeath_.IsPlaying();
-	if (wasLightDeathPlaying) {
-		UpdateLightDeath(deltaTime);
-	}
-	const bool isStageStartPlaying = wasLightDeathPlaying ? false : UpdateStagePlayer(deltaTime);
-	stageBgm_.Update(deltaTime);
-	// 本編のDoor・危険Lightの結果だけを、自動確認部品へ渡します。
-	if (!wasLightDeathPlaying) {
-		gameplaySmoke_.Update(
-			{
-				&hazardLights_,
-				&collisionWorld_.GetSolidObbs(),
-				lightPuzzle_.IsDoorSwitchReceivingLight(),
-				lightPuzzle_.GetDoorOpenAmount(),
-			},
-			deltaTime);
-		if (!fixedMirrors_.empty()) {
-			UpdateMirrorGameplay();
+	bool isStageStartPlaying = false;
+	if (isGameViewActive) {
+		const bool wasLightDeathPlaying = lightDeath_.IsPlaying();
+		if (wasLightDeathPlaying) {
+			UpdateLightDeath(deltaTime);
 		}
-	}
-	if (!fixedMirrors_.empty()) {
-		UpdateLightPuzzle(deltaTime, !wasLightDeathPlaying);
-		// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
-		hazardLights_.Update(
-			deltaTime,
-			player_ && !wasLightDeathPlaying ? &player_->GetSphere() : nullptr,
-			[this](const std::vector<LaserSegment>& sourceSegments)
-			{
-				return ReflectHazardLightSegments(sourceSegments);
-			});
-		// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
-		stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
-		// 接触判定より先に警告の方向と範囲を更新し、死亡演出へそのまま引き継ぎます。
-		if (player_ && !wasLightDeathPlaying) {
-			stageLightWarning_.Update(*player_, lightPuzzle_, hazardLights_, deltaTime);
-		}
-		if (!wasLightDeathPlaying && !isStageStartPlaying &&
-			(lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit())) {
-			if (player_) {
-				lightDeath_.Begin(*player_, stageLightWarning_);
+		isStageStartPlaying = wasLightDeathPlaying ? false : UpdateStagePlayer(deltaTime);
+		stageBgm_.Update(deltaTime);
+		// 本編のDoor・危険Lightの結果だけを、自動確認部品へ渡します。
+		if (!wasLightDeathPlaying) {
+			gameplaySmoke_.Update(
+				{
+					&hazardLights_,
+					&collisionWorld_.GetSolidObbs(),
+					lightPuzzle_.IsDoorSwitchReceivingLight(),
+					lightPuzzle_.GetDoorOpenAmount(),
+				},
+				deltaTime);
+			if (!fixedMirrors_.empty()) {
+				UpdateMirrorGameplay();
 			}
 		}
+		if (!fixedMirrors_.empty()) {
+			UpdateLightPuzzle(deltaTime, !wasLightDeathPlaying);
+			// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
+			hazardLights_.Update(
+				deltaTime,
+				player_ && !wasLightDeathPlaying ? &player_->GetSphere() : nullptr,
+				[this](const std::vector<LaserSegment>& sourceSegments)
+				{
+					return ReflectHazardLightSegments(sourceSegments);
+				});
+			// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
+			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
+			// 接触判定より先に警告の方向と範囲を更新し、死亡演出へそのまま引き継ぎます。
+			if (player_ && !wasLightDeathPlaying) {
+				stageLightWarning_.Update(*player_, lightPuzzle_, hazardLights_, deltaTime);
+			}
+			if (!wasLightDeathPlaying && !isStageStartPlaying &&
+				(lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit())) {
+				if (player_) {
+					lightDeath_.Begin(*player_, stageLightWarning_);
+				}
+			}
+		} else {
+			// 設計開始時のStageでは前StageのLaser光だけを残さず、共通の床と配置物を表示します。
+			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
+		}
 	} else {
-		// 設計開始時のStageでは前StageのLaser光だけを残さず、共通の床と配置物を表示します。
-		stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
+		// Edit ViewではCollider表示だけを現在の配置へ同期し、Player入力や演出は進めません。
+		UpdateStagePlayer(0.0f);
 	}
 
 	// ---------- カメラとデバッグ UI の更新 ----------
@@ -506,10 +514,8 @@ void Stage::Update()
 	ImGuiManager::GetInstance()->End();
 	const int nextStageId = ImGuiManager::GetInstance()->TakeRequestedStageId();
 	if (nextStageId >= 1 && nextStageId != GetStageId()) {
-		// 切替前の編集中データを現在StageのJSONへ保存し、失敗したら番号を変えません。
-		if (SaveStageMap()) {
-			RequestStage(nextStageId);
-		}
+		// 明示保存していない編集は現在Stageのメモリだけに残し、切替成功時に破棄します。
+		RequestStage(nextStageId);
 	}
 
 	PrepareStageRenderObjects();
@@ -593,7 +599,7 @@ void Stage::Draw()
 	stageBgm_.MarkFrameDrawn();
 }
 
-// 開始演出・自動確認・通常入力のいずれかでPlayerを更新し、開始演出中ならtrueを返します。
+// Colliderを先に同期し、Game Viewでだけ開始演出・自動確認・Player入力を進めます。
 bool Stage::UpdateStagePlayer(float deltaTime)
 {
 	if (!player_ || !floor_) {
@@ -618,6 +624,10 @@ bool Stage::UpdateStagePlayer(float deltaTime)
 		return true;
 	}
 
+	if (!isGameViewActive) {
+		return false;
+	}
+
 	if (gameplaySmoke_.IsEnabled()) {
 		// 自動検証ではCameraに影響されない世界+X方向へ歩かせます。
 		Player::ControlInput smokeControl{};
@@ -627,10 +637,6 @@ bool Stage::UpdateStagePlayer(float deltaTime)
 			collisionWorld_.GetSolidObbs(),
 			{ 0.0f, 0.0f, 1.0f },
 			smokeControl);
-		return false;
-	}
-
-	if (!isGameViewActive) {
 		return false;
 	}
 

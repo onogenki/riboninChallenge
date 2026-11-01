@@ -633,7 +633,7 @@ void ImGuiManager::SceneWindow(const char* sceneName)
 			}
 			ImGui::EndCombo();
 		}
-		ImGui::TextDisabled("Saves the current map, then loads the selected stage JSON.");
+		ImGui::TextWrapped("Unsaved edits are discarded when changing stages. Press Save Map first to keep them.");
 		ImGui::SeparatorText("Scene");
 	}
 

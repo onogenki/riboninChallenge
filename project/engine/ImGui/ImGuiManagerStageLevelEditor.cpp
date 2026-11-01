@@ -3,13 +3,15 @@
 #include <algorithm>
 #include <numbers>
 
-// 選択中StageのJSON再読込と、その配置物だけを編集するInspector UIを表示します。
+// 選択中StageのJSON再読込と配置物の編集を表示し、削除操作は対象の詳細欄へ置きます。
 LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 	bool& autoReload,
 	const std::string& filePath,
 	const std::string& status,
 	LevelLoader::LevelData* levelData,
-	int& selectedObjectIndex)
+	int& selectedObjectIndex,
+	bool canUndo,
+	bool canRedo)
 {
 	LevelEditorResult result{};
 #ifdef USE_IMGUI
@@ -27,11 +29,42 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		ImGui::Checkbox("Auto Reload", &autoReload);
 		ImGui::TextDisabled("Watches changes saved by an external editor.");
 		result.saveRequested = ImGui::Button("Save Map");
-		ImGui::SameLine();
 		result.reloadRequested = ImGui::Button("Reload Now");
 		if (ImGui::IsItemHovered()) {
 			ImGui::SetTooltip("Discards unsaved edits and reloads the JSON file.");
 		}
+		// 履歴がある側だけ黄色にし、狭いInspectorでもReloadの右へ二つの操作を収めます。
+		ImGui::SameLine();
+		if (canUndo) {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.78f, 0.63f, 0.12f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.75f, 0.20f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.65f, 0.50f, 0.08f, 1.0f));
+		}
+		result.undoRequested = ImGui::Button("Undo") && canUndo;
+		if (canUndo) {
+			ImGui::PopStyleColor(3);
+		}
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip(canUndo
+				? "Undo one Stage map edit in memory. Press Save Map to keep it."
+				: "No Stage map edit to undo.");
+		}
+		ImGui::SameLine();
+		if (canRedo) {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.78f, 0.63f, 0.12f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.92f, 0.75f, 0.20f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.65f, 0.50f, 0.08f, 1.0f));
+		}
+		result.redoRequested = ImGui::Button("Redo") && canRedo;
+		if (canRedo) {
+			ImGui::PopStyleColor(3);
+		}
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip(canRedo
+				? "Redo one undone Stage map edit in memory. Press Save Map to keep it."
+				: "No undone Stage map edit to redo.");
+		}
+		ImGui::TextWrapped("Only Save Map writes the JSON. Unsaved edits disappear on stage or scene change and exit.");
 	}
 	ImGui::TextWrapped("Status: %s", status.c_str());
 
@@ -96,7 +129,37 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 		ImGui::TextWrapped("Editing: %s", objectData.name.c_str());
 		ImGui::PopStyleColor();
 		ImGui::TextWrapped("Model: %s", objectData.fileName.empty() ? "(none)" : objectData.fileName.c_str());
-		ImGui::Text("Tag: %s", objectData.tag.empty() ? "(none)" : objectData.tag.c_str());
+		// Tagと削除を同じ行に置き、狭いInspectorでも対象名を確認してから押せるようにします。
+		if (ImGui::BeginTable("ObjectTagActions", 2, ImGuiTableFlags_SizingStretchProp)) {
+			ImGui::TableSetupColumn("Tag", ImGuiTableColumnFlags_WidthStretch);
+			ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthFixed, 72.0f);
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::TextWrapped("Tag: %s", objectData.tag.empty() ? "(none)" : objectData.tag.c_str());
+			ImGui::TableSetColumnIndex(1);
+			const bool protectedObject = objectData.tag == "Floor" || objectData.tag == "Mirror";
+			// 削除できるモデルを選んだ時だけ赤くし、それ以外は通常のボタン色で表示します。
+			const bool highlightRemovableModel = !protectedObject && objectData.type == "MESH";
+			ImGui::BeginDisabled(protectedObject);
+			if (highlightRemovableModel) {
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.65f, 0.16f, 0.16f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.82f, 0.24f, 0.24f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.50f, 0.10f, 0.10f, 1.0f));
+			}
+			result.removeSelectedRequested = ImGui::Button("Remove", ImVec2(-1.0f, 0.0f));
+			if (highlightRemovableModel) {
+				ImGui::PopStyleColor(3);
+			}
+			ImGui::EndDisabled();
+			if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+				if (protectedObject) {
+					ImGui::SetTooltip("Floor and Mirror cannot be removed.");
+				} else {
+					ImGui::SetTooltip("Remove %s. Press Save Map to keep this change.", objectData.name.c_str());
+				}
+			}
+			ImGui::EndTable();
+		}
 		if (objectData.tag == "EditorAdded") {
 			// 入力中の文字をフレーム間で保持し、確定後だけRuntimeの名前対応を作り直します。
 			static int nameEditIndex = -1;
@@ -373,14 +436,9 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 			if (ImGui::IsItemHovered()) {
 				ImGui::SetTooltip("Adds a box that changes distance, pitch, and FOV while player stays in control.");
 			}
-			result.addPathSphereRequested = ImGui::Button("Add Path Sphere");
-			const bool protectedObject =
-				objectData.tag == "Floor" || objectData.tag == "Mirror";
-			ImGui::BeginDisabled(protectedObject);
-			result.removeSelectedRequested = ImGui::Button("Remove Selected");
-			ImGui::EndDisabled();
-			if (protectedObject && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-				ImGui::SetTooltip("Floor and Mirror cannot be removed.");
+			result.addPathBoxRequested = ImGui::Button("Add Path Box");
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("Optional moving block or obstacle. Edit its path and BOX collider in Object Details.");
 			}
 		}
 	}
@@ -391,6 +449,8 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 	(void)status;
 	(void)levelData;
 	(void)selectedObjectIndex;
+	(void)canUndo;
+	(void)canRedo;
 #endif
 	return result;
 }

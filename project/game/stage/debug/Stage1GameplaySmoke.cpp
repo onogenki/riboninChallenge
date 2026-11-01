@@ -203,7 +203,7 @@ namespace
 			!editor.SynchronizeFirstMirror(noMirrorData, fixedMirror, 0.25f);
 	}
 
-	// Editorの再構築失敗時に、削除・一括削除・追加が元のJSONと選択を保つか確認します。
+	// Editorの再構築失敗時は元へ戻し、成功した一括削除も明示保存前のメモリだけに留めます。
 	bool CheckStageEditorFailureRollback()
 	{
 		LevelLoader::LevelData levelData{};
@@ -217,7 +217,6 @@ namespace
 		levelData.objects.push_back(std::move(addedObject));
 		int selectedIndex = 1;
 		int applyCalls = 0;
-		int saveCalls = 0;
 		std::string status;
 		StageLevelEditor::Context context{};
 		context.levelData = &levelData;
@@ -226,11 +225,6 @@ namespace
 		{
 			++applyCalls;
 			return false;
-		};
-		context.saveLevelData = [&saveCalls]()
-		{
-			++saveCalls;
-			return true;
 		};
 		context.setStatus = [&status](const std::string& message)
 		{
@@ -246,23 +240,18 @@ namespace
 		StageLevelEditor editor;
 		const bool removeRejected = !editor.RemoveSelectedObject(context) && isOriginalState();
 		const bool clearRejected = editor.ClearEditorAddedObjects(context) ==
-			"Clear failed. Current stage was kept." && isOriginalState() && saveCalls == 0;
+			"Clear failed. Current stage was kept." && isOriginalState();
 		const bool addRejected = !editor.AddCameraArea(context) && isOriginalState();
 		const bool pairRejected = !editor.AddEventPair(context) && isOriginalState();
-		// 再構築は成功して保存だけ失敗した時、保存済みと誤表示しないことも確認します。
+		// 成功した削除もJSON保存済みと誤表示せず、既存モデルを残すことを確認します。
 		context.applyLevelData = [](bool) { return true; };
-		context.saveLevelData = [&saveCalls]()
-		{
-			++saveCalls;
-			return false;
-		};
 		const std::string clearMessage = editor.ClearEditorAddedObjects(context);
-		const bool saveFailureReported = levelData.objects.size() == 1 &&
+		const bool clearedOnlyInMemory = levelData.objects.size() == 1 &&
 			levelData.objects.front().name == "Existing" && selectedIndex == 0 &&
-			saveCalls == 1 && status == "Models cleared in memory, but Save Map failed." &&
+			status == "Models cleared in memory. Press Save Map to keep it." &&
 			clearMessage == status;
 		return removeRejected && clearRejected && addRejected && pairRejected &&
-			saveFailureReported && applyCalls == 4;
+			clearedOnlyInMemory && applyCalls == 4;
 	}
 
 	// 実モデルに合うBOX判定と改名がRuntimeへ届き、不正対象と反映失敗では元のデータを保つか確認します。

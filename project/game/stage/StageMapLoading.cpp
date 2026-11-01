@@ -14,7 +14,7 @@ bool Stage::LoadStage(int stageId, bool resetPlayerPosition)
 		stageEditor_.SetReloadStatus(reloadStatus);
 		return false;
 	}
-	stageEditor_.ResetForStage(stageMapRepository_.GetLevelData()->objects.size());
+	stageEditor_.ResetForStage(*stageMapRepository_.GetLevelData());
 	if (resetPlayerPosition && player_) {
 		const Vector3 playerStartPosition = GetStagePlayerStartPosition();
 		player_->SetPosition(playerStartPosition);
@@ -78,6 +78,7 @@ bool Stage::ReloadStageMap(bool resetPlayerPosition)
 		return false;
 	}
 	stageEditor_.ClampSelectedObjectIndex(stageMapRepository_.GetLevelData()->objects.size());
+	stageEditor_.ResetHistory(*stageMapRepository_.GetLevelData());
 	if (resetPlayerPosition && player_) {
 		const Vector3 playerStartPosition = GetStagePlayerStartPosition();
 		player_->SetPosition(playerStartPosition);

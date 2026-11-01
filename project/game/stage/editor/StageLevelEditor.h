@@ -21,9 +21,8 @@ public:
 		const StageMapRuntime* mapRuntime = nullptr;
 		Vector3 playerPosition{};
 		int* selectedObjectIndex = nullptr;
-		// Stage1側の実行中モデル再構築・JSON保存・状態表示を呼ぶ窓口です。
+		// 実行中モデルへの反映と状態表示だけを借り、JSON保存はInspectorの明示操作へ任せます。
 		std::function<bool(bool rebuildRuntimeObjects)> applyLevelData;
-		std::function<bool()> saveLevelData;
 		std::function<void(const std::string&)> setStatus;
 	};
 
@@ -33,19 +32,19 @@ public:
 	void DrawModelShelf(const Context& context);
 	// Edit Viewへ落としたモデルを、同じ追加処理へ渡します。
 	void HandleShelfDropOnEditView(const Context& context);
-	// 任意モデル、Sphere、Event対、Camera Area、Path SphereをLevelDataへ追加します。
+	// 任意モデル、Sphere、Event対、Camera Area、Path BoxをLevelDataへ追加します。
 	bool AddModel(const Context& context, const std::string& fileName);
 	bool AddSphere(const Context& context);
 	bool AddEventPair(const Context& context);
 	bool AddCameraArea(const Context& context);
-	bool AddPathSphere(const Context& context);
+	bool AddPathBox(const Context& context);
 	// 選択中のEditor追加モデルだけを改名し、失敗した再構築では旧名へ戻します。
 	bool RenameSelectedObject(const Context& context, const std::string& requestedName);
 	// 選択中の通常モデルへBOX判定を付け、反映失敗時には元のデータへ戻します。
 	bool AddBoxCollider(const Context& context);
 	// 選択中の削除可能なObjectを消し、再構築失敗時はデータと選択を戻します。
 	bool RemoveSelectedObject(const Context& context);
-	// Editor追加モデルだけを消し、再構築と保存の結果を表示用の文章で返します。
+	// Editor追加モデルだけをメモリから消し、再構築の結果を表示用の文章で返します。
 	std::string ClearEditorAddedObjects(const Context& context);
 	// Scene終了時にShelfの前回選択を破棄します。
 	void Finalize();

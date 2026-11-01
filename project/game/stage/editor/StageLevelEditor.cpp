@@ -34,7 +34,7 @@ void StageLevelEditor::Initialize()
 	SceneEditor::ScanResourceShelf(shelfState_);
 }
 
-// Model Shelfからの追加・一括削除を、現在StageのLevelData操作へ変換し、保存失敗を棚にも表示します。
+// Model Shelfからの追加・一括削除を現在Stageのメモリへ反映し、明示保存までJSONを変更しません。
 void StageLevelEditor::DrawModelShelf(const Context& context)
 {
 #ifdef USE_IMGUI
@@ -50,11 +50,7 @@ void StageLevelEditor::DrawModelShelf(const Context& context)
 	callbacks.addModel = [this, &context, &actionMessage](const std::string& fileName)
 	{
 		const bool added = AddModel(context, fileName);
-		if (added && context.saveLevelData) {
-			if (!context.saveLevelData()) {
-				actionMessage = "Model added in memory, but Save Map failed. Press Save Map to retry.";
-			}
-		} else if (added) {
+		if (added) {
 			actionMessage = "Model added in memory. Press Save Map to keep it.";
 		}
 		return added;
@@ -73,7 +69,7 @@ void StageLevelEditor::DrawModelShelf(const Context& context)
 #endif
 }
 
-// Edit ViewへのDrag & DropをModel Shelfと同じモデル追加処理へ渡し、保存失敗を棚にも表示します。
+// Edit ViewへのDrag & Dropもメモリだけに追加し、Save Mapを押すまでJSONを変更しません。
 void StageLevelEditor::HandleShelfDropOnEditView(const Context& context)
 {
 #ifdef USE_IMGUI
@@ -83,11 +79,7 @@ void StageLevelEditor::HandleShelfDropOnEditView(const Context& context)
 	callbacks.addModel = [this, &context, &actionMessage](const std::string& fileName)
 	{
 		const bool added = AddModel(context, fileName);
-		if (added && context.saveLevelData) {
-			if (!context.saveLevelData()) {
-				actionMessage = "Model added in memory, but Save Map failed. Press Save Map to retry.";
-			}
-		} else if (added) {
+		if (added) {
 			actionMessage = "Model added in memory. Press Save Map to keep it.";
 		}
 		return added;
@@ -339,7 +331,7 @@ bool StageLevelEditor::AddEventPair(const Context& context)
 		return false;
 	}
 	if (context.setStatus) {
-		context.setStatus("Added Event Trigger and Event Camera.");
+		context.setStatus("Added Event Trigger and Event Camera in memory. Press Save Map to keep them.");
 	}
 	return true;
 }
@@ -371,8 +363,8 @@ bool StageLevelEditor::AddCameraArea(const Context& context)
 	return CommitAddedObject(context, std::move(areaData), "Added Camera Area. Adjust it in the Inspector.", "Add failed. Camera Area could not be created.");
 }
 
-// 制御点に沿って往復するsphere.objを、Player左前方へ追加します。
-bool StageLevelEditor::AddPathSphere(const Context& context)
+// BOX判定と同じ形のbox.objを、制御点で動く任意の配置物としてPlayer左前方へ追加します。
+bool StageLevelEditor::AddPathBox(const Context& context)
 {
 	if (!context.levelData || !context.selectedObjectIndex) {
 		if (context.setStatus) {
@@ -383,10 +375,10 @@ bool StageLevelEditor::AddPathSphere(const Context& context)
 
 	LevelLoader::ObjectData objectData{};
 	objectData.type = "MESH";
-	objectData.name = MakeUniqueName(*context.levelData, "PathSphere");
+	objectData.name = MakeUniqueName(*context.levelData, "PathBox");
 	objectData.tag = "MapObject";
 	objectData.objectType = "PATH_OBJECT";
-	objectData.fileName = "debug/sphere.obj";
+	objectData.fileName = "debug/box.obj";
 	objectData.translation = context.playerPosition;
 	objectData.translation.x -= 4.0f;
 	objectData.translation.y += 1.5f;
@@ -397,7 +389,7 @@ bool StageLevelEditor::AddPathSphere(const Context& context)
 	objectData.hasCollider = true;
 	objectData.collider.type = "BOX";
 	objectData.collider.size = { 1.0f, 1.0f, 1.0f };
-	return CommitAddedObject(context, std::move(objectData), "Added control point path sphere.", "Add failed. Path sphere could not be created.");
+	return CommitAddedObject(context, std::move(objectData), "Added control point path box.", "Add failed. Path box could not be created.");
 }
 
 // 選択中のObjectを実行中モデルへ反映してから確定し、失敗時はデータと選択を戻します。
@@ -430,12 +422,12 @@ bool StageLevelEditor::RemoveSelectedObject(const Context& context)
 		return false;
 	}
 	if (context.setStatus) {
-		context.setStatus("Removed selected object.");
+		context.setStatus("Removed selected object in memory. Press Save Map to keep the removal.");
 	}
 	return true;
 }
 
-// EditorAddedタグだけを消し、再構築失敗時は復元して結果を棚とInspectorへ返します。
+// EditorAddedタグだけをメモリから消し、再構築失敗時は復元して結果を棚とInspectorへ返します。
 std::string StageLevelEditor::ClearEditorAddedObjects(const Context& context)
 {
 	if (!context.levelData || !context.selectedObjectIndex || !context.applyLevelData) {
@@ -459,22 +451,11 @@ std::string StageLevelEditor::ClearEditorAddedObjects(const Context& context)
 		}
 		return "Clear failed. Current stage was kept.";
 	}
-	if (context.saveLevelData && !context.saveLevelData()) {
-		if (context.setStatus) {
-			context.setStatus("Models cleared in memory, but Save Map failed.");
-		}
-		return "Models cleared in memory, but Save Map failed.";
-	}
-	if (!context.saveLevelData) {
-		if (context.setStatus) {
-			context.setStatus("Models cleared in memory. Press Save Map to keep it.");
-		}
-		return "Models cleared in memory. Press Save Map to keep it.";
-	}
+	const std::string message = "Models cleared in memory. Press Save Map to keep it.";
 	if (context.setStatus) {
-		context.setStatus("Cleared models added from Edit View.");
+		context.setStatus(message);
 	}
-	return "Cleared models added from Edit View.";
+	return message;
 }
 
 // 同じprefixの連番を調べ、まだ使われていない最初のObject名を返します。
@@ -512,7 +493,7 @@ bool StageLevelEditor::CommitAddedObject(
 		return false;
 	}
 	if (context.setStatus) {
-		context.setStatus(successMessage);
+		context.setStatus(successMessage + " Press Save Map to keep it.");
 	}
 	return true;
 }
