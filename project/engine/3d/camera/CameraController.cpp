@@ -11,6 +11,20 @@ using namespace MyMath;
 
 namespace Engine
 {
+namespace
+{
+	// 通常視点を遮る壁が近付いた時だけ上昇し、天井の手前までの距離も候補ごとに調べます。
+	constexpr float kWallAvoidanceStartDistance = 8.0f;
+	constexpr float kWallAvoidanceMaximumPitch = 1.45f;
+	constexpr int kWallAvoidancePitchSamples = 16;
+	constexpr float kWallAvoidanceRiseSpeed = 7.0f;
+	constexpr float kWallAvoidanceReturnSpeed = 3.0f;
+	constexpr float kWallAvoidancePositionSpeed = 6.0f;
+	constexpr float kWallAvoidanceTurnSpeed = 2.5f;
+	constexpr float kWallAvoidanceYawStep = 0.15f;
+	constexpr int kWallAvoidanceYawSamples = 8;
+}
+
 void CameraController::Initialize(Engine::Camera* camera, const Vector3& targetPosition)
 {
 	// Controller は Camera を作らず、Scene から渡された Camera を操作する
@@ -25,6 +39,9 @@ void CameraController::Initialize(Engine::Camera* camera, const Vector3& targetP
 	targetDistance_ = distance_;
 	manualDistance_ = distance_;
 	manualOrbitPitch_ = orbitPitch_;
+	wallPitchOffset_ = 0.0f;
+	wallYawOffset_ = 0.0f;
+	isAutomaticWallViewEnabled_ = true;
 	orbitAnchorYaw_ = targetOrbitYaw_;
 	orbitStepIndex_ = 0;
 	distanceStepIndex_ = std::clamp(
@@ -53,6 +70,9 @@ void CameraController::Initialize(
 	orbitStepIndex_ = 0;
 	orbitPitch_ = std::clamp(orbitPitch, minimumOrbitPitch_, maximumOrbitPitch_);
 	manualOrbitPitch_ = orbitPitch_;
+	wallPitchOffset_ = 0.0f;
+	wallYawOffset_ = 0.0f;
+	isAutomaticWallViewEnabled_ = false;
 	targetOrbitPitch_ = orbitPitch_;
 	distanceStepIndex_ = std::clamp(
 		static_cast<int>(std::round((manualDistance_ - minimumManualDistance_) / manualDistanceStep_)),
@@ -168,26 +188,44 @@ void CameraController::UpdateOrbit(
 	orbitPitch_ += (targetOrbitPitch_ - orbitPitch_) * orbitT;
 }
 
-// 壁回避済みの位置と視野角を更新し、最後にCameraのTransformへ反映します。
+// 壁際では手動角度を残して上方へ逃がし、天井と外壁を避けた位置・視野角を反映します。
 void CameraController::UpdateCameraTransform(
 	float deltaTime,
 	bool isTargetMoving,
 	const std::vector<MyMath::OBB>& cameraCollisionObbs)
 {
 
+	// 手動角度を変更せず、横壁の自動回転と上方回避だけを一時的に足します。
+	const float desiredYawOffset = isWallAvoidanceEnabled_ && isAutomaticWallViewEnabled_
+		? CalculateWallAvoidanceYaw(cameraCollisionObbs) - orbitYaw_
+		: 0.0f;
+	const float yawT = 1.0f - std::exp(-kWallAvoidanceTurnSpeed * deltaTime);
+	wallYawOffset_ += (desiredYawOffset - wallYawOffset_) * yawT;
+	const float effectiveYaw = orbitYaw_ + wallYawOffset_;
+	const float desiredPitchOffset = isWallAvoidanceEnabled_ && isAutomaticWallViewEnabled_
+		? (std::max)(0.0f, CalculateWallAvoidancePitch(effectiveYaw, cameraCollisionObbs) - orbitPitch_)
+		: 0.0f;
+	const float pitchSpeed = desiredPitchOffset > wallPitchOffset_
+		? kWallAvoidanceRiseSpeed : kWallAvoidanceReturnSpeed;
+	const float pitchT = 1.0f - std::exp(-pitchSpeed * deltaTime);
+	wallPitchOffset_ += (desiredPitchOffset - wallPitchOffset_) * pitchT;
+	const float effectivePitch = std::clamp(
+		orbitPitch_ + wallPitchOffset_, minimumOrbitPitch_, kWallAvoidanceMaximumPitch);
+	wallPitchOffset_ = effectivePitch - orbitPitch_;
+
 	// Camera の理想位置は Focus 基準で決めるため、Player が向くだけでは移動しない
 	const Vector3 targetCameraPosition =
-		CalculateCollisionSafeCameraPosition(cameraCollisionObbs);
-	const Vector3 idealCameraPosition = CalculateTargetCameraPosition();
+		CalculateCollisionSafeCameraPosition(cameraCollisionObbs, effectiveYaw, effectivePitch);
+	const Vector3 idealCameraPosition = CalculateTargetCameraPosition(effectiveYaw, effectivePitch, distance_);
 	const Vector3 avoidanceOffset{
 		idealCameraPosition.x - targetCameraPosition.x,
 		idealCameraPosition.y - targetCameraPosition.y,
 		idealCameraPosition.z - targetCameraPosition.z,
 	};
 	const bool isAvoidingOuterWall = Length(avoidanceOffset) > 0.0001f;
-	const float followSpeed = isAvoidingOuterWall
-		? wallAvoidanceFollowSpeed_
-		: cameraFollowSpeed_;
+	const float followSpeed = wallPitchOffset_ > 0.001f
+		? kWallAvoidancePositionSpeed
+		: (isAvoidingOuterWall ? wallAvoidanceFollowSpeed_ : cameraFollowSpeed_);
 	const float cameraT = 1.0f - std::exp(-followSpeed * deltaTime);
 	cameraPosition_ = Lerp(cameraPosition_, targetCameraPosition, cameraT);
 	// 補間中に外壁を通り抜けるFrameを作らず、建物の外を映さないようにします。
@@ -344,12 +382,26 @@ void CameraController::SynchronizeToCamera(const Vector3& targetPosition)
 	targetDistance_ = distance;
 	orbitPitch_ = std::asin(std::clamp(cameraOffset.y / distance, -1.0f, 1.0f));
 	manualOrbitPitch_ = orbitPitch_;
+	wallPitchOffset_ = 0.0f;
+	wallYawOffset_ = 0.0f;
 	targetOrbitPitch_ = orbitPitch_;
 	orbitYaw_ = std::atan2(-cameraOffset.x, -cameraOffset.z);
 	targetOrbitYaw_ = orbitYaw_;
 	orbitAnchorYaw_ = orbitYaw_;
 	orbitStepIndex_ = 0;
 	autoRecenterTimer_ = 0.0f;
+}
+
+// 死亡前の手動角度やCamera Areaを残さず、Stage開始時と同じ追従設定を再構築します。
+void CameraController::ResetToInitialState(const Vector3& targetPosition)
+{
+	Engine::Camera* camera = camera_;
+	const bool autoRecenterEnabled = isAutoRecenterEnabled_;
+	const bool wallAvoidanceEnabled = isWallAvoidanceEnabled_;
+	*this = CameraController{};
+	isAutoRecenterEnabled_ = autoRecenterEnabled;
+	isWallAvoidanceEnabled_ = wallAvoidanceEnabled;
+	Initialize(camera, targetPosition);
 }
 
 void CameraController::SetAreaSettings(const CameraAreaSettings& settings)
@@ -448,10 +500,113 @@ bool CameraController::IsCameraSettingAvailable(
 	return candidateRatio > currentRatio + 0.05f;
 }
 
-Vector3 CameraController::CalculateCollisionSafeCameraPosition(
+// 通常視点が壁へ近付くほど上方候補を試し、天井も含めて見通せる距離を確保します。
+float CameraController::CalculateWallAvoidancePitch(
+	float yaw,
 	const std::vector<MyMath::OBB>& cameraCollisionObbs) const
 {
-	const Vector3 targetCameraPosition = CalculateTargetCameraPosition();
+	if (cameraCollisionObbs.empty() || orbitPitch_ >= kWallAvoidanceMaximumPitch) {
+		return orbitPitch_;
+	}
+
+	const float normalSafeDistance = distance_ * CalculateAvailablePathRatio(
+		yaw, orbitPitch_, distance_, cameraCollisionObbs);
+	if (normalSafeDistance >= kWallAvoidanceStartDistance) {
+		return orbitPitch_;
+	}
+
+	float bestPitch = orbitPitch_;
+	float bestDistance = normalSafeDistance;
+	for (int sample = 1; sample <= kWallAvoidancePitchSamples; ++sample) {
+		const float pitch = orbitPitch_ +
+			(kWallAvoidanceMaximumPitch - orbitPitch_) *
+			static_cast<float>(sample) / static_cast<float>(kWallAvoidancePitchSamples);
+		const float safeDistance = distance_ * CalculateAvailablePathRatio(
+			yaw, pitch, distance_, cameraCollisionObbs);
+		if (safeDistance >= kWallAvoidanceStartDistance) {
+			return pitch;
+		}
+		if (safeDistance > bestDistance) {
+			bestDistance = safeDistance;
+			bestPitch = pitch;
+		}
+	}
+	return bestPitch;
+}
+
+// 横のCameraBoundaryに遮られた時だけ、壁を越えず距離を取り戻す向きへゆっくり回します。
+float CameraController::CalculateWallAvoidanceYaw(
+	const std::vector<MyMath::OBB>& cameraCollisionObbs) const
+{
+	if (cameraCollisionObbs.empty()) {
+		return orbitYaw_;
+	}
+
+	const Vector3 normalTarget = CalculateTargetCameraPosition(orbitYaw_, orbitPitch_, distance_);
+	const MyMath::OBB* nearestBoundary = nullptr;
+	float nearestHitT = 1.0f;
+	for (const MyMath::OBB& boundary : cameraCollisionObbs) {
+		const Collision::SegmentHit hit = Collision::SegmentOBB(
+			focus_, normalTarget, boundary, cameraCollisionRadius_);
+		if (hit.isHit && hit.t < nearestHitT) {
+			nearestHitT = hit.t;
+			nearestBoundary = &boundary;
+		}
+	}
+	if (!nearestBoundary) {
+		return orbitYaw_;
+	}
+
+	// 最も薄い軸がX方向の外壁だけを横壁とし、天井や前後の壁では自動回転しません。
+	int normalAxis = 0;
+	if (nearestBoundary->size.y < nearestBoundary->size.x) {
+		normalAxis = 1;
+	}
+	if (nearestBoundary->size.z <
+		(normalAxis == 0 ? nearestBoundary->size.x : nearestBoundary->size.y)) {
+		normalAxis = 2;
+	}
+	const Vector3 wallNormal = nearestBoundary->orientations[normalAxis];
+	if (std::abs(wallNormal.x) <= (std::max)(std::abs(wallNormal.y), std::abs(wallNormal.z))) {
+		return orbitYaw_;
+	}
+
+	const float normalSafeDistance = distance_ * CalculateAvailablePathRatio(
+		orbitYaw_, orbitPitch_, distance_, cameraCollisionObbs);
+	if (normalSafeDistance >= kWallAvoidanceStartDistance) {
+		return orbitYaw_;
+	}
+
+	float bestYaw = orbitYaw_;
+	float bestDistance = normalSafeDistance;
+	// 左右が同じだけ空いている場合は、まず現在の手動角度が0へ近付く側を試します。
+	const float preferredSign = std::abs(wallYawOffset_) > 0.01f
+		? (wallYawOffset_ > 0.0f ? 1.0f : -1.0f)
+		: (std::remainder(orbitYaw_, 2.0f * std::numbers::pi_v<float>) > 0.0f ? -1.0f : 1.0f);
+	for (int sample = 1; sample <= kWallAvoidanceYawSamples; ++sample) {
+		for (const float sign : { preferredSign, -preferredSign }) {
+			const float yaw = orbitYaw_ + sign * kWallAvoidanceYawStep * static_cast<float>(sample);
+			const float safeDistance = distance_ * CalculateAvailablePathRatio(
+				yaw, orbitPitch_, distance_, cameraCollisionObbs);
+			if (safeDistance >= kWallAvoidanceStartDistance) {
+				return yaw;
+			}
+			if (safeDistance > bestDistance + 0.05f) {
+				bestDistance = safeDistance;
+				bestYaw = yaw;
+			}
+		}
+	}
+	return bestYaw;
+}
+
+// 選んだ上方角度でも外壁・天井を越えず、最初の接触位置の少し手前で止めます。
+Vector3 CameraController::CalculateCollisionSafeCameraPosition(
+	const std::vector<MyMath::OBB>& cameraCollisionObbs,
+	float yaw,
+	float pitch) const
+{
+	const Vector3 targetCameraPosition = CalculateTargetCameraPosition(yaw, pitch, distance_);
 	// 壁越しシルエットを使うSceneでは、CameraをPlayerへ近付けず通常距離を維持します。
 	if (!isWallAvoidanceEnabled_) {
 		return targetCameraPosition;
@@ -468,8 +623,8 @@ Vector3 CameraController::CalculateCollisionSafeCameraPosition(
 
 	// CameraとFocusの間に壁がある場合は、壁の少し手前まで近づける
 	const float safeT = CalculateAvailablePathRatio(
-		orbitYaw_,
-		orbitPitch_,
+		yaw,
+		pitch,
 		distance_,
 		cameraCollisionObbs);
 	return {

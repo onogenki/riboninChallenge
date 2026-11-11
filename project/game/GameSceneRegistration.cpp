@@ -1,6 +1,7 @@
 #include "GameSceneRegistration.h"
 
 #include "gameOver/GameOverScene.h"
+#include "stageClear/StageClearScene.h"
 #include "loading/LoadingScene.h"
 #include "SceneFactory.h"
 #include "Stage.h"
@@ -17,6 +18,8 @@ void RegisterGameScenes(SceneFactory& sceneFactory)
 	sceneFactory.RegisterScene("STAGE_SELECT", []() { return std::make_unique<StageSelectScene>(); });
 	// Game Overは共通の夜空だけを描き、再挑戦時は直前のStage IDを使います。
 	sceneFactory.RegisterScene("GAME_OVER", []() { return std::make_unique<GameOverScene>(); });
+	// Goalに触れた後は共通の夜空とクリア案内を表示します。
+	sceneFactory.RegisterScene("STAGE_CLEAR", []() { return std::make_unique<StageClearScene>(); });
 	sceneFactory.RegisterScene("STAGE_RETRY", []() { return std::make_unique<Stage>(GameOverScene::GetRetryStageId()); });
 	// 本編は一つのStage Sceneを使い、Stage IDごとにstage1.jsonからstage5.jsonを読み分けます。
 	sceneFactory.RegisterScene("STAGE1", []() { return std::make_unique<Stage>(1); });

@@ -25,6 +25,7 @@
 #include "StageGimmickFactory.h"
 #include "StageMirrorFactory.h"
 #include "render/StageReflectionRenderer.h"
+#include "render/StageContactShadowRenderer.h"
 #include "render/StageRenderContext.h"
 #include "render/StageSceneRenderer.h"
 #include "StageTitleOverlay.h"
@@ -42,6 +43,7 @@ using namespace MyMath;
 namespace
 {
 	constexpr const char* kSkyBoxTexturePath = "Resources/backGround/skybox-night-cube.dds";
+	constexpr const char* kGoalTag = "Goal";
 	// CSVの一マスを、ゲーム内でも1x1x1のブロックとして配置します。
 	constexpr float kStageMapChipCellSize = 1.0f;
 	// P0が従来と同じX=24、Z=35になるよう、CSV左上の座標を決めます。
@@ -50,6 +52,8 @@ namespace
 	constexpr float kStageMapChipFloorY = -2.5f;
 	// Playerの球Colliderが床上面へ接する開始高さです。
 	constexpr float kStageMapChipPlayerY = -0.8f;
+	// JSONに携帯鏡がないStageではFactoryと同じ開始位置を使います。
+	const Vector3 kDefaultCarryableMirrorPosition{ -2.5f, -0.8f, 4.5f };
 	// 提出用Titleだけが使う、Edit Viewで決めた固定Cameraの位置と角度です。
 	const Vector3 kTemporaryTitleCameraPosition{ 16.703f, 0.689f, 37.457f };
 	const Vector3 kTemporaryTitleCameraRotationDegrees{ 0.335f, -183.0f, 0.0f };
@@ -80,6 +84,7 @@ void Stage::Initialize()
 	pauseState_ = PauseState::kPlaying;
 	lightDeath_.Reset();
 	isLeavingForGameOver_ = false;
+	isLeavingForClear_ = false;
 	if (!InitializeRenderSystems()) {
 		Logger::Log(stageLogPrefix + "light puzzle renderer could not be prepared.");
 		PostQuitMessage(1);
@@ -99,6 +104,7 @@ void Stage::Initialize()
 		PostQuitMessage(1);
 		return;
 	}
+	//playerとCameraを作るのに失敗したら、壊れたstageを開始しない
 	if (!InitializePlayerAndCamera()) {
 		Logger::Log(stageLogPrefix + "player or camera could not be prepared.");
 		PostQuitMessage(1);
@@ -109,6 +115,12 @@ void Stage::Initialize()
 		Engine::DirectXCommon::GetInstance(), cameraManager_->GetActiveCamera(), kSkyBoxTexturePath);
 	if (!skyBox_) {
 		Logger::Log(stageLogPrefix + "SkyBox texture could not be loaded: " + kSkyBoxTexturePath);
+		PostQuitMessage(1);
+		return;
+	}
+	contactShadows_ = std::make_unique<StageContactShadowRenderer>();
+	if (!contactShadows_->Initialize(object3dCommon_)) {
+		Logger::Log(stageLogPrefix + "contact shadow plane or circle texture could not be prepared.");
 		PostQuitMessage(1);
 		return;
 	}
@@ -165,7 +177,7 @@ bool Stage::InitializeStageGimmicks()
 		object3dCommon_,
 		// 以前から携帯Mirrorに使っていた白い板Modelを使います。
 		"debug/plane.obj",
-		{ -2.5f, -0.8f, 4.5f },
+		kDefaultCarryableMirrorPosition,
 		3.6f,
 		3.6f);
 	if (!carryableMirror_) {
@@ -316,7 +328,7 @@ void Stage::InitializeGameplaySmoke()
 	});
 }
 
-// 初期化途中でもTitle・Pause案内を含む生成済みの所有物だけを安全に解放します。
+// 初期化途中でも床影とTitle・Pause案内を含む生成済みの所有物だけを安全に解放します。
 void Stage::Finalize()
 {
 	isStageReady_ = false;
@@ -328,6 +340,7 @@ void Stage::Finalize()
 	if (stagePauseOverlay_) {
 		stagePauseOverlay_->Finalize();
 	}
+	contactShadows_.reset();
 	skyBox_.reset();
 	stageCameraEvents_.Clear(cameraManager_.get());
 	stageEditor_.Finalize();
@@ -485,6 +498,10 @@ void Stage::Update()
 			// 設計開始時のStageでは前StageのLaser光だけを残さず、共通の床と配置物を表示します。
 			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
 		}
+		// 危険Lightの死亡判定後にGoalを調べ、死亡演出中はクリアへ進めません。
+		if (!isStageStartPlaying) {
+			UpdateGoal();
+		}
 	} else {
 		// Edit ViewではCollider表示だけを現在の配置へ同期し、Player入力や演出は進めません。
 		UpdateStagePlayer(0.0f);
@@ -521,7 +538,7 @@ void Stage::Update()
 	PrepareStageRenderObjects();
 }
 
-// Sceneは所有対象を渡す順番だけを決め、共通の描画準備はStageRenderContextへ任せます。
+// Sceneは表示条件と所有対象だけを渡し、鏡のE案内を含む描画準備はStageRenderContextへ任せます。
 void Stage::PrepareStageRenderObjects()
 {
 	StageRenderContext::Context renderContext{
@@ -533,11 +550,15 @@ void Stage::PrepareStageRenderObjects()
 		mirrorFloor_.get(),
 		carryableMirror_.get(),
 		player_.get(),
-		*skyBox_ };
+		*skyBox_,
+		stagePauseOverlay_.get(),
+		!isTemporaryTitleActive_ && pauseState_ == PauseState::kPlaying &&
+		!lightDeath_.IsPlaying() && (!stageStart_ || !stageStart_->IsPlaying()) &&
+		ImGuiManager::GetInstance()->IsGameViewActive() };
 	StageRenderContext::Prepare(renderContext);
 }
 
-// 3Dの後に本編のTab案内とPause案内を重ね、反射と画面提示の順番を保ちます。
+// 床影を3D描画に含めた後でTab・E・Pause案内を重ね、反射と画面提示の順番を保ちます。
 void Stage::Draw()
 {
 	if (!isStageReady_) {
@@ -573,6 +594,20 @@ void Stage::Draw()
 	sceneRendererContext.mirrorFloor = fixedMirrors_.empty() ? nullptr : mirrorFloor_.get();
 	sceneRendererContext.carryableMirror = fixedMirrors_.empty() ? nullptr : carryableMirror_.get();
 	sceneRendererContext.player = player_.get();
+	// 仮Titleは従来の景色を保ち、本編Stageの床にだけ接地位置の影を足します。
+	sceneRendererContext.contactShadows = isTemporaryTitleActive_ ? nullptr : contactShadows_.get();
+	sceneRendererContext.groundObbs = &collisionWorld_.GetSolidObbs();
+	sceneRendererContext.playerShadowVisibility = lightDeath_.GetShadowVisibility();
+	sceneRendererContext.warningLightDirection = stageLightWarning_.GetDirection();
+	sceneRendererContext.warningLightStrength = stageLightWarning_.GetStrength();
+	// 通常Lightは照明の所有者から現在のPlayer位置で評価し、危険Lightの予兆とは分けて渡します。
+	if (player_) {
+		const StageLighting::ShadowInfluence shadowLight =
+			stageLighting_.GetShadowInfluence(player_->GetSphere().center);
+		sceneRendererContext.ordinaryLightDirection = shadowLight.direction;
+		sceneRendererContext.ordinaryLightStrength = shadowLight.strength;
+	}
+	sceneRendererContext.lighting = &stageLighting_;
 	sceneRendererContext.lightPuzzle = &lightPuzzle_;
 	sceneRendererContext.hazardLights = &hazardLights_;
 	StageSceneRenderer::Draw(sceneRendererContext);
@@ -585,6 +620,11 @@ void Stage::Draw()
 		// Tabは本編とPauseの両方で表示し、停止時だけ二枚の案内を追加します。
 		SceneRenderPipeline::DrawSprites(
 			Engine::SpriteCommon::GetInstance(), stagePauseOverlay_->GetTabSprites());
+		if (stagePauseOverlay_->IsPickupPromptVisible()) {
+			// 鏡を拾える時だけ、3D描画後にE案内を鏡の上へ重ねます。
+			SceneRenderPipeline::DrawSprites(
+				Engine::SpriteCommon::GetInstance(), stagePauseOverlay_->GetPickupSprites());
+		}
 		if (pauseState_ != PauseState::kPlaying) {
 			SceneRenderPipeline::DrawSprites(
 				Engine::SpriteCommon::GetInstance(), stagePauseOverlay_->GetPauseSprites());
@@ -605,7 +645,7 @@ bool Stage::UpdateStagePlayer(float deltaTime)
 	if (!player_ || !floor_) {
 		return false;
 	}
-
+	//衝突用
 	collisionWorld_.Rebuild({
 		floor_,
 		&fixedMirrors_,
@@ -669,11 +709,11 @@ void Stage::UpdateLightDeath(float deltaTime)
 	}
 
 	const Vector3 respawnPosition = GetStagePlayerStartPosition();
-	// ワープ直前のCamera位置を保存し、復帰後の同じ向き・距離をPlayerの初期位置へ移します。
-	Engine::Camera* deathCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
-	const Vector3 deathCameraPosition = deathCamera ? deathCamera->GetTranslate() : Vector3{};
-	const Vector3 deathCameraRotation = deathCamera ? deathCamera->GetRotate() : Vector3{};
 	player_->ResetForRespawn(respawnPosition);
+	// 鏡も所持状態と落とした位置を残さず、現在のStageの開始位置へ戻します。
+	if (carryableMirror_) {
+		carryableMirror_->ResetForRespawn();
+	}
 	if (lightDeath_.GetDeathCount() >= 3) {
 		// 切替フェード中にも初期位置のPlayerが一瞬映らないよう、透明のまま待機します。
 		player_->GetObject().SetOpacity(0.0f);
@@ -684,18 +724,24 @@ void Stage::UpdateLightDeath(float deltaTime)
 	}
 	stageLightWarning_.Reset(*player_);
 	if (cameraManager_ && mainCamera_) {
-		stageCameraEvents_.RestoreMainCamera(*cameraManager_);
-		mainCamera_->SetTranslate({
-			deathCameraPosition.x + respawnPosition.x - lightDeath_.GetStartPosition().x,
-			deathCameraPosition.y + respawnPosition.y - lightDeath_.GetStartPosition().y,
-			deathCameraPosition.z + respawnPosition.z - lightDeath_.GetStartPosition().z,
-		});
-		mainCamera_->SetRotate(deathCameraRotation);
+		stageCameraEvents_.ResetForRespawn(*cameraManager_);
 		if (cameraController_) {
-			cameraController_->SynchronizeToCamera(respawnPosition);
+			// 距離・周回角度も含めて本編Cameraの初期視点へ戻します。
+			cameraController_->ResetToInitialState(respawnPosition);
 		}
 	}
 	lightDeath_.CompleteRespawn();
+}
+
+// Colliderを持つGoalとの重なりだけでクリアを決め、Fade中の重複切替を防ぎます。
+void Stage::UpdateGoal()
+{
+	if (!player_ || isLeavingForClear_ || isLeavingForGameOver_ ||
+		lightDeath_.IsPlaying() ||
+		!stageMapRuntime_.IsTouchingTag(kGoalTag, player_->GetCollider())) {
+		return;
+	}
+	isLeavingForClear_ = Engine::SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_CLEAR");
 }
 
 // 固定鏡の位置・向きから、各鏡面用Cameraの反射行列を更新します。
@@ -837,9 +883,10 @@ void Stage::ApplyStageStartSettings(
 		stagePlayerStartPosition_ = playerStartData->translation;
 	}
 
-	if (carryableMirrorData && carryableMirror_) {
-		// 持てるMirrorの置き場所は、ほかのStage物と同じくJSONで変更します。
-		carryableMirror_->SetDroppedPosition(carryableMirrorData->translation);
+	if (carryableMirror_) {
+		// 所持中のHot Reloadでも、次の復帰に使う開始位置は現在のStageへ更新します。
+		carryableMirror_->SetStartPosition(carryableMirrorData
+			? carryableMirrorData->translation : kDefaultCarryableMirrorPosition);
 	}
 	// Stage間で未指定の開始演出値を引き継がないよう、各読込の既定値へ戻します。
 	stageStartSettings_ = {};

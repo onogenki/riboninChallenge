@@ -73,6 +73,9 @@
 	<Filter Include="game\gameOver">
 	  <UniqueIdentifier>{00000000-0000-4000-8000-000000000024}</UniqueIdentifier>
 	</Filter>
+	<Filter Include="game\stageClear">
+	  <UniqueIdentifier>{D55CF9C0-CEB7-4B83-A47A-77D4F6173B2C}</UniqueIdentifier>
+	</Filter>
     <Filter Include="resources\shaders">
       <UniqueIdentifier>{00000000-0000-4000-8000-000000000014}</UniqueIdentifier>
     </Filter>
@@ -581,6 +584,9 @@
 	<ClCompile Include="game\stage\render\StageReflectionRenderer.cpp">
       <Filter>game\stage\render</Filter>
     </ClCompile>
+	<ClCompile Include="game\stage\render\StageContactShadowRenderer.cpp">
+	  <Filter>game\stage\render</Filter>
+	</ClCompile>
 	<ClCompile Include="game\stage\render\StageSceneRenderer.cpp">
       <Filter>game\stage\render</Filter>
     </ClCompile>
@@ -638,6 +644,12 @@
 	</ClCompile>
 	<ClCompile Include="game\gameOver\GameOverOverlay.cpp">
 	  <Filter>game\gameOver</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stageClear\StageClearScene.cpp">
+	  <Filter>game\stageClear</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stageClear\StageClearOverlay.cpp">
+	  <Filter>game\stageClear</Filter>
 	</ClCompile>
 	<ClCompile Include="game\loading\LoadingScene.cpp">
 	  <Filter>game\loading</Filter>
@@ -983,6 +995,9 @@
 	<ClInclude Include="game\stage\render\StageReflectionRenderer.h">
       <Filter>game\stage\render</Filter>
     </ClInclude>
+	<ClInclude Include="game\stage\render\StageContactShadowRenderer.h">
+	  <Filter>game\stage\render</Filter>
+	</ClInclude>
 	<ClInclude Include="game\stage\render\StageSceneRenderer.h">
       <Filter>game\stage\render</Filter>
     </ClInclude>
@@ -1043,6 +1058,12 @@
 	</ClInclude>
 	<ClInclude Include="game\gameOver\GameOverOverlay.h">
 	  <Filter>game\gameOver</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stageClear\StageClearScene.h">
+	  <Filter>game\stageClear</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stageClear\StageClearOverlay.h">
+	  <Filter>game\stageClear</Filter>
 	</ClInclude>
 	<ClInclude Include="game\loading\LoadingScene.h">
 	  <Filter>game\loading</Filter>

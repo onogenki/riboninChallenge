@@ -3,14 +3,14 @@
 #include "Object3d.h"
 #include "Object3dCollection.h"
 
-// 床の上面が従来どおりY=-2.0になる予備位置を設定します。
+// 木目床の元寸法を従来の床へ合わせ、上面がY=-2.0になる予備位置を設定します。
 Engine::Object3d* StageGimmickFactory::CreateFloor(Object3dCollection& objects)
 {
-	Engine::Object3d* floor = objects.Create("debug/floor.obj");
+	Engine::Object3d* floor = objects.Create("stageObj/floor/woodFloor.obj");
 	if (!floor) {
 		return nullptr;
 	}
-	floor->SetScale({ 1.0f, 1.0f, 1.0f });
+	floor->SetScale({ 2.0f, 3.0f, 2.0f });
 	floor->SetRotate({ 0.0f, 0.0f, 0.0f });
 	floor->SetTranslate({ 0.0f, -3.500001f, 5.0f });
 	return floor;
@@ -79,12 +79,13 @@ bool StageGimmickFactory::CreateSwitchesAndDoor(
 		return false;
 	}
 
-	Engine::Object3d* lightDoor = objects.Create("debug/floor.obj");
+	// 旧Boxと同じ4×3×1の大きさへ合わせ、扉の位置と当たり判定を保ちます。
+	Engine::Object3d* lightDoor = objects.Create("stageObj/wall/wall.obj");
 	if (!lightDoor) {
 		return false;
 	}
 	lightDoor->SetTranslate(settings.doorClosedPosition);
-	lightDoor->SetScale({ 0.20f, 1.00f, 0.05f });
+	lightDoor->SetScale({ 1.0f, 0.75f, 0.7142857f });
 	outObjects = { chargeSwitch, doorSwitch, lightDoor };
 	return true;
 }

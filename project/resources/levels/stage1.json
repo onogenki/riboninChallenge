@@ -162,17 +162,54 @@
             "collider": {
                 "center": [
                     0.0,
+                    0.5,
+                    0.0
+                ],
+                "size": [
+                    2.7,
+                    2.0,
+                    2.7
+                ],
+                "type": "BOX"
+            },
+            "file_name": "stageObj/goal/goalPlace.obj",
+            "name": "GoalPlace",
+            "object_type": "STATIC",
+            "tag": "Goal",
+            "transform": {
+                "rotation": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "scaling": [
+                    1.0,
+                    1.0,
+                    1.0
+                ],
+                "translation": [
+                    26.0,
+                    -1.45,
+                    30.0
+                ]
+            },
+            "type": "MESH"
+        },
+        {
+            "collider": {
+                "center": [
+                    0.0,
                     0.0,
                     0.0
                 ],
                 "size": [
-                    20.0,
-                    3.0,
-                    20.0
+                    10.0,
+                    1.0,
+                    10.0
                 ],
                 "type": "BOX"
             },
-            "file_name": "debug/floor.obj",
+            "file_name": "stageObj/floor/woodFloor.obj",
             "name": "StartFloor",
             "object_type": "STATIC",
             "tag": "StartFloor",
@@ -183,9 +220,9 @@
                     0.0
                 ],
                 "scaling": [
-                    1.0,
-                    1.0,
-                    4.0
+                    2.0,
+                    3.0,
+                    8.0
                 ],
                 "translation": [
                     24.0,
@@ -203,13 +240,13 @@
                     0.0
                 ],
                 "size": [
-                    20.0,
-                    3.0,
-                    20.0
+                    4.0,
+                    4.0,
+                    1.4
                 ],
                 "type": "BOX"
             },
-            "file_name": "debug/floor.obj",
+            "file_name": "stageObj/wall/wall.obj",
             "name": "LightingTestLeftWall",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -220,9 +257,9 @@
                     0.0
                 ],
                 "scaling": [
-                    0.10000000149011612,
-                    2.5,
-                    4.0
+                    0.5,
+                    1.875,
+                    57.142857142857146
                 ],
                 "translation": [
                     13.0,
@@ -240,13 +277,13 @@
                     0.0
                 ],
                 "size": [
-                    20.0,
-                    3.0,
-                    20.0
+                    4.0,
+                    4.0,
+                    1.4
                 ],
                 "type": "BOX"
             },
-            "file_name": "debug/floor.obj",
+            "file_name": "stageObj/wall/wall.obj",
             "name": "LightingTestRightWall",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -257,9 +294,9 @@
                     0.0
                 ],
                 "scaling": [
-                    0.10000000149011612,
-                    2.5,
-                    4.0
+                    0.5,
+                    1.875,
+                    57.142857142857146
                 ],
                 "translation": [
                     35.0,
@@ -277,13 +314,13 @@
                     0.0
                 ],
                 "size": [
-                    20.0,
-                    3.0,
-                    20.0
+                    4.0,
+                    4.0,
+                    1.4
                 ],
                 "type": "BOX"
             },
-            "file_name": "debug/floor.obj",
+            "file_name": "stageObj/wall/wall.obj",
             "name": "LightingTestCeiling",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -294,9 +331,9 @@
                     0.0
                 ],
                 "scaling": [
-                    1.100000023841858,
-                    0.5,
-                    4.0
+                    5.5,
+                    0.375,
+                    57.142857142857146
                 ],
                 "translation": [
                     24.0,
@@ -314,13 +351,13 @@
                     0.0
                 ],
                 "size": [
-                    20.0,
-                    3.0,
-                    20.0
+                    4.0,
+                    4.0,
+                    1.4
                 ],
                 "type": "BOX"
             },
-            "file_name": "debug/floor.obj",
+            "file_name": "stageObj/wall/wall.obj",
             "name": "LightingTestEntranceWall",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -331,9 +368,9 @@
                     0.0
                 ],
                 "scaling": [
-                    1.100000023841858,
-                    2.5,
-                    0.10000000149011612
+                    5.5,
+                    1.875,
+                    1.4285714285714286
                 ],
                 "translation": [
                     24.0,
@@ -351,13 +388,13 @@
                     0.0
                 ],
                 "size": [
-                    20.0,
-                    3.0,
-                    20.0
+                    4.0,
+                    4.0,
+                    1.4
                 ],
                 "type": "BOX"
             },
-            "file_name": "debug/floor.obj",
+            "file_name": "stageObj/wall/wall.obj",
             "name": "LightingTestExitWall",
             "object_type": "STATIC",
             "tag": "CameraBoundary",
@@ -368,9 +405,9 @@
                     0.0
                 ],
                 "scaling": [
-                    1.100000023841858,
-                    2.5,
-                    0.10000000149011612
+                    5.5,
+                    1.875,
+                    1.4285714285714286
                 ],
                 "translation": [
                     24.0,
@@ -388,13 +425,13 @@
                     0.0
                 ],
                 "size": [
-                    20.0,
-                    3.000001907348633,
-                    20.0
+                    10.0,
+                    1.0,
+                    10.0
                 ],
                 "type": "BOX"
             },
-            "file_name": "debug/floor.obj",
+            "file_name": "stageObj/floor/woodFloor.obj",
             "name": "StageFloor",
             "object_type": "STATIC",
             "tag": "Floor",
@@ -405,9 +442,9 @@
                     0.0
                 ],
                 "scaling": [
-                    1.0,
-                    1.0,
-                    1.0
+                    2.0,
+                    3.0,
+                    2.0
                 ],
                 "translation": [
                     0.0,

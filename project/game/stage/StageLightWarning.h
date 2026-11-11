@@ -22,6 +22,9 @@ public:
 	void UpdateDeath(Player& player, float progress);
 	// 別Stageやリスポーンで、Playerの予兆だけを通常状態へ戻します。
 	void Reset(Player& player);
+	// 床影も球の反射と同じ危険Light方向を使い、予兆の向きをそろえます。
+	const Vector3& GetDirection() const { return direction_; }
+	float GetStrength() const { return strength_; }
 
 private:
 	Vector3 direction_{ 0.0f, 0.0f, 1.0f };

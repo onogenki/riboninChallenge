@@ -60,3 +60,9 @@ void StageLightDeath::CompleteRespawn()
 {
 	isPlaying_ = false;
 }
+
+// 消失開始時の影を残し、Playerが透明になる途中で床影も自然に消します。
+float StageLightDeath::GetShadowVisibility() const
+{
+	return isPlaying_ ? 1.0f - std::clamp(elapsedTime_ / 0.30f, 0.0f, 1.0f) : 1.0f;
+}

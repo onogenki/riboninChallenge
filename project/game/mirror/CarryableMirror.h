@@ -53,10 +53,16 @@ public:
 	// 床・壁一覧やLaser遮蔽へ渡す、持てる鏡のOBB形状データを返します。
 	const MyMath::OBB& GetObb() const { return collider_.GetShape(); }
 	bool IsCarried() const { return isCarried_; }
+	// PlayerがEで拾える距離にいるか、鏡の現在位置から判定します。
+	bool CanBePickedUp(const Vector3& playerPosition) const;
 	// Stage開始時の装備状態やEventから、鏡を持つ・置く状態へ明示的に切り替えます。
 	void SetCarried(bool isCarried);
-	// stage1.jsonで指定した位置へ、置かれているMirrorだけを移動します。
+	// 実行中に置かれているMirrorだけを移動し、Stageの開始位置は変更しません。
 	void SetDroppedPosition(const Vector3& position);
+	// 読み込んだStageの開始位置を保存し、置かれている時だけ配置も反映します。
+	void SetStartPosition(const Vector3& position);
+	// 死亡復帰時に所持・構え・傾きを消し、見た目とColliderを開始位置へ戻します。
+	void ResetForRespawn();
 
 private:
 	void ApplyTransform(const Vector3& position, float pitch, float yaw);
@@ -93,4 +99,5 @@ private:
 	float rightMouseClickThreshold_ = 0.22f;
 	bool wasRightMouseHeld_ = false;
 	bool isCarried_ = false;
+	Vector3 startPosition_{};
 };

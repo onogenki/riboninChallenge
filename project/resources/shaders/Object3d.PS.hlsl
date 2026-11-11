@@ -61,7 +61,7 @@ struct Camera
     float32_t opacity;
     float32_t specularBoost;
     float32_t glowIntensity;
-    float32_t padding;
+    float32_t contactShadowMask;
     float32_t3 warningDirection;
     float32_t warningStrength;
 };
@@ -85,6 +85,18 @@ PixelShaderOutput main(
     
     float32_t4 transformedUV = mul(float32_t4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float32_t4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
+    // 影専用planeだけ白黒Textureを透明度に使い、通常ObjectのLight計算は変えません。
+    if (gCamera.contactShadowMask > 0.5f)
+    {
+        // 円画像の外周が広がりすぎないよう、中心を残して薄い部分を早めに消します。
+        float32_t shadowMask = pow(saturate(textureColor.r), 0.60f);
+        output.color = float32_t4(0.0f, 0.0f, 0.0f, shadowMask * gCamera.opacity);
+        if (output.color.a <= 0.001f)
+        {
+            discard;
+        }
+        return output;
+    }
     // 環境光は法線の向きに関係なく足し、室内の影側を真っ黒にしません。
     float32_t3 ambientLight =
         gMaterial.color.rgb * textureColor.rgb *

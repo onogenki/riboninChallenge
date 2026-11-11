@@ -47,8 +47,8 @@ public:
 	void Clear();
 
 private:
-	// floor.objのローカル座標で使うCollider設定です。
-	Vector3 floorLocalHalfSize_{ 10.0f, 1.500001f, 10.0f };
+	// woodFloor.objのローカル座標で使うCollider設定です。
+	Vector3 floorLocalHalfSize_{ 5.0f, 0.5f, 5.0f };
 	Vector3 floorColliderLocalCenter_{};
 	MyMath::OBB floorObb_{};
 	std::vector<MyMath::OBB> solidObbs_;

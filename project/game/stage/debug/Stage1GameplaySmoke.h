@@ -126,6 +126,10 @@ private:
 	bool gameplaySmokePickedUpMirror_ = false;
 	// 携帯MirrorをEキー操作で置けたかを記録します。
 	bool gameplaySmokeDroppedMirror_ = false;
+	// 横持ちからEで置いても縦向きになり、同じ場所から拾えるか記録します。
+	bool gameplaySmokeDroppedHorizontalMirrorUpright_ = false;
+	// 死亡復帰で携帯鏡の所持状態・反射面・ColliderがJSON開始位置へ戻るか記録します。
+	bool gameplaySmokeMirrorRespawn_ = false;
 	// 床へ置いた携帯Mirrorが、Stage1のPlayer用障害物一覧に含まれたかを記録します。
 	bool gameplaySmokeDroppedMirrorIsSolid_ = false;
 	// 携帯MirrorがLaserを反射したかを記録します。
@@ -170,6 +174,8 @@ private:
 	bool gameplaySmokeCameraRegistrationReplacement_ = false;
 	// 矢印キーによるCamera段階操作を記録します。
 	bool gameplaySmokeCameraSteps_ = false;
+	// 死亡復帰でCameraの距離・周回角度・追従中心が初期値へ戻るか記録します。
+	bool gameplaySmokeCameraRespawn_ = false;
 	// 壁側へCameraを回せないことを記録します。
 	bool gameplaySmokeCameraWallBlock_ = false;
 	// 壁越しシルエットを使う設定では、壁があってもCamera距離を維持することを記録します。
@@ -178,6 +184,8 @@ private:
 	bool gameplaySmokeCameraSmooth_ = false;
 	// PlayerがCamera側へ動いた時に追従できるかを記録します。
 	bool gameplaySmokeCameraBacktracks_ = false;
+	// 外壁際で上からPlayerを見られ、壁を離れると元の角度へ戻るかを記録します。
+	bool gameplaySmokeCameraRisesNearWall_ = false;
 	// 自動確認を開始してからの経過時間です。
 	float gameplaySmokeElapsedTime_ = 0.0f;
 	// 自動確認開始時のPlayerの高さです。

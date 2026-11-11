@@ -305,6 +305,20 @@ void StageCameraEvents::RestoreMainCamera(Engine::CameraManager& cameraManager)
 	activeEventCameraName_.clear();
 }
 
+// Camera本体を戻した後、開始位置で同じAreaにいても設定が再適用されるよう履歴を消します。
+void StageCameraEvents::ResetForRespawn(Engine::CameraManager& cameraManager)
+{
+	RestoreMainCamera(cameraManager);
+	activeCameraAreaName_.clear();
+	for (EventTrigger& trigger : eventTriggers_) {
+		trigger.isPlayerInside = false;
+	}
+	for (CameraArea& area : cameraAreas_) {
+		area.isPlayerInside = false;
+	}
+	status_.clear();
+}
+
 void StageCameraEvents::Clear(Engine::CameraManager* cameraManager)
 {
 	if (cameraManager) {

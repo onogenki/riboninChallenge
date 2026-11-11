@@ -33,13 +33,13 @@
                     0.0
                 ],
                 "size": [
-                    20.0,
-                    3.0,
-                    20.0
+                    10.0,
+                    1.0,
+                    10.0
                 ],
                 "type": "BOX"
             },
-            "file_name": "debug/floor.obj",
+            "file_name": "stageObj/floor/woodFloor.obj",
             "name": "Stage4Floor",
             "object_type": "STATIC",
             "tag": "Floor",
@@ -50,9 +50,9 @@
                     0.0
                 ],
                 "scaling": [
-                    1.0,
-                    1.0,
-                    1.0
+                    2.0,
+                    3.0,
+                    2.0
                 ],
                 "translation": [
                     0.0,

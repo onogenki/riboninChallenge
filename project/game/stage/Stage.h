@@ -30,6 +30,7 @@ class Player;
 namespace Engine { class SkyBox; }
 class StageTitleOverlay;
 class StagePauseOverlay;
+class StageContactShadowRenderer;
 namespace Engine { class CameraManager; }
 namespace Engine { class Object3dCommon; }
 
@@ -102,6 +103,8 @@ private:
 	bool UpdateStagePlayer(float deltaTime);
 	// 接触後の一秒だけPlayerを上昇・透過させ、復帰かGame Overを決定します。
 	void UpdateLightDeath(float deltaTime);
+	// 配置物のGoalにPlayerが触れた時だけ、クリア画面への切替を予約します。
+	void UpdateGoal();
 	// 通常Cameraを各鏡面で反転し、反射Cameraの位置と回転を更新します。
 	void UpdateReflectionCameras();
 	// ---------- 鏡・Laserギミック ----------
@@ -159,6 +162,8 @@ private:
 	Engine::Object3dCollection sceneObjects_{};
 	// 仮Titleと本編が同じ夜空を使い、Scene終了時にSkyBoxを解放します。
 	std::unique_ptr<Engine::SkyBox> skyBox_;
+	// Playerと立っている鏡の床影だけを所有し、通常モデルや床の材質は変更しません。
+	std::unique_ptr<StageContactShadowRenderer> contactShadows_;
 	// ---------- 鏡の状態 ----------
 
 	// 大型の固定鏡です。複数枚それぞれが反射Cameraと専用Textureを持ちます。
@@ -207,6 +212,8 @@ private:
 	StageLightDeath lightDeath_{};
 	// Scene切替の予約はStageが行い、消失演出部品にはSceneManagerを持たせません。
 	bool isLeavingForGameOver_ = false;
+	// Fade中にGoalへの接触が続いても、クリア画面を重複して予約しません。
+	bool isLeavingForClear_ = false;
 	// 床の見た目です。寿命はsceneObjects_、判定形状はcollisionWorld_が管理します。
 	Engine::Object3d* floor_ = nullptr;
 	// ---------- 通常Cameraと開始演出 ----------

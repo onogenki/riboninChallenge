@@ -593,6 +593,19 @@ Vector3 Stage1GameplaySmoke::VerifyCarryMirrorControls(const InitializeContext& 
 		tiltedProbeSegments[1].end.z - tiltedProbeSegments[1].start.z > 0.50f;
 	// 長押しを離しても、短押し扱いになって表裏が切り替わらないことを確認します。
 	carryableMirror_->Update(0.01f, mirrorPosition, 0.0f, false, false, 0.0f, false, 0.0f);
+	// 横持ちのままEで置き、Model・反射面・Colliderを縦向きへそろえてから拾い直します。
+	const Vector3 horizontalDropPosition = carryableMirror_->GetMirror().GetCenter();
+	carryableMirror_->Update(0.01f, mirrorPosition, 0.0f, true);
+	gameplaySmokeDroppedHorizontalMirrorUpright_ =
+		!carryableMirror_->IsCarried() &&
+		std::abs(carryableMirror_->GetObject().GetTransform().rotate.x) < 0.001f &&
+		std::abs(carryableMirror_->GetMirror().GetNormal().y) < 0.001f &&
+		carryableMirror_->GetObb().orientations[1].y > 0.99f &&
+		Length(Subtract(carryableMirror_->GetMirror().GetCenter(), horizontalDropPosition)) < 0.001f &&
+		carryableMirror_->CanBePickedUp(horizontalDropPosition) &&
+		!carryableMirror_->CanBePickedUp({ horizontalDropPosition.x + 5.0f,
+			horizontalDropPosition.y, horizontalDropPosition.z });
+	carryableMirror_->Update(0.01f, horizontalDropPosition, 0.0f, true);
 	// 左クリックと同じ操作で、水平状態から通常の縦向きMirrorへ戻します。
 	carryableMirror_->Update(1.0f, mirrorPosition, 0.0f, false, true, 0.0f);
 	// 長押しは鏡を反転させず、構えるための操作だけとして扱います。
@@ -682,6 +695,15 @@ void Stage1GameplaySmoke::VerifyLaserBlockingAndDrop(const Vector3& mirrorPositi
 	gameplaySmokeMirrorBlocksPlayer_ =
 		blockedLaser.GetSegments().size() >= 2 &&
 		!laserHitsSphere(blockedLaser, testPlayerSphere);
+	// 持ち運んで向きを変えた鏡を死亡復帰させ、ModelとColliderを同じ開始位置へ戻します。
+	carryableMirror_->SetCarried(true);
+	carryableMirror_->Update(1.0f, mirrorPosition, 1.57079633f, false);
+	carryableMirror_->ResetForRespawn();
+	gameplaySmokeMirrorRespawn_ =
+		!carryableMirror_->IsCarried() &&
+		Length(Subtract(carryableMirror_->GetMirror().GetCenter(), mirrorPosition)) < 0.001f &&
+		Length(Subtract(carryableMirror_->GetObb().center, mirrorPosition)) < 0.001f &&
+		carryableMirror_->GetMirror().GetNormal().z < -0.99f;
 }
 
 // Colliderと編集処理の契約を、Stage本編を変えずに検証します。
@@ -985,6 +1007,79 @@ void Stage1GameplaySmoke::VerifyCameraControls()
 		canReturnFromFullOrbit &&
 		distanceReachedFarLimit &&
 		distanceReachedNearLimit;
+	// 周回・距離を操作した後、復帰時のCamera本体とControllerが同じ初期視点を持つか確認します。
+	testController.ResetToInitialState({ 3.0f, 0.0f, 4.0f });
+	gameplaySmokeCameraRespawn_ =
+		std::abs(testController.GetDistance() - 14.0f) < 0.001f &&
+		std::abs(testController.GetOrbitYaw()) < 0.001f &&
+		std::abs(testController.GetOrbitPitch() - 0.32f) < 0.001f &&
+		std::abs(testController.GetFocus().x - 3.0f) < 0.001f &&
+		std::abs(testController.GetFocus().z - 4.0f) < 0.001f &&
+		Length(Subtract(testCamera.GetTranslate(), testController.GetCameraPosition())) < 0.001f;
+
+	// 外壁へ後退しても球の中へ寄り切らず、天井の下へ上がってから通常視点へ戻るか確認します。
+	Engine::Camera wallCamera;
+	Engine::CameraController wallController;
+	wallController.Initialize(&wallCamera, { 0.0f, 0.0f, 0.0f });
+	wallController.SetAutoRecenterEnabled(false);
+	OBB entranceWall{};
+	entranceWall.center = { 0.0f, 1.5f, -4.0f };
+	entranceWall.orientations[0] = { 1.0f, 0.0f, 0.0f };
+	entranceWall.orientations[1] = { 0.0f, 1.0f, 0.0f };
+	entranceWall.orientations[2] = { 0.0f, 0.0f, 1.0f };
+	entranceWall.size = { 11.0f, 4.0f, 0.3f };
+	OBB ceiling{};
+	ceiling.center = { 0.0f, 7.0f, 0.0f };
+	ceiling.orientations[0] = { 1.0f, 0.0f, 0.0f };
+	ceiling.orientations[1] = { 0.0f, 1.0f, 0.0f };
+	ceiling.orientations[2] = { 0.0f, 0.0f, 1.0f };
+	ceiling.size = { 11.0f, 1.0f, 40.0f };
+	for (int frame = 0; frame < 60; ++frame) {
+		wallController.Update(1.0f / 60.0f, { 0.0f, 0.0f, 0.0f }, {}, false, { entranceWall, ceiling });
+	}
+	const Vector3 raisedPosition = wallController.GetCameraPosition();
+	const Vector3 raisedFocus = wallController.GetFocus();
+	const bool reachedSafeUpperView =
+		Length(Subtract(raisedPosition, raisedFocus)) > 3.5f &&
+		raisedPosition.y > raisedFocus.y + 3.0f &&
+		!Collision::SegmentOBB(raisedFocus, raisedPosition, entranceWall, 0.3f).isHit &&
+		!Collision::SegmentOBB(raisedFocus, raisedPosition, ceiling, 0.3f).isHit &&
+		std::abs(wallController.GetOrbitPitch() - 0.32f) < 0.001f;
+	for (int frame = 0; frame < 180; ++frame) {
+		wallController.Update(1.0f / 60.0f, { 0.0f, 0.0f, 0.0f }, {}, false, {});
+	}
+	// 横壁では手動角度を保持したまま室内側へ回り、毎Frame外壁を越えないか確認します。
+	Engine::Camera sideWallCamera;
+	Engine::CameraController sideWallController;
+	sideWallController.Initialize(&sideWallCamera, { 0.0f, 0.0f, 0.0f });
+	sideWallController.SetAutoRecenterEnabled(false);
+	OBB sideWall = entranceWall;
+	sideWall.center = { -4.0f, 1.5f, 0.0f };
+	sideWall.size = { 0.3f, 4.0f, 40.0f };
+	sideWallController.SetOrbitYaw(0.7f);
+	for (int frame = 0; frame < 60; ++frame) {
+		sideWallController.Update(1.0f / 60.0f, { 0.0f, 0.0f, 0.0f }, {}, false, { sideWall, ceiling });
+	}
+	bool remainedInsideSideWall = true;
+	for (int frame = 0; frame < 90; ++frame) {
+		sideWallController.Update(1.0f / 60.0f, { 0.0f, 0.0f, 0.0f }, {}, false, { sideWall, ceiling });
+		remainedInsideSideWall &=
+			!Collision::SegmentOBB(sideWallController.GetFocus(),
+				sideWallController.GetCameraPosition(), sideWall, 0.3f).isHit;
+	}
+	const Vector3 sideWallPosition = sideWallController.GetCameraPosition();
+	const bool turnedInsideSideWall =
+		remainedInsideSideWall &&
+		sideWallPosition.x > -3.6f &&
+		sideWallPosition.z < -5.0f &&
+		Length(Subtract(sideWallPosition, sideWallController.GetFocus())) > 6.0f &&
+		std::abs(sideWallController.GetOrbitYaw() - 0.7f) < 0.001f &&
+		!sideWallController.TryStepOrbit(1, { sideWall, ceiling });
+	gameplaySmokeCameraRisesNearWall_ =
+		reachedSafeUpperView &&
+		turnedInsideSideWall &&
+		Length(Subtract(wallController.GetCameraPosition(),
+			{ 0.0f, 1.2f + 14.0f * std::sin(0.32f), -14.0f * std::cos(0.32f) })) < 0.15f;
 }
 
 // 自動確認が有効かを返し、Stage1が専用の入力制御を選ぶために使います。
@@ -1152,6 +1247,8 @@ void Stage1GameplaySmoke::FinishWhenReady()
 		gameplaySmokeEnemyManagerSpawn_ &&
 		gameplaySmokePickedUpMirror_ &&
 		gameplaySmokeDroppedMirror_ &&
+		gameplaySmokeDroppedHorizontalMirrorUpright_ &&
+		gameplaySmokeMirrorRespawn_ &&
 		gameplaySmokeDroppedMirrorIsSolid_ &&
 		gameplaySmokeCarryMirrorReflectedLaser_ &&
 		gameplaySmokeCarryMirrorBackfaceIgnored_ &&
@@ -1170,10 +1267,12 @@ void Stage1GameplaySmoke::FinishWhenReady()
 		gameplaySmokeDoorDiagonalReflection_ &&
 		gameplaySmokeCameraRegistrationReplacement_ &&
 		gameplaySmokeCameraSteps_ &&
+		gameplaySmokeCameraRespawn_ &&
 		gameplaySmokeCameraWallBlock_ &&
 		gameplaySmokeCameraKeepsDistanceBehindWall_ &&
 		gameplaySmokeCameraSmooth_ &&
 		gameplaySmokeCameraBacktracks_ &&
+		gameplaySmokeCameraRisesNearWall_ &&
 		gameplaySmokeSawGrounded_ &&
 		gameplaySmokeLeftFloor_ &&
 		gameplaySmokeFell_;
@@ -1193,6 +1292,8 @@ void Stage1GameplaySmoke::FinishWhenReady()
 			<< " enemyManager=" << gameplaySmokeEnemyManagerSpawn_
 			<< " picked=" << gameplaySmokePickedUpMirror_
 			<< " dropped=" << gameplaySmokeDroppedMirror_
+			<< " horizontalDropUpright=" << gameplaySmokeDroppedHorizontalMirrorUpright_
+			<< " mirrorRespawn=" << gameplaySmokeMirrorRespawn_
 			<< " droppedMirrorSolid=" << gameplaySmokeDroppedMirrorIsSolid_
 			<< " carryLaser=" << gameplaySmokeCarryMirrorReflectedLaser_
 			<< " carryBackface=" << gameplaySmokeCarryMirrorBackfaceIgnored_
@@ -1212,10 +1313,12 @@ void Stage1GameplaySmoke::FinishWhenReady()
 			<< " doorDiagonal=" << gameplaySmokeDoorDiagonalReflection_
 			<< " cameraRegistrationReplacement=" << gameplaySmokeCameraRegistrationReplacement_
 			<< " cameraSteps=" << gameplaySmokeCameraSteps_
+			<< " cameraRespawn=" << gameplaySmokeCameraRespawn_
 			<< " cameraWall=" << gameplaySmokeCameraWallBlock_
 			<< " cameraKeepsDistance=" << gameplaySmokeCameraKeepsDistanceBehindWall_
 			<< " cameraSmooth=" << gameplaySmokeCameraSmooth_
 			<< " cameraBacktracks=" << gameplaySmokeCameraBacktracks_
+			<< " cameraRisesNearWall=" << gameplaySmokeCameraRisesNearWall_
 			<< " grounded=" << gameplaySmokeSawGrounded_
 			<< " fallProbe=" << gameplaySmokeStartedFallProbe_
 			<< " leftFloor=" << gameplaySmokeLeftFloor_

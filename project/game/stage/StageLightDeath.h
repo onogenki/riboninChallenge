@@ -25,6 +25,8 @@ public:
 	int GetDeathCount() const { return deathCount_; }
 	// 復帰Cameraの相対位置を保つため、接触時のPlayer座標を返します。
 	const Vector3& GetStartPosition() const { return startPosition_; }
+	// 接触直後に床影を消さず、Playerの消失に合わせて短時間で薄くします。
+	float GetShadowVisibility() const;
 
 private:
 	int deathCount_ = 0;

@@ -19,6 +19,7 @@ bool CarryableMirror::Initialize(
 {
 	width_ = (std::max)(width, 0.1f);
 	height_ = (std::max)(height, 0.1f);
+	startPosition_ = startPosition;
 	// 値として所有するMirrorモデルも、Factoryの共通初期化経路を使います。
 	if (!Engine::Object3dFactory::InitializeObject(object_, object3dCommon, modelName)) {
 		return false;
@@ -50,16 +51,17 @@ void CarryableMirror::Update(
 {
 	if (interactPressed) {
 		if (isCarried_) {
+			// 横持ちのまま置いても、見た目・Laser反射面・Colliderを同時に縦向きへ戻します。
+			const Vector3 droppedPosition = mirror_.GetCenter();
 			isCarried_ = false;
+			isHorizontalHoldMode_ = false;
+			isHorizontalFacingUp_ = false;
+			horizontalTilt_ = 0.0f;
+			ApplyTransform(droppedPosition, 0.0f, yaw_);
 			wasRightMouseHeld_ = false;
 			rightMouseHoldTime_ = 0.0f;
 		} else {
-			const Vector3 difference{
-				mirror_.GetCenter().x - playerPosition.x,
-				mirror_.GetCenter().y - playerPosition.y,
-				mirror_.GetCenter().z - playerPosition.z,
-			};
-			if (Length(difference) <= pickupDistance_) {
+			if (CanBePickedUp(playerPosition)) {
 				isCarried_ = true;
 				aimYawOffset_ = 0.0f;
 				isHorizontalHoldMode_ = false;
@@ -141,6 +143,20 @@ void CarryableMirror::Update(
 	}
 }
 
+// E表示と実際の拾う操作がずれないよう、同じ距離条件を一か所で判定します。
+bool CarryableMirror::CanBePickedUp(const Vector3& playerPosition) const
+{
+	if (isCarried_) {
+		return false;
+	}
+	const Vector3 difference{
+		mirror_.GetCenter().x - playerPosition.x,
+		mirror_.GetCenter().y - playerPosition.y,
+		mirror_.GetCenter().z - playerPosition.z,
+	};
+	return Length(difference) <= pickupDistance_;
+}
+
 void CarryableMirror::SetDroppedPosition(const Vector3& position)
 {
 	if (isCarried_) {
@@ -149,6 +165,26 @@ void CarryableMirror::SetDroppedPosition(const Vector3& position)
 	}
 
 	ApplyTransform(position, 0.0f, 3.14159265f);
+}
+
+// JSONの開始位置を所持中も保存し、次の復帰時には編集後の正しい位置へ戻します。
+void CarryableMirror::SetStartPosition(const Vector3& position)
+{
+	startPosition_ = position;
+	SetDroppedPosition(position);
+}
+
+// Playerのワープと同じフレームで鏡の操作状態・反射面・Colliderを初期配置へそろえます。
+void CarryableMirror::ResetForRespawn()
+{
+	isCarried_ = false;
+	aimYawOffset_ = 0.0f;
+	isHorizontalHoldMode_ = false;
+	isHorizontalFacingUp_ = false;
+	horizontalTilt_ = 0.0f;
+	rightMouseHoldTime_ = 0.0f;
+	wasRightMouseHeld_ = false;
+	ApplyTransform(startPosition_, 0.0f, 3.14159265f);
 }
 
 void CarryableMirror::SetCarried(bool isCarried)
