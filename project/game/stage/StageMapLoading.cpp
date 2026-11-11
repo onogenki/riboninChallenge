@@ -26,6 +26,7 @@ bool Stage::LoadStage(int stageId, bool resetPlayerPosition)
 	// 別Stageへ切り替えた時だけ死亡回数と演出を初期化し、前Stageの失敗を持ち越しません。
 	lightDeath_.Reset();
 	isLeavingForGameOver_ = false;
+	isLeavingForClear_ = false;
 	if (player_) {
 		player_->GetObject().SetOpacity(1.0f);
 		player_->GetObject().SetSpecularGlow(1.0f, 0.0f);

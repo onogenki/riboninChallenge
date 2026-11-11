@@ -1,5 +1,6 @@
 #pragma once
 
+#include "MyMath.h"
 #include "StageMapRuntime.h"
 #include <memory>
 #include <vector>
@@ -13,6 +14,8 @@ class Player;
 namespace Engine { class SkyBox; }
 class StageHazardLights;
 class StageLightPuzzle;
+class StageContactShadowRenderer;
+class StageLighting;
 
 // Stage IDに関係なく、通常Game Viewへ所有済みObjectを決まった順で描くRendererです。
 // Sceneの進行・Objectの寿命・Camera計算は持たず、Stageが渡す描画対象を使うだけです。
@@ -32,6 +35,14 @@ public:
 		FixedMirror* mirrorFloor = nullptr;
 		CarryableMirror* carryableMirror = nullptr;
 		Player* player = nullptr;
+		StageContactShadowRenderer* contactShadows = nullptr;
+		const std::vector<MyMath::OBB>* groundObbs = nullptr;
+		float playerShadowVisibility = 1.0f;
+		Vector3 warningLightDirection{ 0.0f, 0.0f, 1.0f };
+		float warningLightStrength = 0.0f;
+		Vector3 ordinaryLightDirection{};
+		float ordinaryLightStrength = 0.0f;
+		const StageLighting* lighting = nullptr;
 		const StageLightPuzzle* lightPuzzle = nullptr;
 		const StageHazardLights* hazardLights = nullptr;
 	};

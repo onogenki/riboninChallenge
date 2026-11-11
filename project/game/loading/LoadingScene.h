@@ -20,7 +20,7 @@ public:
 	void Finalize() override;
 	// 一度白画面を表示してから次Sceneを予約し、生成不能なら失敗を通知します。
 	void Update() override;
-	// ImGuiを出さず、白いLoading画面だけを描画します。
+	// Debug・DevelopmentではImGuiのGame View内に白いLoading画面を描画します。
 	void Draw() override;
 
 private:

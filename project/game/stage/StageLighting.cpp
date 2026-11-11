@@ -3,6 +3,8 @@
 #include "StageHazardLights.h"
 #include "StageLightPuzzle.h"
 #include "MyMath.h"
+#include <algorithm>
+#include <cmath>
 
 using namespace MyMath;
 
@@ -131,4 +133,40 @@ void StageLighting::UpdateLaserSpotLights(
 	addSegmentsAsSpotLights(hazardLights.GetHorizontalMoveSegments(), { 1.00f, 0.82f, 0.10f, 1.0f }, 3.0f);
 	addSegmentsAsSpotLights(hazardLights.GetBottomPulseSegments(), { 0.15f, 0.55f, 1.00f, 1.0f }, 3.4f);
 	addSegmentsAsSpotLights(hazardLights.GetOrbitSegments(), { 0.20f, 1.00f, 0.35f, 1.0f }, 2.8f);
+}
+
+// 球に届く点光源とJSONの通常SpotLightを比較し、Laserの予兆影とは独立した床影を作ります。
+StageLighting::ShadowInfluence StageLighting::GetShadowInfluence(const Vector3& playerPosition) const
+{
+	ShadowInfluence result{};
+	float strongest = 0.0f;
+	if (pointLight_.intensity > 0.0f && pointLight_.radius > 0.0f) {
+		const Vector3 fromLight = Subtract(playerPosition, pointLight_.position);
+		const float distance = Length(fromLight);
+		const float attenuation = std::pow(std::clamp(1.0f - distance / pointLight_.radius, 0.0f, 1.0f), pointLight_.decay);
+		strongest = pointLight_.intensity * attenuation;
+		if (distance > 0.0001f) {
+			result.direction = Normalize(Subtract(pointLight_.position, playerPosition));
+		}
+	}
+	for (const Engine::Object3d::SpotLight& light : stageSpotLights_) {
+		const Vector3 fromLight = Subtract(playerPosition, light.position);
+		const float distance = Length(fromLight);
+		if (distance <= 0.0001f || distance >= light.distance) {
+			continue;
+		}
+		const float attenuation = std::pow(std::clamp(1.0f - distance / light.distance, 0.0f, 1.0f), light.decay);
+		const float cone = std::clamp(
+			(Dot(Normalize(fromLight), light.direction) - light.cosAngle) /
+			(std::max)(light.cosFalloffStart - light.cosAngle, 0.00001f), 0.0f, 1.0f);
+		const float influence = light.intensity * attenuation * cone;
+		if (influence > strongest) {
+			strongest = influence;
+			result.direction = Normalize(Subtract(light.position, playerPosition));
+		}
+	}
+	// Stage1の点光源は開始位置にも届くため、早く最大値へ張り付かないよう近距離側を強調します。
+	const float normalized = std::clamp(strongest / 0.30f, 0.0f, 1.0f);
+	result.strength = normalized * normalized;
+	return result;
 }

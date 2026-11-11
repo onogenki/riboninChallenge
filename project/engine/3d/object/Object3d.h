@@ -82,7 +82,8 @@ public:
 		// 消失演出中だけ鏡面反射と青白い発光を強めます。
 		float specularBoost = 1.0f;
 		float glowIntensity = 0.0f;
-		float padding = 0.0f;
+		// 影専用Objectだけ、白黒画像を半透明の黒い影として使います。
+		float contactShadowMask = 0.0f;
 		// ワールド空間のLight方向なので、Playerの向きを変えても反射側を保ちます。
 		Vector3 warningDirection{ 0.0f, 0.0f, 1.0f };
 		float warningStrength = 0.0f;
@@ -174,6 +175,8 @@ public:
 	void SetBackFaceBrightness(float brightness);
 	// 共有Modelへ影響させず、このObject一体だけの透明度を設定します。
 	void SetOpacity(float opacity);
+	// このObjectだけを床影として描き、共有plane.objの材質を変えません。
+	void SetContactShadowMask(bool enabled);
 	// 共有ModelやStageのLightを変えず、このObjectだけの反射と発光を調整します。
 	void SetSpecularGlow(float specularBoost, float glowIntensity);
 	// 近づくLightの世界方向と強さを、このObjectの反射面にだけ渡します。

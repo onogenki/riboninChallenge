@@ -97,6 +97,8 @@ namespace
 			std::abs(objectData.collider.size.z) * 0.5f,
 		};
 		runtimeObject.collider.SetLocalShape(objectData.collider.center, localHalfSize);
+		// Goalは押し戻さず、Playerとの重なりだけをScene切替へ通知します。
+		runtimeObject.collider.SetTrigger(objectData.tag == "Goal");
 	}
 }
 
@@ -250,6 +252,19 @@ void StageMapRuntime::SyncColliders()
 		}
 		runtimeObject.collider.SyncTransform(runtimeObject.visual->GetTransform());
 	}
+}
+
+// JSONのGoalなど指定タグを持つ配置物だけを調べ、Triggerを床・壁の押し戻しと分離します。
+bool StageMapRuntime::IsTouchingTag(const std::string& tag, const SphereCollider& other) const
+{
+	for (const RuntimeObject& runtimeObject : objects_) {
+		if (runtimeObject.tag == tag && runtimeObject.hasBoxCollider &&
+			runtimeObject.GetCollider().IsEnabled() &&
+			runtimeObject.GetCollider().Check(other).isCollision) {
+			return true;
+		}
+	}
+	return false;
 }
 
 void StageMapRuntime::Clear()

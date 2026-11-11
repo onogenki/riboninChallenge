@@ -80,6 +80,8 @@ public:
 	std::string ConsumeStatus();
 	// Event Cameraを解除し、MainCameraへ戻します。
 	void RestoreMainCamera(Engine::CameraManager& cameraManager);
+	// 復帰時はEvent視点とAreaの入室履歴を消し、開始位置のAreaを次のUpdateで判定し直します。
+	void ResetForRespawn(Engine::CameraManager& cameraManager);
 	// CameraManagerからEvent Cameraを外し、所有データを解放します。
 	// cameraManagerがnullptrなら登録解除を省きます。Stage終了時は登録元を渡します。
 	void Clear(Engine::CameraManager* cameraManager);

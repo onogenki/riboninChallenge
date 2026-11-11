@@ -427,6 +427,8 @@
     <ClCompile Include="game\GameSceneRegistration.cpp" />
 	<ClCompile Include="game\gameOver\GameOverScene.cpp" />
 	<ClCompile Include="game\gameOver\GameOverOverlay.cpp" />
+	<ClCompile Include="game\stageClear\StageClearScene.cpp" />
+	<ClCompile Include="game\stageClear\StageClearOverlay.cpp" />
 	<ClCompile Include="game\StartupRouteSmoke.cpp" />
 	<ClCompile Include="game\loading\LoadingScene.cpp" />
 	<ClCompile Include="game\stageSelect\StageSelectScene.cpp" />
@@ -462,6 +464,7 @@
     <ClCompile Include="game\stage\StageHazardLights.cpp" />
     <ClCompile Include="game\stage\StageLightPuzzle.cpp" />
     <ClCompile Include="game\stage\render\StageReflectionRenderer.cpp" />
+    <ClCompile Include="game\stage\render\StageContactShadowRenderer.cpp" />
     <ClCompile Include="game\stage\render\StageSceneRenderer.cpp" />
     <ClCompile Include="game\stage\render\StageRenderContext.cpp" />
     <ClCompile Include="game\stage\StageStart.cpp" />
@@ -472,6 +475,8 @@
     <ClInclude Include="game\GameSceneRegistration.h" />
 	<ClInclude Include="game\gameOver\GameOverScene.h" />
 	<ClInclude Include="game\gameOver\GameOverOverlay.h" />
+	<ClInclude Include="game\stageClear\StageClearScene.h" />
+	<ClInclude Include="game\stageClear\StageClearOverlay.h" />
 	<ClInclude Include="game\StartupRouteSmoke.h" />
 	<ClInclude Include="game\loading\LoadingScene.h" />
 	<ClInclude Include="game\stageSelect\StageSelectScene.h" />
@@ -504,6 +509,7 @@
 	<ClInclude Include="game\stage\StageLightDeath.h" />
 	<ClInclude Include="game\stage\StageLightWarning.h" />
     <ClInclude Include="game\stage\render\StageReflectionRenderer.h" />
+    <ClInclude Include="game\stage\render\StageContactShadowRenderer.h" />
     <ClInclude Include="game\stage\render\StageSceneRenderer.h" />
     <ClInclude Include="game\stage\render\StageRenderContext.h" />
     <ClInclude Include="game\stage\StageStart.h" />

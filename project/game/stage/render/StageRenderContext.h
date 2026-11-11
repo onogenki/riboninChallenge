@@ -10,6 +10,7 @@ namespace Engine { class Object3d; }
 class Player;
 class StageLighting;
 class StageMapRuntime;
+class StagePauseOverlay;
 namespace Engine { class SkyBox; }
 
 // Stageが所有する描画対象を借り、Camera・Lightと行列の準備を同じ順序で行います。
@@ -28,8 +29,10 @@ public:
 		CarryableMirror* carryableMirror = nullptr;
 		Player* player = nullptr;
 		Engine::SkyBox& skyBox;
+		StagePauseOverlay* pauseOverlay = nullptr;
+		bool showPickupPrompt = false;
 	};
 
-	// Stage内の全3D Objectへ同じCamera・Lightを反映し、最後にSkyBoxの行列を更新します。
+	// 3D ObjectとSkyBoxの行列を更新した後、拾える鏡のE案内をCamera位置へ合わせます。
 	static void Prepare(const Context& context);
 };

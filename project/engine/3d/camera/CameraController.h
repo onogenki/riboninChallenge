@@ -54,6 +54,8 @@ public:
 	void ResetBehindTarget(float targetFacingYaw);
 	// 開始演出などで動かしたCamera位置を、通常追従Cameraの現在値として引き継ぎます。
 	void SynchronizeToCamera(const Vector3& targetPosition);
+	// 周回・距離・Camera Areaの履歴を消し、現在の対象を初めて追う時の視点へ戻します。
+	void ResetToInitialState(const Vector3& targetPosition);
 	// Areaへ入った時だけ、Cameraの距離・縦角度・視野角を変更する
 	void SetAreaSettings(const CameraAreaSettings& settings);
 	void ClearAreaSettings();
@@ -93,6 +95,12 @@ private:
 		float deltaTime,
 		bool isTargetMoving,
 		const std::vector<MyMath::OBB>& cameraCollisionObbs);
+	// 外壁で距離が足りない時だけ、天井も避けながら見下ろす角度を選びます。
+	float CalculateWallAvoidancePitch(
+		float yaw,
+		const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
+	// 左右の外壁に遮られた時だけ、室内へ向く一時的な横角度を選びます。
+	float CalculateWallAvoidanceYaw(const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
 	// Focus の後ろ・上にある、カメラが目指す位置を計算する
 	Vector3 CalculateTargetCameraPosition() const;
 	Vector3 CalculateTargetCameraPosition(float yaw, float pitch, float distance) const;
@@ -109,7 +117,9 @@ private:
 		const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
 	// Focusから理想位置までの線が壁に当たるなら、壁の手前の安全な位置を返す
 	Vector3 CalculateCollisionSafeCameraPosition(
-		const std::vector<MyMath::OBB>& cameraCollisionObbs) const;
+		const std::vector<MyMath::OBB>& cameraCollisionObbs,
+		float yaw,
+		float pitch) const;
 	// 補間途中でもCameraが外壁を越えないよう、現在位置を壁の内側へ収めます。
 	Vector3 ClampCameraPositionToCollisionBoundaries(
 		const Vector3& cameraPosition,
@@ -163,6 +173,10 @@ private:
 	float cameraFollowSpeed_ = 4.5f;
 	// 外壁へ近付いた時だけ、急に寄らずゆっくりCameraを縮める速さです。
 	float wallAvoidanceFollowSpeed_ = 3.0f;
+	// 手動の縦角度は残し、壁際で増やす見下ろし角だけを別に補間します。
+	float wallPitchOffset_ = 0.0f;
+	// 左右キーで選んだ角度を残し、横壁を避ける自動回転だけを別に補間します。
+	float wallYawOffset_ = 0.0f;
 	// 矢印キーで選んだ方向へ、ロボットが向きを変えるよう素早く移動します。
 	float orbitFollowSpeed_ = 24.0f;
 	// Playerが移動している方向の少し先へFocusをずらす距離
@@ -174,6 +188,8 @@ private:
 	bool isAutoRecenterEnabled_ = true;
 	// trueの時だけ、CameraとFocusの間にある壁の手前へCameraを移動します。
 	bool isWallAvoidanceEnabled_ = true;
+	// イベント視点は指定した構図を守り、通常追従Cameraだけが壁際で自動回転・上昇します。
+	bool isAutomaticWallViewEnabled_ = true;
 	// 上下キーで選ぶ近・中・遠の三段階です。
 	float minimumManualDistance_ = 10.0f;
 	float manualDistanceStep_ = 2.0f;

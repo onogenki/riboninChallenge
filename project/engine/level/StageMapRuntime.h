@@ -79,6 +79,8 @@ public:
 	void Draw() const;
 	// Editor変更・移動経路で変わったモデルTransformをColliderへ反映します。
 	void SyncColliders();
+	// 指定タグの配置物に球Colliderが触れたかを、各配置物が所有する判定で調べます。
+	bool IsTouchingTag(const std::string& tag, const SphereCollider& other) const;
 	// Stage終了時に、実行中のモデルをすべて解放します。
 	void Clear();
 

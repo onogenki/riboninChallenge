@@ -9,9 +9,10 @@
 #include "SceneRenderPipeline.h"
 #include "SkyBox.h"
 #include "StageHazardLights.h"
+#include "StageContactShadowRenderer.h"
 #include "StageLightPuzzle.h"
 
-// 夜空→Object一覧・JSON配置物→鏡面→携帯鏡・Player→光の順にGame Viewを描きます。
+// 夜空→Object一覧・JSON配置物→鏡面→床影→携帯鏡・Player→光の順にGame Viewを描きます。
 // 鏡面の専用Pipelineから通常設定へ戻し、後続Objectの描画形式が変わらないようにします。
 void StageSceneRenderer::Draw(const Context& context)
 {
@@ -42,6 +43,21 @@ void StageSceneRenderer::Draw(const Context& context)
 	if (context.mirrorFloor) {
 		context.mirrorFloor->DrawSurface(*context.activeCamera);
 		context.object3dCommon->SetCommonDrawSetting();
+	}
+	if (context.contactShadows && context.groundObbs) {
+		// 床と鏡面の後、Playerより前に描き、透明な影が球や鏡面を黒く覆わないようにします。
+		context.contactShadows->Draw(
+			*context.activeCamera,
+			context.player,
+			context.playerShadowVisibility,
+			context.warningLightDirection,
+			context.warningLightStrength,
+			context.ordinaryLightDirection,
+			context.ordinaryLightStrength,
+			context.lighting,
+			context.carryableMirror,
+			*context.fixedMirrors,
+			*context.groundObbs);
 	}
 	if (context.carryableMirror) {
 		// 反射Cameraで使ったWVPが残らないよう、Game View用Cameraを描画直前に必ず設定し直します。

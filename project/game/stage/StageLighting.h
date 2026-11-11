@@ -13,6 +13,12 @@ class StageLightPuzzle;
 class StageLighting
 {
 public:
+	struct ShadowInfluence
+	{
+		Vector3 direction{};
+		float strength = 0.0f;
+	};
+
 	// JSONにLightingがない時も同じ見た目になるよう、Stage1の初期照明を設定します。
 	void InitializeDefaults();
 	// 読込済みLightingを適用し、指定がない時は現在の平行光・点光源を保ち、JSON用SpotLightを消します。
@@ -24,6 +30,8 @@ public:
 	const Engine::Object3d::DirectionalLight& GetDirectionalLight() const { return directionalLight_; }
 	const Engine::Object3d::PointLight& GetPointLight() const { return pointLight_; }
 	const std::array<Engine::Object3d::SpotLight, Engine::Object3d::kMaximumSpotLightCount>& GetSpotLights() const { return spotLights_; }
+	// Playerに届く通常Lightのうち最も強い一灯を選び、床影へ方向と強さを渡します。
+	ShadowInfluence GetShadowInfluence(const Vector3& playerPosition) const;
 
 private:
 	// 三灯照明は最大3本に固定し、残りのSpotLight枠をLaser演出へ残します。

@@ -41,6 +41,8 @@ public:
 	void SetBackFaceBrightness(float brightness) { cameraData_->backFaceBrightness = brightness; }
 	// 個体別の透明度をCamera用Constant Bufferへ渡します。
 	void SetOpacity(float opacity) { cameraData_->opacity = opacity; }
+	// 共有Modelに影響させず、影専用の白黒マスク指定を個体別に渡します。
+	void SetContactShadowMask(bool enabled) { cameraData_->contactShadowMask = enabled ? 1.0f : 0.0f; }
 	// 一体分の反射倍率と発光量を、通常描画と鏡面描画で同じ値へ固定します。
 	void SetSpecularGlow(float specularBoost, float glowIntensity) {
 		cameraData_->specularBoost = specularBoost;

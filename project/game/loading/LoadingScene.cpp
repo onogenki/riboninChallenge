@@ -1,6 +1,7 @@
 #include "LoadingScene.h"
 
 #include "DirectXCommon.h"
+#include "ImGuiManager.h"
 #include "Logger.h"
 #include "PostEffect.h"
 #include "SceneManager.h"
@@ -66,6 +67,9 @@ void LoadingScene::Update()
 	if (!loadingSprite_) {
 		return;
 	}
+	// 切替予約が失敗するフレームでもBeginとEndを対にし、Drawへ未生成のUIを渡しません。
+	ImGuiManager::GetInstance()->Begin("Loading");
+	ImGuiManager::GetInstance()->End();
 	Engine::SceneManager* sceneManager = Engine::SceneManager::GetInstance();
 	// 切替待機中は予約できないため、Loadingを描画しながら次の受付フレームを待ちます。
 	if (!hasRequestedNextScene_ && !sceneManager->HasPendingScene()) {
@@ -87,7 +91,7 @@ void LoadingScene::Update()
 	loadingSprite_->Update();
 }
 
-// 白Spriteを準備できた時だけ、ImGuiなしの白い画面をSwapChainへ出します。
+// 白SpriteをGame Viewへ出し、準備済みImGuiをその外側へ重ねます。
 void LoadingScene::Draw()
 {
 	if (!loadingSprite_) {
@@ -98,7 +102,7 @@ void LoadingScene::Draw()
 	SceneRenderPipeline::Begin(Engine::DirectXCommon::GetInstance(), &whiteClearColor);
 	spriteCommon_->SetCommonDrawSetting();
 	loadingSprite_->Draw();
-	SceneRenderPipeline::End(Engine::DirectXCommon::GetInstance(), nullptr, false);
+	SceneRenderPipeline::End(Engine::DirectXCommon::GetInstance(), nullptr);
 }
 
 // LoadingSceneは白背景だけを所有するため、それだけを解放します。

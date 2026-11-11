@@ -1,12 +1,14 @@
 #include "StageRenderContext.h"
 
 #include "CarryableMirror.h"
+#include "DirectXCommon.h"
 #include "FixedMirror.h"
 #include "Object3dRenderContext.h"
 #include "Player.h"
 #include "SkyBox.h"
 #include "StageLighting.h"
 #include "StageMapRuntime.h"
+#include "StagePauseOverlay.h"
 
 // Stageが決めたCamera・Lightを全Objectへ同じ順番で渡し、描画前の行列をそろえます。
 void StageRenderContext::Prepare(const Context& context)
@@ -34,4 +36,15 @@ void StageRenderContext::Prepare(const Context& context)
 	}
 	// Cameraの更新後にSkyBoxの行列を作り、仮Titleと本編で同じ向きを描きます。
 	context.skyBox.Update();
+	if (context.pauseOverlay) {
+		// Cameraと鏡の更新後にE案内を投影し、同じFrameの3D位置へ追従させます。
+		Engine::DirectXCommon* directXCommon = Engine::DirectXCommon::GetInstance();
+		context.pauseOverlay->UpdatePickupPrompt(
+			context.activeCamera,
+			context.carryableMirror,
+			context.player ? context.player->GetPosition() : Vector3{},
+			context.showPickupPrompt && context.player,
+			static_cast<float>(directXCommon->GetClientWidth()),
+			static_cast<float>(directXCommon->GetClientHeight()));
+	}
 }

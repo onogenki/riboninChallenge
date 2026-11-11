@@ -304,6 +304,14 @@ void Object3d::SetOpacity(float opacity)
 	}
 }
 
+// 影用の板だけを白黒マスクとして描き、通常モデルのLight計算を維持します。
+void Object3d::SetContactShadowMask(bool enabled)
+{
+	if (gpuData_) {
+		gpuData_->SetContactShadowMask(enabled);
+	}
+}
+
 // Playerだけを強く光らせるため、共有材質ではなくObject専用Constant Bufferを変更します。
 void Object3d::SetSpecularGlow(float specularBoost, float glowIntensity)
 {
