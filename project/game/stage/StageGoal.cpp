@@ -2,18 +2,34 @@
 
 #include "Camera.h"
 #include "DirectXCommon.h"
+#include "ParticleManager.h"
 #include "Player.h"
 #include "Sprite.h"
 #include "SpriteCommon.h"
 #include "TextureManager.h"
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 
 namespace
 {
 	constexpr const char* kWhiteTexture = "resources/debug/white.png";
+	constexpr const char* kGoalParticleGroup = "StageGoalLight";
+	constexpr const char* kGoalParticleTexture = "Resources/debug/circle2.png";
 	constexpr float kLightHeight = 8.0f;
-	constexpr float kClearDuration = 1.65f;
+	constexpr float kOrbitDuration = 1.40f;
+	constexpr float kFrontMoveDuration = 0.30f;
+	constexpr float kFrontHoldDuration = 0.18f;
+	constexpr float kOrbitRadius = 2.10f;
+	constexpr float kFrontRadius = 0.85f;
+	constexpr float kCameraPlayerGap = 7.00f;
+	constexpr float kCameraApproachDuration = kOrbitDuration + kFrontMoveDuration;
+	constexpr float kSqueezeStart = kCameraApproachDuration + kFrontHoldDuration;
+	constexpr float kSqueezeDuration = 0.38f;
+	constexpr float kRiseStart = kSqueezeStart + kSqueezeDuration;
+	constexpr float kRiseDuration = 0.22f;
+	constexpr float kClearDuration = kRiseStart + 0.55f;
+	constexpr float kSparkleInterval = 0.10f;
 	constexpr float kOuterLightWidth = 2.4f;
 	constexpr float kInnerLightWidth = 0.85f;
 
@@ -45,7 +61,8 @@ bool StageGoal::Initialize(Engine::DirectXCommon* directXCommon, Engine::SpriteC
 	}
 	overlay->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
 	overlaySprites_.push_back(std::move(overlay));
-	return true;
+	// 一つの既存Groupに三種類の光を入れ、画像とSRVの登録失敗をStage開始前に検出します。
+	return Engine::ParticleManager::GetInstance()->CreateParticleGroup(kGoalParticleGroup, kGoalParticleTexture);
 }
 
 // モデルのくぼみと倍率に光柱を合わせ、Editorや再読込の位置変更にも追従します。
@@ -65,7 +82,10 @@ void StageGoal::ClearGoal()
 {
 	hasGoal_ = false;
 	isPlaying_ = false;
+	sparkleTimer_ = 0.0f;
 	lightSegments_.clear();
+	// Sceneを離れた後に別の画面へGoalの粒子を持ち越さないようにします。
+	Engine::ParticleManager::GetInstance()->ClearParticles(kGoalParticleGroup);
 }
 
 // Goalモデルの外縁、上の縁、中央のくぼみを半径別の高さとして扱い、ジャンプなしで登れるようにします。
@@ -108,7 +128,7 @@ bool StageGoal::IsPlayerInLight(const Player& player) const
 		position.y >= goalCenter_.y && position.y <= goalCenter_.y + kLightHeight;
 }
 
-// 現在のCameraから光の手前へ寄せ、切替直後に視点を飛ばしません。
+// 現在位置から一周する軌道とCamera側の停止位置を作り、演出開始時の瞬間移動を防ぎます。
 void StageGoal::Begin(const Player& player, const Engine::Camera& camera)
 {
 	if (isPlaying_) {
@@ -116,73 +136,160 @@ void StageGoal::Begin(const Player& player, const Engine::Camera& camera)
 	}
 	isPlaying_ = true;
 	elapsedTime_ = 0.0f;
+	sparkleTimer_ = 0.0f;
 	overlayAlpha_ = 0.0f;
+	Engine::ParticleManager::GetInstance()->ClearParticles(kGoalParticleGroup);
 	playerStart_ = player.GetPosition();
 	cameraStart_ = camera.GetTranslate();
-	// 光へ近づく距離を六割で止め、Playerと台座が見える余地を残します。
+	cameraStartRotation_ = camera.GetRotate();
+	const float cameraDx = cameraStart_.x - goalCenter_.x;
+	const float cameraDz = cameraStart_.z - goalCenter_.z;
+	const float cameraDistance = std::sqrt(cameraDx * cameraDx + cameraDz * cameraDz);
+	const Vector3 frontDirection = cameraDistance > 0.001f
+		? Vector3{ cameraDx / cameraDistance, 0.0f, cameraDz / cameraDistance }
+		: Vector3{ 0.0f, 0.0f, -1.0f };
+	frontPosition_ = {
+		goalCenter_.x + frontDirection.x * kFrontRadius,
+		playerStart_.y,
+		goalCenter_.z + frontDirection.z * kFrontRadius,
+	};
+	const float startDx = playerStart_.x - goalCenter_.x;
+	const float startDz = playerStart_.z - goalCenter_.z;
+	orbitStartRadius_ = std::sqrt(startDx * startDx + startDz * startDz);
+	orbitStartDirection_ = orbitStartRadius_ > 0.001f
+		? Vector3{ startDx / orbitStartRadius_, 0.0f, startDz / orbitStartRadius_ }
+		: frontDirection;
+	// 手前に立つPlayerの全身が見える距離で止め、細くなる演出中も近づき過ぎないようにします。
+	const float targetDistance = (std::max)(cameraDistance * 0.65f, kFrontRadius + kCameraPlayerGap);
 	cameraTarget_ = {
-		cameraStart_.x + (goalCenter_.x - cameraStart_.x) * 0.60f,
+		goalCenter_.x + frontDirection.x * targetDistance,
 		cameraStart_.y + (goalCenter_.y + 2.1f - cameraStart_.y) * 0.60f,
-		cameraStart_.z + (goalCenter_.z - cameraStart_.z) * 0.60f,
+		goalCenter_.z + frontDirection.z * targetDistance,
 	};
 }
 
-// 光の中心で球が上昇・透明化する間にCameraを接近させ、最後に画面全体を白くします。
+// 一周とCamera接近中の細い姿、停止直後の急上昇、白画面の順に進めます。
 bool StageGoal::Update(Player& player, Engine::Camera& camera, float deltaTime)
 {
 	if (!isPlaying_) {
 		return false;
 	}
+	const float previousElapsedTime = elapsedTime_;
 	elapsedTime_ = (std::min)(elapsedTime_ + deltaTime, kClearDuration);
 	UpdatePlayerPresentation(player);
 	UpdateCameraPresentation(player, camera);
+	UpdateParticles(player, previousElapsedTime, deltaTime);
 	UpdateOverlayPresentation();
 	return elapsedTime_ >= kClearDuration;
 }
 
-// 先にPlayerを上昇・透明化し、後続のCameraが更新後の位置を見るようにします。
+// 周回中の小光、細くなる時の光核、急上昇時の渦を既存の発生関数で順に出します。
+void StageGoal::UpdateParticles(const Player& player, float previousElapsedTime, float deltaTime)
+{
+	Engine::ParticleManager* particles = Engine::ParticleManager::GetInstance();
+	if (elapsedTime_ < kOrbitDuration) {
+		sparkleTimer_ += (std::max)(deltaTime, 0.0f);
+		if (sparkleTimer_ >= kSparkleInterval) {
+			sparkleTimer_ -= kSparkleInterval;
+			const Vector3& position = player.GetPosition();
+			particles->EmitPillarSparkle(
+				kGoalParticleGroup, 6, { position.x, position.y + 0.35f, position.z }, 0.75f);
+		}
+	}
+	if (previousElapsedTime < kSqueezeStart && elapsedTime_ >= kSqueezeStart) {
+		particles->EmitLightCore(
+			kGoalParticleGroup, 12, { goalCenter_.x, playerStart_.y + 0.45f, goalCenter_.z }, 0.65f);
+	}
+	if (previousElapsedTime < kRiseStart && elapsedTime_ >= kRiseStart) {
+		const Vector3& position = player.GetPosition();
+		particles->EmitLightSpiral(
+			kGoalParticleGroup, 28, { position.x, position.y + 0.35f, position.z }, 0.65f);
+	}
+}
+
+// 最初はGoalの周囲を加速しながら回り、Camera側へ戻ってから細くなって上昇します。
 void StageGoal::UpdatePlayerPresentation(Player& player)
 {
-	const float rise = std::clamp(elapsedTime_ / 1.80f, 0.0f, 1.0f);
-	const float fade = std::clamp((elapsedTime_ - 0.25f) / 1.20f, 0.0f, 1.0f);
-	player.SetPosition({ goalCenter_.x, playerStart_.y + 3.8f * rise, goalCenter_.z });
+	Vector3 position = playerStart_;
+	Vector3 facingTarget = cameraStart_;
+	const float squeezeTime = std::clamp((elapsedTime_ - kSqueezeStart) / kSqueezeDuration, 0.0f, 1.0f);
+	const float squeeze = squeezeTime * squeezeTime * (3.0f - 2.0f * squeezeTime);
+	const float orbitTime = std::clamp(elapsedTime_ / kOrbitDuration, 0.0f, 1.0f);
+	const float startAngle = std::atan2(orbitStartDirection_.z, orbitStartDirection_.x);
+	const float angle = startAngle - 2.0f * std::numbers::pi_v<float> * orbitTime * orbitTime;
+	const float radiusBlend = std::clamp(orbitTime / 0.18f, 0.0f, 1.0f);
+	const float radius = orbitStartRadius_ + (kOrbitRadius - orbitStartRadius_) * radiusBlend;
+	const Vector3 orbitEnd{
+		goalCenter_.x + orbitStartDirection_.x * kOrbitRadius,
+		playerStart_.y,
+		goalCenter_.z + orbitStartDirection_.z * kOrbitRadius,
+	};
+	if (elapsedTime_ < kOrbitDuration) {
+		position = {
+			goalCenter_.x + std::cos(angle) * radius,
+			playerStart_.y + 0.20f * std::sin(4.0f * std::numbers::pi_v<float> * orbitTime),
+			goalCenter_.z + std::sin(angle) * radius,
+		};
+		facingTarget = { position.x + std::sin(angle), position.y, position.z - std::cos(angle) };
+	} else if (elapsedTime_ < kCameraApproachDuration) {
+		const float moveTime = std::clamp((elapsedTime_ - kOrbitDuration) / kFrontMoveDuration, 0.0f, 1.0f);
+		const float move = moveTime * moveTime * (3.0f - 2.0f * moveTime);
+		position = {
+			orbitEnd.x + (frontPosition_.x - orbitEnd.x) * move,
+			playerStart_.y,
+			orbitEnd.z + (frontPosition_.z - orbitEnd.z) * move,
+		};
+	} else {
+		position = {
+			frontPosition_.x + (goalCenter_.x - frontPosition_.x) * squeeze,
+			playerStart_.y,
+			frontPosition_.z + (goalCenter_.z - frontPosition_.z) * squeeze,
+		};
+	}
+	const float horizontalScale = 1.0f - 0.78f * squeeze;
+	player.SetVisualScale({ horizontalScale, 1.0f, horizontalScale });
+	const float riseTime = std::clamp((elapsedTime_ - kRiseStart) / kRiseDuration, 0.0f, 1.0f);
+	const float rise = 1.0f - std::pow(1.0f - riseTime, 3.0f);
+	const float fade = std::clamp((elapsedTime_ - kRiseStart - 0.08f) / 0.34f, 0.0f, 1.0f);
+	player.SetPosition({ position.x, position.y + 3.8f * rise, position.z });
+	player.FaceToward(facingTarget);
 	player.SetVisualOpacity(1.0f - fade);
 	player.SetVisualSpecularGlow(1.0f + 12.0f * fade, 10.0f * fade * (1.0f - fade));
 }
 
-// 更新済みPlayerへ視線を向け、Cameraが光へ近づく演出を進めます。
+// 周回中は向きを保ち、停止後の上昇だけを縦回転で追うことでPlayerを画面内に残します。
 void StageGoal::UpdateCameraPresentation(const Player& player, Engine::Camera& camera)
 {
-	// 前半を速く進めて最後だけ減速し、Cameraが止まるフレームにSceneを切り替えます。
-	const float cameraTime = std::clamp(elapsedTime_ / kClearDuration, 0.0f, 1.0f);
+	// 体が細くなる間も接近を続け、Camera停止とPlayerの急上昇を同じ時刻に揃えます。
+	const float cameraTime = std::clamp(elapsedTime_ / kRiseStart, 0.0f, 1.0f);
 	const float approach = 1.0f - (1.0f - cameraTime) * (1.0f - cameraTime);
 	camera.SetTranslate({
 		cameraStart_.x + (cameraTarget_.x - cameraStart_.x) * approach,
 		cameraStart_.y + (cameraTarget_.y - cameraStart_.y) * approach,
 		cameraStart_.z + (cameraTarget_.z - cameraStart_.z) * approach,
 	});
-	// 上昇するPlayerへ視線を保ち、光柱の真下では角度が不安定にならないよう既存のYawを使います。
-	const Vector3 cameraPosition = camera.GetTranslate();
-	const Vector3 lookDirection{
-		player.GetPosition().x - cameraPosition.x,
-		player.GetPosition().y + 0.45f - cameraPosition.y,
-		player.GetPosition().z - cameraPosition.z,
-	};
-	const float horizontalLength = std::sqrt(
-		lookDirection.x * lookDirection.x + lookDirection.z * lookDirection.z);
-	if (horizontalLength > 0.05f) {
-		camera.SetRotate({
-			-std::atan2(lookDirection.y, horizontalLength) - 0.08f,
-			std::atan2(lookDirection.x, lookDirection.z),
-			0.0f,
-		});
+	if (elapsedTime_ < kRiseStart) {
+		return;
 	}
+	// Goalの中心への水平距離は固定し、上昇した高さの差だけCameraを上へ向けます。
+	const float dx = goalCenter_.x - cameraTarget_.x;
+	const float dz = goalCenter_.z - cameraTarget_.z;
+	const float horizontalDistance = (std::max)(std::sqrt(dx * dx + dz * dz), 0.05f);
+	const float startHeight = playerStart_.y + 0.45f - cameraTarget_.y;
+	const float currentHeight = player.GetPosition().y + 0.45f - cameraTarget_.y;
+	const float pitchDelta = std::atan2(startHeight, horizontalDistance) -
+		std::atan2(currentHeight, horizontalDistance);
+	camera.SetRotate({
+		cameraStartRotation_.x + pitchDelta,
+		cameraStartRotation_.y,
+		cameraStartRotation_.z,
+	});
 }
 
-// Cameraの更新後に白いSpriteを進め、画面切替直前まで描画します。
+// 急上昇が始まってから白いSpriteを重ね、周回と細くなる動きを隠さないようにします。
 void StageGoal::UpdateOverlayPresentation()
 {
-	overlayAlpha_ = std::clamp((elapsedTime_ - 0.70f) / 0.85f, 0.0f, 1.0f);
+	overlayAlpha_ = std::clamp((elapsedTime_ - kRiseStart - 0.06f) / 0.45f, 0.0f, 1.0f);
 	if (!overlaySprites_.empty()) {
 		Engine::Sprite& overlay = *overlaySprites_.front();
 		overlay.SetColor({ 1.0f, 1.0f, 1.0f, overlayAlpha_ });
@@ -196,9 +303,10 @@ void StageGoal::UpdateOverlayPresentation()
 	}
 }
 
+// 細くなる間は床影を残し、実際に上昇し始めた時だけ影を消します。
 float StageGoal::GetShadowVisibility() const
 {
-	return isPlaying_ ? 1.0f - std::clamp(elapsedTime_ / 0.75f, 0.0f, 1.0f) : 1.0f;
+	return isPlaying_ ? 1.0f - std::clamp((elapsedTime_ - kRiseStart) / kRiseDuration, 0.0f, 1.0f) : 1.0f;
 }
 
 // 既存SpotLight配列の一枠に白い光を加え、光柱の周囲のモデルも強く照らします。

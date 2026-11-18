@@ -13,6 +13,7 @@
 #include "Logger.h"
 #include "Object3dCommon.h"
 #include "Object3dFactory.h"
+#include "ParticleManager.h"
 #include "Player.h"
 #include "PostEffect.h"
 #include "SceneRenderPipeline.h"
@@ -164,6 +165,8 @@ bool Stage::InitializeRenderSystems()
 
 	// Playerが部屋を見る通常Cameraを、まず作成します。
 	InitializeMainCamera(cameraManager_, mainCamera_, { 0.0f, 1.0f, -12.0f });
+	// Goal粒子が本編のCamera行列を使えるよう、Camera完成後に非所有ポインタだけ渡します。
+	Engine::ParticleManager::GetInstance()->SetCameraManager(cameraManager_.get());
 	object3dCommon_ = Engine::Object3dCommon::GetInstance();
 	object3dCommon_->Initialize(dxCommon);
 	object3dCommon_->SetDefaultCamera(cameraManager_->GetActiveCamera());
@@ -354,6 +357,8 @@ void Stage::Finalize()
 	playerGlow_.reset();
 	contactShadows_.reset();
 	stageGoal_.ClearGoal();
+	// StageがCameraを破棄する前に、粒子Managerが借りている参照を外します。
+	Engine::ParticleManager::GetInstance()->SetCameraManager(nullptr);
 	skyBox_.reset();
 	stageCameraEvents_.Clear(cameraManager_.get());
 	stageEditor_.Finalize();
@@ -486,9 +491,15 @@ void Stage::Update()
 			}
 		}
 		isStageStartPlaying = wasLightDeathPlaying || wasGoalPlaying ? false : UpdateStagePlayer(deltaTime);
+		// Goalと危険Lightが同じフレームに重なる時はGoalを先に確定し、以後のPlayer接触を止めます。
+		if (!isStageStartPlaying && !wasLightDeathPlaying && !wasGoalPlaying) {
+			UpdateGoal();
+		}
+		const bool checkPlayerCollision =
+			!wasLightDeathPlaying && !lightDeath_.IsPlaying() && !stageGoal_.IsPlaying();
 		stageBgm_.Update(deltaTime);
 		// 本編のDoor・危険Lightの結果だけを、自動確認部品へ渡します。
-		if (!wasLightDeathPlaying && !wasGoalPlaying) {
+		if (checkPlayerCollision) {
 			gameplaySmoke_.Update(
 				{
 					&hazardLights_,
@@ -502,11 +513,11 @@ void Stage::Update()
 			}
 		}
 		if (!fixedMirrors_.empty()) {
-			UpdateLightPuzzle(deltaTime, !wasLightDeathPlaying && !wasGoalPlaying);
+			UpdateLightPuzzle(deltaTime, checkPlayerCollision);
 			// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
 			hazardLights_.Update(
 				deltaTime,
-				player_ && !wasLightDeathPlaying && !wasGoalPlaying ? &player_->GetSphere() : nullptr,
+				player_ && checkPlayerCollision ? &player_->GetSphere() : nullptr,
 				[this](const std::vector<LaserSegment>& sourceSegments)
 				{
 					return ReflectHazardLightSegments(sourceSegments);
@@ -514,10 +525,10 @@ void Stage::Update()
 			// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
 			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_, &goalLight);
 			// 接触判定より先に警告の方向と範囲を更新し、死亡演出へそのまま引き継ぎます。
-			if (player_ && !wasLightDeathPlaying && !wasGoalPlaying) {
+			if (player_ && checkPlayerCollision) {
 				stageLightWarning_.Update(*player_, lightPuzzle_, hazardLights_, deltaTime);
 			}
-			if (!wasLightDeathPlaying && !wasGoalPlaying && !isStageStartPlaying &&
+			if (checkPlayerCollision && !isStageStartPlaying &&
 				(lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit())) {
 				if (player_) {
 					lightDeath_.Begin(*player_, stageLightWarning_);
@@ -526,10 +537,6 @@ void Stage::Update()
 		} else {
 			// 設計開始時のStageでは前StageのLaser光だけを残さず、共通の床と配置物を表示します。
 			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_, &goalLight);
-		}
-		// 危険Lightの死亡判定後にGoalを調べ、死亡演出中はクリアへ進めません。
-		if (!isStageStartPlaying && !wasGoalPlaying) {
-			UpdateGoal();
 		}
 	} else {
 		// Edit ViewではCollider表示だけを現在の配置へ同期し、Player入力や演出は進めません。
@@ -583,6 +590,8 @@ void Stage::PrepareStageRenderObjects()
 		stagePauseOverlay_.get(),
 		!isTemporaryTitleActive_ && pauseState_ == PauseState::kPlaying &&
 		!lightDeath_.IsPlaying() && (!stageStart_ || !stageStart_->IsPlaying()) &&
+		ImGuiManager::GetInstance()->IsGameViewActive(),
+		!isTemporaryTitleActive_ && pauseState_ == PauseState::kPlaying && stageGoal_.IsPlaying() &&
 		ImGuiManager::GetInstance()->IsGameViewActive() };
 	StageRenderContext::Prepare(renderContext);
 }
