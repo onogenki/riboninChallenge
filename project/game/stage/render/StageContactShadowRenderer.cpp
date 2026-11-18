@@ -62,11 +62,13 @@ void StageContactShadowRenderer::Draw(
 		const Sphere& sphere = player->GetSphere();
 		const float bottomY = sphere.center.y - sphere.radius;
 		if (FindGroundY(sphere.center, bottomY, groundObbs, groundY)) {
-			// 着地中は球の外まで見せ、ジャンプが高いほど影を小さく薄くします。
-			const float height = (std::max)(bottomY - groundY, 0.0f);
+			// Colliderを動かさない浮遊分も高さへ足し、モデルが上がる時に影も縮めます。
+			const float visualFloatHeight = player->GetVisualFloatOffsetY();
+			const float height = (std::max)(bottomY - groundY + visualFloatHeight, 0.0f);
 			const float airRatio = std::clamp(height / 1.5f, 0.0f, 1.0f);
-			const float size = 1.0f - 0.38f * airRatio;
-			const float visibility = playerShadowVisibility * (1.0f - 0.55f * airRatio);
+			const float floatShadowRate = std::clamp(1.0f - visualFloatHeight, 0.78f, 1.0f);
+			const float size = (1.0f - 0.38f * airRatio) * floatShadowRate;
+			const float visibility = playerShadowVisibility * (1.0f - 0.55f * airRatio) * floatShadowRate;
 			const float warning = std::clamp(warningLightStrength / 0.72f, 0.0f, 1.0f);
 			const float ordinary = std::clamp(ordinaryLightStrength, 0.0f, 1.0f);
 			Vector3 floorPosition = sphere.center;
@@ -121,7 +123,7 @@ void StageContactShadowRenderer::Draw(
 			DrawPlane(camera, floorPosition, groundY,
 				sphere.radius * 1.35f * size, sphere.radius * 1.05f * size,
 				0.0f, (0.62f + 0.25f * ordinary + 0.25f * warning) *
-					contact * contact * playerShadowVisibility, 0.022f);
+					contact * contact * playerShadowVisibility * floatShadowRate, 0.022f);
 			DrawPlane(camera, floorPosition, groundY,
 				sphere.radius * 1.05f * size, sphere.radius * 0.82f * size,
 				0.0f, (0.50f + 0.35f * ordinary + 0.24f * warning) * visibility, 0.025f);

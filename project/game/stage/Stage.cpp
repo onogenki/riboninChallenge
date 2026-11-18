@@ -26,6 +26,7 @@
 #include "StageMirrorFactory.h"
 #include "render/StageReflectionRenderer.h"
 #include "render/StageContactShadowRenderer.h"
+#include "render/StagePlayerGlow.h"
 #include "render/StageRenderContext.h"
 #include "render/StageSceneRenderer.h"
 #include "StageTitleOverlay.h"
@@ -50,8 +51,8 @@ namespace
 	const Vector3 kStageMapChipOrigin{ 22.0f, 0.0f, 33.0f };
 	// 高さ1.0のブロック上面をY=-2.0へ揃える中心高さです。
 	constexpr float kStageMapChipFloorY = -2.5f;
-	// Playerの球Colliderが床上面へ接する開始高さです。
-	constexpr float kStageMapChipPlayerY = -0.8f;
+	// 半径1.14のCollider中心をモデル原点より0.32上げ、Y=-2.0の床へ接地させます。
+	constexpr float kStageMapChipPlayerY = -1.18f;
 	// JSONに携帯鏡がないStageではFactoryと同じ開始位置を使います。
 	const Vector3 kDefaultCarryableMirrorPosition{ -2.5f, -0.8f, 4.5f };
 	// 提出用Titleだけが使う、Edit Viewで決めた固定Cameraの位置と角度です。
@@ -83,6 +84,7 @@ void Stage::Initialize()
 	isTemporaryTitleActive_ = startsWithTemporaryTitle_;
 	pauseState_ = PauseState::kPlaying;
 	lightDeath_.Reset();
+	stageGoal_.ClearGoal();
 	isLeavingForGameOver_ = false;
 	isLeavingForClear_ = false;
 	if (!InitializeRenderSystems()) {
@@ -123,6 +125,15 @@ void Stage::Initialize()
 		Logger::Log(stageLogPrefix + "contact shadow plane or circle texture could not be prepared.");
 		PostQuitMessage(1);
 		return;
+	}
+	if (!isTemporaryTitleActive_) {
+		// 本編だけでPlayer周囲の光を作り、固定Cameraの仮Titleの景色は保ちます。
+		playerGlow_ = std::make_unique<StagePlayerGlow>();
+		if (!playerGlow_->Initialize(Engine::DirectXCommon::GetInstance())) {
+			Logger::Log(stageLogPrefix + "player glow renderer could not be prepared.");
+			PostQuitMessage(1);
+			return;
+		}
 	}
 	if (isTemporaryTitleActive_ &&
 		!stageTitleOverlay_->Initialize(Engine::SpriteCommon::GetInstance(), Engine::DirectXCommon::GetInstance())) {
@@ -205,6 +216,10 @@ bool Stage::InitializeStageGimmicks()
 	if (!hazardLights_.Initialize(dxCommon)) {
 		return false;
 	}
+	// Goalの光柱と白画面は専用部品へ生成を任せ、初期化失敗を描画成功として扱いません。
+	if (!stageGoal_.Initialize(dxCommon, Engine::SpriteCommon::GetInstance())) {
+		return false;
+	}
 
 	// SwitchとDoorは危険LightのRenderer準備後に生成する順序を変えません。
 	StageGimmickFactory::SwitchesAndDoor puzzleObjects;
@@ -239,9 +254,10 @@ bool Stage::InitializeStageMap()
 // CSV・JSONで開始位置が指定されなければ、従来の既定座標を全経路へ返します。
 Vector3 Stage::GetStagePlayerStartPosition() const
 {
+	// JSONやCSVがない時も、新しいPlayerの球Colliderを床上面へ接地させます。
 	return hasStagePlayerStart_
 		? stagePlayerStartPosition_
-		: Vector3{ 0.0f, -0.8f, 5.0f };
+		: Vector3{ 0.0f, -1.18f, 5.0f };
 }
 
 // Player、通常追従Camera、開始演出を、この順番で作成します。
@@ -249,17 +265,12 @@ bool Stage::InitializePlayerAndCamera()
 {
 	const Vector3 playerStartPosition = GetStagePlayerStartPosition();
 	player_ = std::make_unique<Player>();
-	if (!player_->Initialize(object3dCommon_, "debug/sphere.obj", playerStartPosition, 1.2f)) {
+	// 右OBJを初期表示、左OBJをA入力用に読み込み、体の半径と浮遊量は維持します。
+	if (!player_->Initialize(object3dCommon_, "player/riboninRight.obj", playerStartPosition, 1.14f, { 0.0f, 0.32f, 0.0f }, "player/riboninLeft.obj")) {
 		// Playerモデルを作れない状態で、Cameraや開始演出がnullptrを参照しないよう中断します。
 		player_.reset();
 		return false;
 	}
-	// sphere.obj本来のUVチェッカーを使わず、Playerだけへモンスターボール画像を明示します。
-	if (!player_->GetObject().SetTextureOverride("resources/debug/monsterBall.png")) {
-		player_.reset();
-		return false;
-	}
-
 	// Camera本体とは別のControllerに、Playerを追従する規則を任せます。
 	cameraController_ = std::make_unique<Engine::CameraController>();
 	cameraController_->Initialize(mainCamera_.get(), player_->GetPosition());
@@ -340,7 +351,9 @@ void Stage::Finalize()
 	if (stagePauseOverlay_) {
 		stagePauseOverlay_->Finalize();
 	}
+	playerGlow_.reset();
 	contactShadows_.reset();
+	stageGoal_.ClearGoal();
 	skyBox_.reset();
 	stageCameraEvents_.Clear(cameraManager_.get());
 	stageEditor_.Finalize();
@@ -447,19 +460,35 @@ void Stage::Update()
 	if (isGameViewActive) {
 		stageMapRuntime_.UpdatePaths(Engine::DirectXCommon::GetInstance()->GetDeltaTime());
 	}
+	// モデル移動後の位置に光と歩ける台座を合わせ、Edit Viewの配置変更にも追従させます。
+	if (const StageMapRuntime::RuntimeObject* goalObject = stageMapRuntime_.FindByTag(kGoalTag)) {
+		stageGoal_.SetGoalTransform(goalObject->visual->GetTransform());
+	} else {
+		stageGoal_.ClearGoal();
+	}
+	const Engine::Object3d::SpotLight goalLight = stageGoal_.GetSpotLight();
 
 	// ---------- Game Viewだけでプレイヤー・ライト・ギミックの時間を進める ----------
 	const float deltaTime = Engine::DirectXCommon::GetInstance()->GetDeltaTime();
 	bool isStageStartPlaying = false;
 	if (isGameViewActive) {
 		const bool wasLightDeathPlaying = lightDeath_.IsPlaying();
+		const bool wasGoalPlaying = stageGoal_.IsPlaying();
 		if (wasLightDeathPlaying) {
 			UpdateLightDeath(deltaTime);
 		}
-		isStageStartPlaying = wasLightDeathPlaying ? false : UpdateStagePlayer(deltaTime);
+		if (wasGoalPlaying && player_ && cameraManager_) {
+			if (Engine::Camera* camera = cameraManager_->GetActiveCamera()) {
+				if (stageGoal_.Update(*player_, *camera, deltaTime) && !isLeavingForClear_) {
+					// 白画面が完成した直後の次フレームへ直接予約し、共通FadeのLoadingを挟みません。
+					isLeavingForClear_ = Engine::SceneManager::GetInstance()->ChangeScene("STAGE_CLEAR");
+				}
+			}
+		}
+		isStageStartPlaying = wasLightDeathPlaying || wasGoalPlaying ? false : UpdateStagePlayer(deltaTime);
 		stageBgm_.Update(deltaTime);
 		// 本編のDoor・危険Lightの結果だけを、自動確認部品へ渡します。
-		if (!wasLightDeathPlaying) {
+		if (!wasLightDeathPlaying && !wasGoalPlaying) {
 			gameplaySmoke_.Update(
 				{
 					&hazardLights_,
@@ -473,22 +502,22 @@ void Stage::Update()
 			}
 		}
 		if (!fixedMirrors_.empty()) {
-			UpdateLightPuzzle(deltaTime, !wasLightDeathPlaying);
+			UpdateLightPuzzle(deltaTime, !wasLightDeathPlaying && !wasGoalPlaying);
 			// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
 			hazardLights_.Update(
 				deltaTime,
-				player_ && !wasLightDeathPlaying ? &player_->GetSphere() : nullptr,
+				player_ && !wasLightDeathPlaying && !wasGoalPlaying ? &player_->GetSphere() : nullptr,
 				[this](const std::vector<LaserSegment>& sourceSegments)
 				{
 					return ReflectHazardLightSegments(sourceSegments);
 				});
 			// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
-			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
+			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_, &goalLight);
 			// 接触判定より先に警告の方向と範囲を更新し、死亡演出へそのまま引き継ぎます。
-			if (player_ && !wasLightDeathPlaying) {
+			if (player_ && !wasLightDeathPlaying && !wasGoalPlaying) {
 				stageLightWarning_.Update(*player_, lightPuzzle_, hazardLights_, deltaTime);
 			}
-			if (!wasLightDeathPlaying && !isStageStartPlaying &&
+			if (!wasLightDeathPlaying && !wasGoalPlaying && !isStageStartPlaying &&
 				(lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit())) {
 				if (player_) {
 					lightDeath_.Begin(*player_, stageLightWarning_);
@@ -496,10 +525,10 @@ void Stage::Update()
 			}
 		} else {
 			// 設計開始時のStageでは前StageのLaser光だけを残さず、共通の床と配置物を表示します。
-			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
+			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_, &goalLight);
 		}
 		// 危険Lightの死亡判定後にGoalを調べ、死亡演出中はクリアへ進めません。
-		if (!isStageStartPlaying) {
+		if (!isStageStartPlaying && !wasGoalPlaying) {
 			UpdateGoal();
 		}
 	} else {
@@ -508,8 +537,8 @@ void Stage::Update()
 	}
 
 	// ---------- カメラとデバッグ UI の更新 ----------
-	if (lightDeath_.IsPlaying()) {
-		// 死亡位置からCameraを動かさず、既存の行列更新だけ行います。
+	if (lightDeath_.IsPlaying() || stageGoal_.IsPlaying()) {
+		// 死亡時はCameraを固定し、Goal中は演出部品が動かしたCameraの行列を更新します。
 		cameraManager_->Update();
 	} else {
 		UpdateStageCamera(deltaTime, isStageStartPlaying);
@@ -519,7 +548,7 @@ void Stage::Update()
 	ImGuiManager::GetInstance()->SetStageSelection(GetStageId());
 	ImGuiManager::GetInstance()->Begin("Stage1");
 	// Gameplay中もPlayerの球Colliderを表示し、Laser接触を黄色で確認できるようにする
-	if (player_ && !lightDeath_.IsPlaying()) {
+	if (player_ && !lightDeath_.IsPlaying() && !stageGoal_.IsPlaying()) {
 		ImGuiManager::GetInstance()->DrawPlayerCollisionDebug(
 			player_->GetSphere(),
 			cameraManager_->GetActiveCamera(),
@@ -596,8 +625,14 @@ void Stage::Draw()
 	sceneRendererContext.player = player_.get();
 	// 仮Titleは従来の景色を保ち、本編Stageの床にだけ接地位置の影を足します。
 	sceneRendererContext.contactShadows = isTemporaryTitleActive_ ? nullptr : contactShadows_.get();
+	// Player周囲の光は描画時の現在位置だけを読み、死亡・Goal中には表示しません。
+	sceneRendererContext.playerGlow =
+		ImGuiManager::GetInstance()->IsGameViewActive() &&
+		!lightDeath_.IsPlaying() && !stageGoal_.IsPlaying()
+		? playerGlow_.get() : nullptr;
 	sceneRendererContext.groundObbs = &collisionWorld_.GetSolidObbs();
-	sceneRendererContext.playerShadowVisibility = lightDeath_.GetShadowVisibility();
+	sceneRendererContext.playerShadowVisibility =
+		lightDeath_.GetShadowVisibility() * stageGoal_.GetShadowVisibility();
 	sceneRendererContext.warningLightDirection = stageLightWarning_.GetDirection();
 	sceneRendererContext.warningLightStrength = stageLightWarning_.GetStrength();
 	// 通常Lightは照明の所有者から現在のPlayer位置で評価し、危険Lightの予兆とは分けて渡します。
@@ -610,6 +645,7 @@ void Stage::Draw()
 	sceneRendererContext.lighting = &stageLighting_;
 	sceneRendererContext.lightPuzzle = &lightPuzzle_;
 	sceneRendererContext.hazardLights = &hazardLights_;
+	sceneRendererContext.goal = isTemporaryTitleActive_ ? nullptr : &stageGoal_;
 	StageSceneRenderer::Draw(sceneRendererContext);
 	if (isTemporaryTitleActive_) {
 		// 3Dの後に透過Spriteを重ね、指定したStage1の景色を隠さずにTitleを見せます。
@@ -629,6 +665,11 @@ void Stage::Draw()
 			SceneRenderPipeline::DrawSprites(
 				Engine::SpriteCommon::GetInstance(), stagePauseOverlay_->GetPauseSprites());
 		}
+	}
+	if (stageGoal_.IsOverlayVisible()) {
+		// Cameraが光へ近づいた後だけ、3Dと案内の上から白いSpriteを重ねます。
+		SceneRenderPipeline::DrawSprites(
+			Engine::SpriteCommon::GetInstance(), stageGoal_.GetOverlaySprites());
 	}
 
 	// PostEffect・SwapChain・ImGui・Presentは、全Scene共通のPipelineへ任せます。
@@ -677,6 +718,9 @@ bool Stage::UpdateStagePlayer(float deltaTime)
 			collisionWorld_.GetSolidObbs(),
 			{ 0.0f, 0.0f, 1.0f },
 			smokeControl);
+		if (deltaTime > 0.0f) {
+			stageGoal_.ApplyWalkableSurface(*player_);
+		}
 		return false;
 	}
 
@@ -695,6 +739,9 @@ bool Stage::UpdateStagePlayer(float deltaTime)
 		}
 	}
 	player_->Update(deltaTime, collisionWorld_.GetSolidObbs(), cameraForward);
+	if (deltaTime > 0.0f) {
+		stageGoal_.ApplyWalkableSurface(*player_);
+	}
 	return false;
 }
 
@@ -716,7 +763,7 @@ void Stage::UpdateLightDeath(float deltaTime)
 	}
 	if (lightDeath_.GetDeathCount() >= 3) {
 		// 切替フェード中にも初期位置のPlayerが一瞬映らないよう、透明のまま待機します。
-		player_->GetObject().SetOpacity(0.0f);
+		player_->SetVisualOpacity(0.0f);
 		stageLightWarning_.UpdateDeath(*player_, 1.0f);
 		GameOverScene::SetRetryStageId(stageMapRepository_.GetStageId());
 		isLeavingForGameOver_ = Engine::SceneManager::GetInstance()->ChangeSceneWithFade("GAME_OVER");
@@ -733,15 +780,17 @@ void Stage::UpdateLightDeath(float deltaTime)
 	lightDeath_.CompleteRespawn();
 }
 
-// Colliderを持つGoalとの重なりだけでクリアを決め、Fade中の重複切替を防ぎます。
+// 台座全体ではなく中央の光へ入った時に、PlayerとCameraのクリア演出を始めます。
 void Stage::UpdateGoal()
 {
 	if (!player_ || isLeavingForClear_ || isLeavingForGameOver_ ||
 		lightDeath_.IsPlaying() ||
-		!stageMapRuntime_.IsTouchingTag(kGoalTag, player_->GetCollider())) {
+		!stageGoal_.IsPlayerInLight(*player_) || !cameraManager_) {
 		return;
 	}
-	isLeavingForClear_ = Engine::SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_CLEAR");
+	if (Engine::Camera* camera = cameraManager_->GetActiveCamera()) {
+		stageGoal_.Begin(*player_, *camera);
+	}
 }
 
 // 固定鏡の位置・向きから、各鏡面用Cameraの反射行列を更新します。

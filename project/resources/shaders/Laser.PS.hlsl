@@ -2,6 +2,7 @@ struct LaserData
 {
     float32_t4x4 viewProjection;
     float32_t4 color;
+    float32_t softGlowMode;
 };
 
 ConstantBuffer<LaserData> gLaser : register(b0);
@@ -14,6 +15,17 @@ struct PixelShaderInput
 
 float32_t4 main(PixelShaderInput input) : SV_TARGET0
 {
+    if (gLaser.softGlowMode > 0.5f)
+    {
+        // Playerの体の近くも淡い青白さに抑え、モデルの輪郭と背景を見分けられるようにします。
+        float32_t2 centered = input.texcoord * 2.0f - 1.0f;
+        float32_t distanceFromCenter = length(centered);
+        float32_t whiteGlow = 1.0f - smoothstep(0.60f, 0.92f, distanceFromCenter);
+        float32_t blueGlow = 1.0f - smoothstep(0.70f, 1.0f, distanceFromCenter);
+        float32_t3 glowColor = lerp(float32_t3(0.42f, 0.64f, 1.0f), gLaser.color.rgb, whiteGlow);
+        float32_t glowAlpha = (whiteGlow * 0.55f + blueGlow * 0.45f) * gLaser.color.a;
+        return float32_t4(glowColor, saturate(glowAlpha));
+    }
     // 0が帯の中心、1が縁です。縁を徐々に透明にして光の体積感を作ります。
     float edgeDistance = abs(input.texcoord.x * 2.0f - 1.0f);
     float outerGlow = 1.0f - smoothstep(0.20f, 1.0f, edgeDistance);

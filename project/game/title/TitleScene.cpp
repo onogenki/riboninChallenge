@@ -397,10 +397,10 @@ void TitleScene::UpdateSceneTransition(bool isGameViewActive)
 	}
 #endif
 
-	// EnterまたはPadの3ボタンで、本編のStage1を開きます。
+	// EnterまたはPadの3ボタンで白くフェードし、Stage選択画面へ進みます。
 	if (input->TriggerKey(DIK_RETURN) || input->IsPadButtonPressed(0, 3))
 	{
-		Engine::SceneManager::GetInstance()->ChangeSceneWithLoading("STAGE1");
+		Engine::SceneManager::GetInstance()->ChangeSceneWithFade("STAGE_SELECT");
 	}
 }
 

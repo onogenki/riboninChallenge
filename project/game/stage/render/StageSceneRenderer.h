@@ -15,7 +15,9 @@ namespace Engine { class SkyBox; }
 class StageHazardLights;
 class StageLightPuzzle;
 class StageContactShadowRenderer;
+class StagePlayerGlow;
 class StageLighting;
+class StageGoal;
 
 // Stage IDに関係なく、通常Game Viewへ所有済みObjectを決まった順で描くRendererです。
 // Sceneの進行・Objectの寿命・Camera計算は持たず、Stageが渡す描画対象を使うだけです。
@@ -36,6 +38,7 @@ public:
 		CarryableMirror* carryableMirror = nullptr;
 		Player* player = nullptr;
 		StageContactShadowRenderer* contactShadows = nullptr;
+		StagePlayerGlow* playerGlow = nullptr;
 		const std::vector<MyMath::OBB>* groundObbs = nullptr;
 		float playerShadowVisibility = 1.0f;
 		Vector3 warningLightDirection{ 0.0f, 0.0f, 1.0f };
@@ -45,6 +48,7 @@ public:
 		const StageLighting* lighting = nullptr;
 		const StageLightPuzzle* lightPuzzle = nullptr;
 		const StageHazardLights* hazardLights = nullptr;
+		StageGoal* goal = nullptr;
 	};
 
 	// 夜空を背景に描いてから、部屋・JSON配置物・鏡・Player・Laserを重ねます。

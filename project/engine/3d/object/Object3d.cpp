@@ -267,6 +267,16 @@ void Object3d::SetModel(const std::string& filePath)
 	modelName_ = filePath;
 }
 
+// Playerの左右切替で未登録モデルを選ばないよう、存在を確認してから見た目だけ変更します。
+bool Object3d::SetLoadedModel(const std::string& filePath)
+{
+	if (isSkeletal_ || !Engine::ModelManager::GetInstance()->FindModel(filePath)) {
+		return false;
+	}
+	SetModel(filePath);
+	return true;
+}
+
 // 読込成功した画像だけを適用し、生成側が欠損を見逃さないよう成否を返します。
 bool Object3d::SetTextureOverride(const std::string& texturePath)
 {
@@ -312,13 +322,23 @@ void Object3d::SetContactShadowMask(bool enabled)
 	}
 }
 
-// Playerだけを強く光らせるため、共有材質ではなくObject専用Constant Bufferを変更します。
+// 個体ごとの反射を弱める・強めるため、共有材質ではなくObject専用Constant Bufferを変更します。
 void Object3d::SetSpecularGlow(float specularBoost, float glowIntensity)
 {
 	if (gpuData_) {
 		gpuData_->SetSpecularGlow(
-			std::clamp(specularBoost, 1.0f, 16.0f),
+			std::clamp(specularBoost, 0.0f, 16.0f),
 			std::clamp(glowIntensity, 0.0f, 4.0f));
+	}
+}
+
+// 共有材質を変えず、Player個体だけの輪郭光とリボンの縁の白さをGPUへ渡します。
+void Object3d::SetGhostRim(float intensity, float ribbonRimScale)
+{
+	if (gpuData_) {
+		gpuData_->SetGhostRim(
+			std::clamp(intensity, 0.0f, 2.0f),
+			std::clamp(ribbonRimScale, 0.0f, 1.0f));
 	}
 }
 

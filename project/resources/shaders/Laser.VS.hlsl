@@ -2,6 +2,7 @@ struct LaserData
 {
     float32_t4x4 viewProjection;
     float32_t4 color;
+    float32_t softGlowMode;
 };
 
 ConstantBuffer<LaserData> gLaser : register(b0);

@@ -124,7 +124,7 @@ void StageLightWarning::Update(
 	if (strength_ < 0.001f) {
 		strength_ = 0.0f;
 	}
-	player.GetObject().SetLightWarning(direction_, strength_);
+	player.SetVisualLightWarning(direction_, strength_);
 }
 
 // 直前に見えていた予兆を保持し、死亡開始フレームに色や範囲を戻しません。
@@ -138,7 +138,7 @@ void StageLightWarning::UpdateDeath(Player& player, float progress)
 {
 	strength_ = deathStartStrength_ +
 		(1.0f - deathStartStrength_) * std::clamp(progress, 0.0f, 1.0f);
-	player.GetObject().SetLightWarning(direction_, strength_);
+	player.SetVisualLightWarning(direction_, strength_);
 }
 
 // 復帰したPlayerに前回のLight方向や黄色い反射を残さないよう初期値へ戻します。
@@ -147,5 +147,5 @@ void StageLightWarning::Reset(Player& player)
 	direction_ = { 0.0f, 0.0f, 1.0f };
 	strength_ = 0.0f;
 	deathStartStrength_ = 0.0f;
-	player.GetObject().SetLightWarning(direction_, strength_);
+	player.SetVisualLightWarning(direction_, strength_);
 }

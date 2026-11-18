@@ -28,8 +28,9 @@ bool Stage::LoadStage(int stageId, bool resetPlayerPosition)
 	isLeavingForGameOver_ = false;
 	isLeavingForClear_ = false;
 	if (player_) {
-		player_->GetObject().SetOpacity(1.0f);
-		player_->GetObject().SetSpecularGlow(1.0f, 0.0f);
+		player_->SetVisualOpacity(1.0f);
+		// Stageを読み直した後は強い消失光を消し、専用の白い輪郭光だけを保ちます。
+		player_->SetVisualSpecularGlow(1.0f, 0.0f);
 		stageLightWarning_.Reset(*player_);
 	}
 	stageMapRepository_.StartWatchingCurrentStage();

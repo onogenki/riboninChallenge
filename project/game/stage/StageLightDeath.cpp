@@ -46,9 +46,9 @@ bool StageLightDeath::Update(Player& player, StageLightWarning& warning, float d
 		startPosition_.y + kDeathRiseHeight * riseProgress,
 		startPosition_.z,
 	});
-	player.GetObject().SetOpacity(1.0f - fadeProgress);
+	player.SetVisualOpacity(1.0f - fadeProgress);
 	// 透明化と同時に鏡面反射を強め、青白い光は消え切る前だけ最大になります。
-	player.GetObject().SetSpecularGlow(
+	player.SetVisualSpecularGlow(
 		1.0f + 10.0f * fadeProgress,
 		12.0f * fadeProgress * (1.0f - fadeProgress));
 	warning.UpdateDeath(player, fadeProgress);

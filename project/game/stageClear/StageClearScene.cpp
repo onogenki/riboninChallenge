@@ -47,7 +47,7 @@ void StageClearScene::Initialize()
 	isReady_ = true;
 }
 
-// 背景と案内を更新し、Game ViewのBackspaceだけを一度のScene切替に使います。
+// 背景と案内に加えて入場時の白画面を薄くし、Game ViewのBackspaceを判定します。
 void StageClearScene::Update()
 {
 	if (!isReady_) {
@@ -56,6 +56,7 @@ void StageClearScene::Update()
 	cameraManager_->Update();
 	skyBox_->Update();
 	overlay_->Update(
+		Engine::DirectXCommon::GetInstance()->GetDeltaTime(),
 		static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientWidth()),
 		static_cast<float>(Engine::DirectXCommon::GetInstance()->GetClientHeight()));
 	ImGuiManager::GetInstance()->Begin("StageClear");
@@ -66,7 +67,7 @@ void StageClearScene::Update()
 	}
 }
 
-// 夜空、クリア見出し、Backspace案内を共通Pipelineの順番で描画します。
+// 夜空と案内の最後に白画面を重ね、共通Pipelineの順番で描画します。
 void StageClearScene::Draw()
 {
 	if (!isReady_) {

@@ -452,6 +452,7 @@
     <ClCompile Include="game\stage\StageEditorUi.cpp" />
     <ClCompile Include="game\stage\StageLighting.cpp" />
 	<ClCompile Include="game\stage\StageLightDeath.cpp" />
+	<ClCompile Include="game\stage\StageGoal.cpp" />
 	<ClCompile Include="game\stage\StageLightWarning.cpp" />
     <ClCompile Include="game\stage\StageMapLoading.cpp" />
     <ClCompile Include="game\stage\StageMapChipFactory.cpp" />
@@ -465,6 +466,7 @@
     <ClCompile Include="game\stage\StageLightPuzzle.cpp" />
     <ClCompile Include="game\stage\render\StageReflectionRenderer.cpp" />
     <ClCompile Include="game\stage\render\StageContactShadowRenderer.cpp" />
+    <ClCompile Include="game\stage\render\StagePlayerGlow.cpp" />
     <ClCompile Include="game\stage\render\StageSceneRenderer.cpp" />
     <ClCompile Include="game\stage\render\StageRenderContext.cpp" />
     <ClCompile Include="game\stage\StageStart.cpp" />
@@ -507,9 +509,11 @@
     <ClInclude Include="game\stage\StageLightPuzzle.h" />
     <ClInclude Include="game\stage\StageLighting.h" />
 	<ClInclude Include="game\stage\StageLightDeath.h" />
+	<ClInclude Include="game\stage\StageGoal.h" />
 	<ClInclude Include="game\stage\StageLightWarning.h" />
     <ClInclude Include="game\stage\render\StageReflectionRenderer.h" />
     <ClInclude Include="game\stage\render\StageContactShadowRenderer.h" />
+    <ClInclude Include="game\stage\render\StagePlayerGlow.h" />
     <ClInclude Include="game\stage\render\StageSceneRenderer.h" />
     <ClInclude Include="game\stage\render\StageRenderContext.h" />
     <ClInclude Include="game\stage\StageStart.h" />

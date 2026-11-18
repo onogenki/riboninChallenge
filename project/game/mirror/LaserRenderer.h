@@ -22,6 +22,8 @@ public:
 	void SetBeamWidth(float width) { beamWidth_ = width; }
 	// 背景と区別しやすい色へ、Laser全体の描画色を設定する。
 	void SetColor(const Vector4& color) { color_ = color; }
+	// Playerの残光だけを柔らかい面として描き、通常のLaserは従来の二枚の板を保ちます。
+	void SetSoftGlowMode(bool enabled) { softGlowMode_ = enabled; }
 
 private:
 	// DirectXCommonの二枚のSwapChainと、鏡・通常画面の二回描画に対応します。
@@ -39,6 +41,7 @@ private:
 	{
 		Matrix4x4 viewProjection;
 		Vector4 color;
+		float softGlowMode = 0.0f;
 	};
 	// 一回のDraw専用のUpload領域です。鏡と通常画面が同じ値を上書きしないようにします。
 	struct DrawResources
@@ -68,4 +71,5 @@ private:
 	FrameResources frameResources_[kFrameSlotCount]{};
 	Vector4 color_{ 1.0f, 0.05f, 0.02f, 1.0f };
 	float beamWidth_ = 0.12f;
+	bool softGlowMode_ = false;
 };

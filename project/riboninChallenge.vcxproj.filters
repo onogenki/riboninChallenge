@@ -569,6 +569,9 @@
 	<ClCompile Include="game\stage\StageLightDeath.cpp">
 	  <Filter>game\stage</Filter>
 	</ClCompile>
+	<ClCompile Include="game\stage\StageGoal.cpp">
+	  <Filter>game\stage</Filter>
+	</ClCompile>
 	<ClCompile Include="game\stage\StageLightWarning.cpp">
 	  <Filter>game\stage</Filter>
 	</ClCompile>
@@ -585,6 +588,9 @@
       <Filter>game\stage\render</Filter>
     </ClCompile>
 	<ClCompile Include="game\stage\render\StageContactShadowRenderer.cpp">
+	  <Filter>game\stage\render</Filter>
+	</ClCompile>
+	<ClCompile Include="game\stage\render\StagePlayerGlow.cpp">
 	  <Filter>game\stage\render</Filter>
 	</ClCompile>
 	<ClCompile Include="game\stage\render\StageSceneRenderer.cpp">
@@ -989,6 +995,9 @@
 	<ClInclude Include="game\stage\StageLightDeath.h">
 	  <Filter>game\stage</Filter>
 	</ClInclude>
+	<ClInclude Include="game\stage\StageGoal.h">
+	  <Filter>game\stage</Filter>
+	</ClInclude>
 	<ClInclude Include="game\stage\StageLightWarning.h">
 		<Filter>game\stage</Filter>
 	</ClInclude>
@@ -996,6 +1005,9 @@
       <Filter>game\stage\render</Filter>
     </ClInclude>
 	<ClInclude Include="game\stage\render\StageContactShadowRenderer.h">
+	  <Filter>game\stage\render</Filter>
+	</ClInclude>
+	<ClInclude Include="game\stage\render\StagePlayerGlow.h">
 	  <Filter>game\stage\render</Filter>
 	</ClInclude>
 	<ClInclude Include="game\stage\render\StageSceneRenderer.h">

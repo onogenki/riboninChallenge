@@ -267,6 +267,17 @@ bool StageMapRuntime::IsTouchingTag(const std::string& tag, const SphereCollider
 	return false;
 }
 
+// 生成済みモデルの位置を使うギミックへ、最初の一致オブジェクトだけを渡します。
+const StageMapRuntime::RuntimeObject* StageMapRuntime::FindByTag(const std::string& tag) const
+{
+	for (const RuntimeObject& runtimeObject : objects_) {
+		if (runtimeObject.tag == tag && runtimeObject.visual) {
+			return &runtimeObject;
+		}
+	}
+	return nullptr;
+}
+
 void StageMapRuntime::Clear()
 {
 	objects_.clear();

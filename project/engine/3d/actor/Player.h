@@ -19,6 +19,8 @@ public:
 		float forward = 0.0f;
 		float right = 0.0f;
 		bool jumpPressed = false;
+		bool leftPressed = false;
+		bool rightPressed = false;
 	};
 
 	// Playerの通常移動とMirror構え中の移動を調整する値です。
@@ -37,8 +39,8 @@ public:
 		float mirrorGuardJumpSpeedRate = 0.70f;
 	};
 
-	// モデルを読み込み、開始位置と当たり判定用の半径を設定します。失敗時はfalseです。
-	bool Initialize(Engine::Object3dCommon* object3dCommon, const std::string& modelName, const Vector3& startPosition, float radius);
+	// モデルを元寸法で読み込み、専用球Colliderの半径とモデル原点からの中心ずれを設定します。
+	bool Initialize(Engine::Object3dCommon* object3dCommon, const std::string& modelName, const Vector3& startPosition, float radius, const Vector3& colliderCenterOffset = {}, const std::string& leftModelName = {});
 	// Cameraの正面方向を基準に入力を読み取り、移動・重力・OBBとの接地判定を更新する
 	void Update(
 		float deltaTime,
@@ -50,6 +52,8 @@ public:
 		const std::vector<MyMath::OBB>& solidObbs,
 		const Vector3& cameraForward,
 		const ControlInput& controlInput);
+	// 携帯鏡の実際の向きへ体を少し傾けます。移動方向とColliderの向きは変えません。
+	void UpdateMirrorPose(float deltaTime, bool isCarried, float mirrorYaw, float mirrorPitch);
 	// 携帯Mirrorを構えている間は、移動中でもPlayerの向きを固定します。
 	void SetMirrorGuardMode(bool isMirrorGuardMode) { isMirrorGuardMode_ = isMirrorGuardMode; }
 	bool IsMirrorGuardMode() const { return isMirrorGuardMode_; }
@@ -58,6 +62,13 @@ public:
 	// 現在の移動値は読み取り専用で返し、外部からの部分的な書き換えを防ぎます。
 	const MovementSettings& GetMovementSettings() const { return movementSettings_; }
 
+	// 演出側が位置やColliderを変更せず、Playerの透明度だけを設定します。
+	void SetVisualOpacity(float opacity);
+	// 演出側がPlayerの反射と発光だけを設定します。
+	void SetVisualSpecularGlow(float specularBoost, float glowIntensity);
+	// 危険Lightの方向と警告の強さをPlayerの見た目へ渡します。
+	void SetVisualLightWarning(const Vector3& worldDirection, float strength);
+
 	// 共通描画や透明化に使うObjectを借ります。所有権はPlayerが持ちます。
 	// 位置を変更する時はSetPositionを使い、見た目・Collider・移動状態をそろえてください。
 	Engine::Object3d& GetObject() { return object_; }
@@ -65,8 +76,12 @@ public:
 	void SetPosition(const Vector3& position);
 	// 復帰時に速度・向き・構え・見た目を開始時と同じ状態へ戻します。
 	void ResetForRespawn(const Vector3& position);
+	// Goalの歩ける表面に着いた時だけ、重力・Collider・モデルの高さをそろえます。
+	void ApplyWalkableSurface(float surfaceY);
 	const Vector3& GetPosition() const { return position_; }
 	const Vector3& GetVelocity() const { return velocity_; }
+	// 接地影がモデルだけの浮遊量を参照し、床上の影を追従させるために返します。
+	float GetVisualFloatOffsetY() const { return floatOffsetY_; }
 	// このフレームにPlayerが移動した水平方向です。Cameraの先読みと自動整列に使います。
 	const Vector3& GetMoveDirection() const { return moveDirection_; }
 	//最後に入力した移動方向へ向く、プレイヤーのY軸回転角です。
@@ -87,11 +102,23 @@ public:
 private:
 	// Keyboard入力を、機器に依存しないControlInputへ変換します。
 	static ControlInput ReadControlInput();
+	// A・Dの同時押しでは右を優先し、切替が必要な時だけ読込済みのOBJを選びます。
+	void UpdateFacingModel(const ControlInput& controlInput);
+	// 地上・移動・空中の状態から、描画だけに使う上下量を滑らかに更新します。
+	void UpdateVisualFloat(float deltaTime, bool canFloat);
+	// ColliderとCameraが参照する位置を変えず、モデルだけを上下量の分動かします。
+	void SyncVisualPosition();
 
-	//画面に描画する球モデル
+	// 画面に元寸法で描画するPlayerモデルです。
 	Engine::Object3d object_;
-	//プレイヤーの中心位置
+	// 右を初期状態とし、Stageで指定した二つの読込済みモデルだけを切り替えます。
+	std::string rightModelName_;
+	std::string leftModelName_;
+	bool isLeftModel_ = false;
+	// Blenderのモデル原点に対応し、Cameraや鏡も参照するPlayer位置です。
 	Vector3 position_{};
+	// モデル原点から体の球Collider中心までのずれです。
+	Vector3 colliderCenterOffset_{};
 	//プレイヤーが最後に移動した方向を表す、Y軸回転角です。
 	float facingYaw_ = 0.0f;
 	//現在の移動速度。今回はY方向の落下・ジャンプに使用する
@@ -102,6 +129,10 @@ private:
 	SphereCollider collider_{};
 	// Playerの通常・Mirror構え中の移動値を一か所で持ちます。
 	MovementSettings movementSettings_{};
+	// お化けの周期、現在の揺れ幅、モデルへ加える高さです。物理位置には足しません。
+	float floatPhase_ = 0.0f;
+	float floatAmplitude_ = 0.0f;
+	float floatOffsetY_ = 0.0f;
 	// 左クリックでMirrorを構えている間だけtrueになり、移動してもPlayerの向きを変えません。
 	bool isMirrorGuardMode_ = false;
 	//床に立っているかどうか

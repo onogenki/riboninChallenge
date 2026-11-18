@@ -80,12 +80,17 @@ void StageLighting::ApplyLevel(const LevelLoader::LightingData* lighting)
 // Laserと危険Lightの線分を、壁や床を照らす従来と同じ優先順のSpotLightへ変換します。
 void StageLighting::UpdateLaserSpotLights(
 	const StageLightPuzzle& lightPuzzle,
-	const StageHazardLights& hazardLights)
+	const StageHazardLights& hazardLights,
+	const Engine::Object3d::SpotLight* goalLight)
 {
 	// 見えるLaser線分と別にSpotLightを作り、光線が近くの壁・床を実際に照らすようにします。
 	// 前フレームのLightが残らないよう、まず全要素を無効化します。
 	spotLights_.fill({});
 	size_t lightIndex = 0;
+	// ゴールの白い光を最初の枠に固定し、危険Lightが多いフレームでも消さないようにします。
+	if (goalLight && goalLight->intensity > 0.0f) {
+		spotLights_[lightIndex++] = *goalLight;
+	}
 	// 最初にJSONで決めたキー・フィル・バックライトを入れ、残りの枠をLaser用に使います。
 	for (const Engine::Object3d::SpotLight& stageSpotLight : stageSpotLights_) {
 		if (lightIndex >= spotLights_.size()) {
