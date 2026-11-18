@@ -4,6 +4,7 @@
 #include "DirectXCommon.h"
 #include "FixedMirror.h"
 #include "Object3dRenderContext.h"
+#include "ParticleManager.h"
 #include "Player.h"
 #include "SkyBox.h"
 #include "StageLighting.h"
@@ -36,6 +37,10 @@ void StageRenderContext::Prepare(const Context& context)
 	}
 	// Cameraの更新後にSkyBoxの行列を作り、仮Titleと本編で同じ向きを描きます。
 	context.skyBox.Update();
+	if (context.updateGoalParticles) {
+		// Goal粒子の位置と板の向きも、同じFrameで更新したCameraへ合わせます。
+		Engine::ParticleManager::GetInstance()->Update();
+	}
 	if (context.pauseOverlay) {
 		// Cameraと鏡の更新後にE案内を投影し、同じFrameの3D位置へ追従させます。
 		Engine::DirectXCommon* directXCommon = Engine::DirectXCommon::GetInstance();

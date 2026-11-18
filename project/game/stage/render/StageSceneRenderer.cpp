@@ -5,6 +5,7 @@
 #include "FixedMirror.h"
 #include "Object3d.h"
 #include "Object3dCommon.h"
+#include "ParticleManager.h"
 #include "Player.h"
 #include "SceneRenderPipeline.h"
 #include "SkyBox.h"
@@ -85,5 +86,9 @@ void StageSceneRenderer::Draw(const Context& context)
 	// Goalの光は台座とPlayerの後に描き、白い芯と柔らかい外側を同じCameraへ重ねます。
 	if (context.goal) {
 		context.goal->DrawLight(*context.activeCamera);
+		if (context.goal->IsPlaying()) {
+			// Goal粒子は通常3Dと光柱の後に描き、白い画面はStageのSprite描画に任せます。
+			Engine::ParticleManager::GetInstance()->Draw();
+		}
 	}
 }

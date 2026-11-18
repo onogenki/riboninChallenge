@@ -66,6 +66,12 @@ public:
 	void SetVisualOpacity(float opacity);
 	// 演出側がPlayerの反射と発光だけを設定します。
 	void SetVisualSpecularGlow(float specularBoost, float glowIntensity);
+	// 通常時の控えめな反射へ戻し、死亡・Goalの強い反射値を引きずらないようにします。
+	void ResetVisualSpecularGlow();
+	// クリア演出中だけモデルを細くし、ColliderとBlender由来の元寸法は変えません。
+	void SetVisualScale(const Vector3& scale);
+	// Goal演出で指定地点へ顔を向け、移動の向きとモデルの向きをそろえます。
+	void FaceToward(const Vector3& target);
 	// 危険Lightの方向と警告の強さをPlayerの見た目へ渡します。
 	void SetVisualLightWarning(const Vector3& worldDirection, float strength);
 

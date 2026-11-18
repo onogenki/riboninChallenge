@@ -20,6 +20,7 @@ namespace
 	constexpr float kIdleFloatPeriod = 2.1f;
 	constexpr float kMovingFloatPeriod = 1.45f;
 	constexpr float kFloatBlendSpeed = 8.0f;
+	constexpr float kNormalSpecularBoost = 0.70f;
 }
 
 // PlayerのOBJを元の大きさで表示し、体を囲む球Colliderをモデル原点からずらして作ります。
@@ -52,7 +53,7 @@ bool Player::Initialize(
 	// Blenderから書き出したPlayerの頂点寸法を、接地用Colliderの半径で拡大せずそのまま表示します。
 	object_.SetScale({ 1.0f, 1.0f, 1.0f });
 	// 普段は輪郭だけ淡く光らせ、死亡・Goalの強い発光とは強さを分けます。
-	SetVisualSpecularGlow(1.0f, 0.0f);
+	ResetVisualSpecularGlow();
 	// 体の白い縁は0.55、ピンクのリボンの縁はその25%に抑えます。
 	object_.SetGhostRim(0.55f, 0.25f);
 	floatPhase_ = 0.0f;
@@ -127,10 +128,34 @@ void Player::SetVisualOpacity(float opacity)
 	object_.SetOpacity(opacity);
 }
 
-// Player本体の通常反射を少し抑えつつ、死亡・Goal演出の反射と発光も同じ個体へ渡します。
+// 死亡・Goal演出が指定する強い反射と発光を、そのままPlayer個体へ渡します。
 void Player::SetVisualSpecularGlow(float specularBoost, float glowIntensity)
 {
-	object_.SetSpecularGlow(specularBoost * 0.70f, glowIntensity);
+	object_.SetSpecularGlow(specularBoost, glowIntensity);
+}
+
+// 通常時だけPlayerの鏡面反射を抑え、演出用の強い光と区別します。
+void Player::ResetVisualSpecularGlow()
+{
+	object_.SetSpecularGlow(kNormalSpecularBoost, 0.0f);
+}
+
+// モデルの見た目だけを縮め、移動と接触判定の寸法は元のまま保ちます。
+void Player::SetVisualScale(const Vector3& scale)
+{
+	object_.SetScale(scale);
+}
+
+// 水平方向だけで向きを決め、Goal演出中も顔がCameraや進行方向を見られるようにします。
+void Player::FaceToward(const Vector3& target)
+{
+	const float dx = target.x - position_.x;
+	const float dz = target.z - position_.z;
+	if (dx * dx + dz * dz <= 0.0001f) {
+		return;
+	}
+	facingYaw_ = std::atan2(dx, dz);
+	object_.SetRotate({ 0.0f, facingYaw_, 0.0f });
 }
 
 // 危険Lightの方向と強さを、Playerが所有するモデルへ渡します。
@@ -166,8 +191,10 @@ void Player::ResetForRespawn(const Vector3& position)
 	isMirrorGuardMode_ = false;
 	object_.SetRotate({ 0.0f, 0.0f, 0.0f });
 	object_.SetOpacity(1.0f);
+	// クリア演出で細くした見た目を、次のリスポーンへ持ち越しません。
+	SetVisualScale({ 1.0f, 1.0f, 1.0f });
 	// 復帰後も通常のお化けの輪郭光へ戻します。
-	SetVisualSpecularGlow(1.0f, 0.0f);
+	ResetVisualSpecularGlow();
 	object_.SetLightWarning({ 0.0f, 0.0f, 1.0f }, 0.0f);
 	// 復帰直後に死亡前の上下量を残さず、床から自然に揺れ始めます。
 	floatPhase_ = 0.0f;

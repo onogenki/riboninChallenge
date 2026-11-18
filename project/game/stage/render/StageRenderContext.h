@@ -31,6 +31,7 @@ public:
 		Engine::SkyBox& skyBox;
 		StagePauseOverlay* pauseOverlay = nullptr;
 		bool showPickupPrompt = false;
+		bool updateGoalParticles = false;
 	};
 
 	// 3D ObjectとSkyBoxの行列を更新した後、拾える鏡のE案内をCamera位置へ合わせます。

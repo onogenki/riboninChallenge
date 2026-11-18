@@ -35,7 +35,7 @@ public:
 	void Begin(const Player& player, const Engine::Camera& camera);
 	// @brief Player、Camera、白画面の順にクリア演出を進めます。
 	// @param player 上昇位置と見た目を更新するPlayerです。
-	// @param camera Playerを追う位置と向きを更新するCameraです。
+	// @param camera 停止位置と、上昇中だけの縦向きを更新するCameraです。
 	// @param deltaTime 今回進める時間を秒で渡します。
 	// @return 演出中に切替時刻へ到達した時だけtrueです。演出していない時はfalseです。
 	bool Update(Player& player, Engine::Camera& camera, float deltaTime);
@@ -53,17 +53,24 @@ public:
 private:
 	// クリア演出の経過時間に合わせて、Playerの位置と見た目を更新します。
 	void UpdatePlayerPresentation(Player& player);
-	// 更新済みPlayerを見ながらCameraを光へ近づけます。
+	// 周回中は向きを保って近づき、上昇中だけ縦方向を追います。
 	void UpdateCameraPresentation(const Player& player, Engine::Camera& camera);
+	// クリアの段階に応じて既存の光粒子を発生させます。
+	void UpdateParticles(const Player& player, float previousElapsedTime, float deltaTime);
 	// 最後に白画面を更新し、Camera移動の後にフェードを進めます。
 	void UpdateOverlayPresentation();
 
 	Vector3 goalCenter_{};
 	Vector3 goalScale_{ 1.0f, 1.0f, 1.0f };
 	Vector3 playerStart_{};
+	Vector3 orbitStartDirection_{ 0.0f, 0.0f, 1.0f };
+	Vector3 frontPosition_{};
+	float orbitStartRadius_ = 0.0f;
 	Vector3 cameraStart_{};
+	Vector3 cameraStartRotation_{};
 	Vector3 cameraTarget_{};
 	float elapsedTime_ = 0.0f;
+	float sparkleTimer_ = 0.0f;
 	float overlayAlpha_ = 0.0f;
 	bool hasGoal_ = false;
 	bool isPlaying_ = false;
