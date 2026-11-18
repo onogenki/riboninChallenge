@@ -145,15 +145,18 @@ void LaserRenderer::Draw(const std::vector<LaserSegment>& segments, const Engine
 			}
 		};
 		appendQuad(side);
-		// 一枚目に対して直角の板を足し、平面の線ではなく円柱状のLightに近づけます。
-		Vector3 crossSide = Cross(beamDirection, side);
-		if (Length(crossSide) > 0.0001f) {
-			crossSide = Multiply(halfWidth, Normalize(crossSide));
-			appendQuad(crossSide);
+		if (!softGlowMode_) {
+			// 通常Laserは直角の板を足し、どの方向からも線の太さを見せます。
+			Vector3 crossSide = Cross(beamDirection, side);
+			if (Length(crossSide) > 0.0001f) {
+				crossSide = Multiply(halfWidth, Normalize(crossSide));
+				appendQuad(crossSide);
+			}
 		}
 	}
 	resources.mappedConstantData->viewProjection = camera.GetViewProjectionMatrix();
 	resources.mappedConstantData->color = color_;
+	resources.mappedConstantData->softGlowMode = softGlowMode_ ? 1.0f : 0.0f;
 
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());

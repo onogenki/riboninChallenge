@@ -1,6 +1,6 @@
 # 旧52点レビューと現行コードの照合
 
-2026-10-29時点の作業ツリーを、2026-10-19の外部AIレビュー28項目と照合した記録です。これは再採点ではありません。古い52点を現在の点数として扱いません。`済`は元レビューが挙げた具体例を解消または現在の用途で確認した意味で、全ソースを完全に検査した意味ではありません。
+2026-10-29時点の作業ツリーを2026-10-19の外部AIレビュー28項目と照合し、その後の確認結果を一部追記した記録です。これは再採点ではありません。古い52点を現在の点数として扱いません。`済`は元レビューが挙げた具体例を解消または現在の用途で確認した意味で、全ソースを完全に検査した意味ではありません。
 
 | 番号 | 評価項目 | 現行コードで確認したこと | 判定 |
 | --- | --- | --- | --- |
@@ -27,8 +27,8 @@
 | 21 | モダンC++ | C++20、smart pointer、lambda、span等を使用。C++23への変更は現行機能の必要性が未確認で、点数だけのために移行しない。 | 方針維持 |
 | 22 | コードの死骸 | 旧GameViewCaptureとMatrixScreenPrintfは現行コードにない。通常の骨付き描画はVertex Shader方式で、Compute SkinningはObject3d::DrawOccludedSilhouetteの骨付き処理で使うが、同関数の現行呼び出し元は見つかっていない。BaseSceneのIsFinishedも現行呼び出し元はなく、公開APIとして残る。 | 一部 |
 | 23 | 未使用コード | 4D数学APIは公開ユーティリティ、Checkpoint/GoalはCSVで解釈する将来のStage用型。Stage1の完成ギミックとは数えない。 | 一部 |
-| 24 | カプセル化 | Object3dのTransform/Skeleton、PlayerのMovementSettingsはconst参照。Player::GetObjectは描画・透明化用の変更可能な参照を公開しており、直接位置を変更するとColliderとずれる余地が残る。Object3dFactoryのfriendはモデル設定をFactoryに限定するため残す。 | 一部 |
-| 25 | クラス分割・移譲 | Stageは進行順、StageMapRepository/Runtimeはデータ、StageRenderContextは描画準備、Rendererは描画。Stage2～5のファイル名定義はあるがデータは未作成で、現在完成しているのはStage1だけ。 | 一部 |
+| 24 | カプセル化 | Object3dのTransform/Skeleton、PlayerのMovementSettingsはconst参照。Playerの演出側は透明度・発光・警告の専用関数を使い、Player::GetObjectは描画・反射用の変更可能な参照として残るため、直接位置を変更するとColliderとずれる余地がある。Object3dFactoryのfriendはモデル設定をFactoryに限定するため残す。 | 一部 |
+| 25 | クラス分割・移譲 | Stageは進行順、StageMapRepository/Runtimeはデータ、StageRenderContextは描画準備、Rendererは描画。Stage1～5のJSONは存在し、Stage2には開始位置と床の定義がある。Stage2～5が完成したゲームステージかどうかは、ファイルの存在だけでは確認できていない。 | 一部 |
 | 26 | ポリモーフィズム | Framework→Game、BaseScene→各Scene、SceneFactoryで仮想関数と基底virtualデストラクタを確認。Enemyは派生しないfinalクラス。ColliderのCheckは形状別オーバーロードのままで、旧レビューの仮想化提案は採用していない。 | 一部 |
 | 27 | Stateパターン | SceneManagerはBaseScene経由で各Sceneの更新・描画を切り替え、StageやStageSelectSceneは次Sceneへの変更を要求する。Player・Pause・Title演出については旧レビューが挙げたStateクラス化を行っていない。 | 一部 |
 | 28 | デザインパターン | Scene/Object生成のFactory、FrameworkのTemplate Method、Scene状態、登録表などを目的に応じて使用。元レビューも100点。 | 維持 |
@@ -49,4 +49,8 @@ Development／Release／Debug x64のSolutionビルド、Loading→Title→Stage 
 
 危険Lightの時間定数化後、ユーザーがDevelopment x64のVisual Studio F5で、Stage1の危険Lightの動き・色、鏡と白フェードが従来どおり正常であることを確認しています。実際に動く危険Lightが鏡に当たって反射する場面そのものを確認したかは不明です。
 
-最新の外部AIレビュー点数は不明です。旧52点の具体的な0点項目は大きく改善したため、現行コードの目安は80点前後と見ていますが、これは再採点の結果ではありません。全クラスの命名・コメント等を網羅した証拠はなく、厳密な点数を断定できません。2026-11-01の確認時点ではGit作業ツリーはクリーンです。同じ評価条件で再レビューすると、点数と新しい指摘を照合できます。Git操作はユーザーが担当します。
+2026-11-18の追加後は、StageGoalのPlayer・Camera・白画面の更新を同じ順序で分け、光の幅と判定に共通の倍率計算を使用しています。Playerの透明度・発光・危険Lightの警告は専用関数経由にしましたが、描画と反射用の変更可能なGetObjectは残るため、カプセル化が完全になったわけではありません。
+
+この整理後、Development／Debug x64のビルドと、DevelopmentでのLoading→Title→Stage Select→Stage1自動起動が成功しました。Stage1のGameplay Smokeも成功し、ユーザーはDevelopment x64のF5で危険Light接触時の色・透明化とゴールの上昇・白フェード・クリア画面が以前どおり正常だったと確認しています。自動テストは動く危険Lightが鏡に当たる場面の見た目を確認していません。
+
+最新の外部AIレビュー点数は不明です。過去に述べた80点前後は主観的な推定であり、再採点の結果ではありません。全クラスの命名・コメント等を網羅した証拠もないため、現在の点数は断定できません。同じ評価条件で再レビューすると、点数と新しい指摘を照合できます。Git操作はユーザーが担当します。

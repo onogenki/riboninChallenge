@@ -64,6 +64,8 @@ struct Camera
     float32_t contactShadowMask;
     float32_t3 warningDirection;
     float32_t warningStrength;
+    float32_t ghostRimIntensity;
+    float32_t ribbonRimScale;
 };
 
 ConstantBuffer<Material> gMaterial : register(b0);
@@ -223,6 +225,9 @@ PixelShaderOutput main(
     // Player消失中だけ反射光を強め、ほかのObjectは倍率1で従来の見た目を保ちます。
     float32_t3 specularLight =
         specularDirectionalLight + specularPointLight + specularSpotLight;
+    // 白い体と赤みのあるピンクのリボンを区別し、リボンの縁の白さだけを抑えます。
+    float32_t ribbonMask = saturate((textureColor.r - max(textureColor.g, textureColor.b) - 0.10f) * 4.0f);
+    float32_t ribbonRimScale = lerp(1.0f, gCamera.ribbonRimScale, ribbonMask);
     output.color.rgb +=
         specularLight * gCamera.specularBoost;
     output.color.rgb += specularLight * warningMask * 6.0f * warningColor;
@@ -252,6 +257,9 @@ PixelShaderOutput main(
     float32_t rim = pow(1.0f - saturate(dot(N, toEye)), 2.0f);
     output.color.rgb += warningColor *
         gCamera.glowIntensity * (0.35f + 0.65f * rim);
+    // 視線に対して横を向いた体表ほど白くし、中心の顔は元の色を保ちます。
+    output.color.rgb += float32_t3(1.0f, 1.0f, 1.0f) *
+        gCamera.ghostRimIntensity * rim * ribbonRimScale;
     
    
     // 元の法線側を表面とします。携帯鏡の+Z法線と同じため、縦持ち・横持ちの両方で判別できます。

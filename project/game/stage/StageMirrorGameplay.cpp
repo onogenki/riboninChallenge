@@ -53,6 +53,11 @@ void Stage::UpdateMirrorGameplay()
 		mirrorAimMouseX,
 		isHorizontalMirrorHeld,
 		mirrorAimMouseY);
+	// 鏡を動かした後の実際の角度へPlayerの見た目を追従させ、反射面と同じフレームに表示します。
+	const Vector3 mirrorRotation = carryableMirror_->GetObject().GetRotate();
+	player_->UpdateMirrorPose(
+		Engine::DirectXCommon::GetInstance()->GetDeltaTime(),
+		carryableMirror_->IsCarried(), mirrorRotation.y, mirrorRotation.x);
 }
 
 // 固定鏡・鏡床・携帯鏡を、Laser経路計算で使うMirror一覧へまとめます。

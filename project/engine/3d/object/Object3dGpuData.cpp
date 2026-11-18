@@ -267,6 +267,8 @@ bool Object3dGpuData::CreateCameraData(Engine::DirectXCommon* dxCommon)
 	cameraData_->contactShadowMask = 0.0f;
 	cameraData_->warningDirection = { 0.0f, 0.0f, 1.0f };
 	cameraData_->warningStrength = 0.0f;
+	cameraData_->ghostRimIntensity = 0.0f;
+	cameraData_->ribbonRimScale = 1.0f;
 	return true;
 }
 

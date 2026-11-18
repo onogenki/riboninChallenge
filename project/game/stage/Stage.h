@@ -11,6 +11,7 @@
 #include "StageCollisionWorld.h"
 #include "StageLightPuzzle.h"
 #include "StageLightDeath.h"
+#include "StageGoal.h"
 #include "StageLighting.h"
 #include "StageLightWarning.h"
 #include "StageMapRepository.h"
@@ -31,6 +32,7 @@ namespace Engine { class SkyBox; }
 class StageTitleOverlay;
 class StagePauseOverlay;
 class StageContactShadowRenderer;
+class StagePlayerGlow;
 namespace Engine { class CameraManager; }
 namespace Engine { class Object3dCommon; }
 
@@ -103,7 +105,7 @@ private:
 	bool UpdateStagePlayer(float deltaTime);
 	// 接触後の一秒だけPlayerを上昇・透過させ、復帰かGame Overを決定します。
 	void UpdateLightDeath(float deltaTime);
-	// 配置物のGoalにPlayerが触れた時だけ、クリア画面への切替を予約します。
+	// くぼみの光へ入った時にクリア演出を始め、白画面の完成後にScene切替を予約します。
 	void UpdateGoal();
 	// 通常Cameraを各鏡面で反転し、反射Cameraの位置と回転を更新します。
 	void UpdateReflectionCameras();
@@ -164,6 +166,8 @@ private:
 	std::unique_ptr<Engine::SkyBox> skyBox_;
 	// Playerと立っている鏡の床影だけを所有し、通常モデルや床の材質は変更しません。
 	std::unique_ptr<StageContactShadowRenderer> contactShadows_;
+	// Playerの現在位置だけに描く白い光を所有し、物理やCameraへは渡しません。
+	std::unique_ptr<StagePlayerGlow> playerGlow_;
 	// ---------- 鏡の状態 ----------
 
 	// 大型の固定鏡です。複数枚それぞれが反射Cameraと専用Textureを持ちます。
@@ -205,11 +209,13 @@ private:
 	// WASD移動とジャンプを行う球のPlayerです。
 	std::unique_ptr<Player> player_;
 	// 選択中StageのJSONにあるPlayerStartから読み込んだ、本編開始時のPlayer座標です。
-	Vector3 stagePlayerStartPosition_{ 0.0f, -0.8f, 5.0f };
+	Vector3 stagePlayerStartPosition_{ 0.0f, -1.18f, 5.0f };
 	// PlayerStartが選択中StageのJSONに書かれていた時だけtrueになります。
 	bool hasStagePlayerStart_ = false;
 	// 危険Lightに触れた回数と一秒の消失演出は、このStage専用部品が所有します。
 	StageLightDeath lightDeath_{};
+	// ゴール専用の光・台座の接地・上昇・白い画面を所有します。
+	StageGoal stageGoal_{};
 	// Scene切替の予約はStageが行い、消失演出部品にはSceneManagerを持たせません。
 	bool isLeavingForGameOver_ = false;
 	// Fade中にGoalへの接触が続いても、クリア画面を重複して予約しません。

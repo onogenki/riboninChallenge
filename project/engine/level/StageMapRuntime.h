@@ -81,6 +81,10 @@ public:
 	void SyncColliders();
 	// 指定タグの配置物に球Colliderが触れたかを、各配置物が所有する判定で調べます。
 	bool IsTouchingTag(const std::string& tag, const SphereCollider& other) const;
+	// 指定タグに一致し、モデルがある最初の配置物を借ります。見つからなければnullptrです。
+	// 所有権はStageMapRuntimeにあり、配置物の追加・削除・再構築やClearを挟んでポインタを保持しないでください。
+	// 戻り値の配置物自体はconstですが、visualが指すモデルまではconstになりません。
+	const RuntimeObject* FindByTag(const std::string& tag) const;
 	// Stage終了時に、実行中のモデルをすべて解放します。
 	void Clear();
 

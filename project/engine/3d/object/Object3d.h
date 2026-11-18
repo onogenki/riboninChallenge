@@ -87,9 +87,12 @@ public:
 		// ワールド空間のLight方向なので、Playerの向きを変えても反射側を保ちます。
 		Vector3 warningDirection{ 0.0f, 0.0f, 1.0f };
 		float warningStrength = 0.0f;
+		// Playerだけの白い縁とリボンの縁の白さです。通常Objectは0と1で従来どおり描きます。
+		float ghostRimIntensity = 0.0f;
+		float ribbonRimScale = 1.0f;
 	};
-	// HLSLのCamera定数バッファと同じ48byte配置を維持します。
-	static_assert(sizeof(CameraForGPU) == 48);
+	// HLSLのCamera定数バッファと同じ56byte配置を維持します。
+	static_assert(sizeof(CameraForGPU) == 56);
 
 	struct ReflectionData
 	{
@@ -179,6 +182,8 @@ public:
 	void SetContactShadowMask(bool enabled);
 	// 共有ModelやStageのLightを変えず、このObjectだけの反射と発光を調整します。
 	void SetSpecularGlow(float specularBoost, float glowIntensity);
+	// Playerだけの白い輪郭とリボン部分の輪郭光倍率を設定します。
+	void SetGhostRim(float intensity, float ribbonRimScale);
 	// 近づくLightの世界方向と強さを、このObjectの反射面にだけ渡します。
 	void SetLightWarning(const Vector3& worldDirection, float strength);
 	// 読込成功時だけこのObjectのTextureを上書きし、失敗時は以前の設定を保ってfalseを返します。
@@ -197,6 +202,8 @@ public:
 	// 共有Modelの材質や頂点を外部から任意に変更させず、読み取りだけを許します。
 	const Engine::Model* GetModel() const { return model_; }
 	const std::string& GetModelName() const { return modelName_; }
+	// 読込済みの通常モデルだけへ切り替え、未登録名なら今の見た目を維持します。
+	bool SetLoadedModel(const std::string& filePath);
 
 	//外部からアニメーションモデルかどうか判定
 	bool IsSkeletal() const { return isSkeletal_; }

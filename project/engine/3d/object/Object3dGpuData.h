@@ -48,6 +48,11 @@ public:
 		cameraData_->specularBoost = specularBoost;
 		cameraData_->glowIntensity = glowIntensity;
 	}
+	// Player専用の縁の白さとリボンの縁の倍率を、描画ごとのCamera値へ保存します。
+	void SetGhostRim(float intensity, float ribbonRimScale) {
+		cameraData_->ghostRimIntensity = intensity;
+		cameraData_->ribbonRimScale = ribbonRimScale;
+	}
 	// Playerの回転とは独立したLightの世界方向と警告の強さを描画へ渡します。
 	void SetLightWarning(const Vector3& worldDirection, float strength) {
 		cameraData_->warningDirection = worldDirection;

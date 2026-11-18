@@ -10,7 +10,9 @@
 #include "SkyBox.h"
 #include "StageHazardLights.h"
 #include "StageContactShadowRenderer.h"
+#include "StagePlayerGlow.h"
 #include "StageLightPuzzle.h"
+#include "StageGoal.h"
 
 // 夜空→Object一覧・JSON配置物→鏡面→床影→携帯鏡・Player→光の順にGame Viewを描きます。
 // 鏡面の専用Pipelineから通常設定へ戻し、後続Objectの描画形式が変わらないようにします。
@@ -59,6 +61,10 @@ void StageSceneRenderer::Draw(const Context& context)
 			*context.fixedMirrors,
 			*context.groundObbs);
 	}
+	if (context.playerGlow && context.player) {
+		// Playerの周囲にだけ白い光を置き、体は後から描いて表面の見た目を保ちます。
+		context.playerGlow->Draw(*context.activeCamera, *context.player);
+	}
 	if (context.carryableMirror) {
 		// 反射Cameraで使ったWVPが残らないよう、Game View用Cameraを描画直前に必ず設定し直します。
 		// Playerと同じ通常Object3d経路で描くため、Mirror専用Pipelineへ依存しません。
@@ -75,5 +81,9 @@ void StageSceneRenderer::Draw(const Context& context)
 	if (context.drawStagePuzzle) {
 		context.lightPuzzle->Draw(*context.activeCamera);
 		context.hazardLights->Draw(*context.activeCamera);
+	}
+	// Goalの光は台座とPlayerの後に描き、白い芯と柔らかい外側を同じCameraへ重ねます。
+	if (context.goal) {
+		context.goal->DrawLight(*context.activeCamera);
 	}
 }
