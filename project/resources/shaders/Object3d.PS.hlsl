@@ -46,7 +46,9 @@ struct SpotLight
 
 struct SpotLightSet
 {
-    SpotLight lights[16];
+    SpotLight lights[96];
+    uint count;
+    uint3 padding;
 };
 
 struct PixelShaderOutput
@@ -178,8 +180,9 @@ PixelShaderOutput main(
     // 複数本のLightを加算し、Laserの周囲が実際に明るく見えるようにします。
     float32_t3 diffuseSpotLight = float32_t3(0.0f, 0.0f, 0.0f);
     float32_t3 specularSpotLight = float32_t3(0.0f, 0.0f, 0.0f);
-    [unroll]
-    for (int spotIndex = 0; spotIndex < 16; ++spotIndex)
+    // CPUが設定した有効範囲だけ調べ、未使用の照明枠は繰り返しません。
+    [loop]
+    for (uint spotIndex = 0; spotIndex < gSpotLights.count; ++spotIndex)
     {
         SpotLight spotLight = gSpotLights.lights[spotIndex];
         if (spotLight.intensity <= 0.0f || spotLight.distance <= 0.0f)

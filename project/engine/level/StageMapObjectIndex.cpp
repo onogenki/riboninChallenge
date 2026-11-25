@@ -16,6 +16,21 @@ LevelLoader::ObjectData* FindPlayerStartInObjects(std::vector<LevelLoader::Objec
 	}
 	return found;
 }
+
+// 読込時と同じ深さ優先順で探し、同じ種類が複数ある場合は最後のデータを返します。
+LevelLoader::ObjectData* FindObjectTypeInObjects(std::vector<LevelLoader::ObjectData>& objects, const std::string& objectType)
+{
+	LevelLoader::ObjectData* found = nullptr;
+	for (LevelLoader::ObjectData& objectData : objects) {
+		if (objectData.objectType == objectType) {
+			found = &objectData;
+		}
+		if (LevelLoader::ObjectData* child = FindObjectTypeInObjects(objectData.children, objectType)) {
+			found = child;
+		}
+	}
+	return found;
+}
 }
 
 // JSONへ保存できる元データを返し、実行中Playerの位置とは分けて編集します。
@@ -24,12 +39,32 @@ LevelLoader::ObjectData* StageMapObjectIndex::FindPlayerStartForEdit(LevelLoader
 	return FindPlayerStartInObjects(levelData.objects);
 }
 
+LevelLoader::ObjectData* StageMapObjectIndex::FindObjectTypeForEdit(LevelLoader::LevelData& levelData, const std::string& objectType)
+{
+	return FindObjectTypeInObjects(levelData.objects, objectType);
+}
+
+// 鏡の追加や順番変更で操作対象が変わらないよう、JSON内で明示された一枚を選びます。
+std::size_t StageMapObjectIndex::GetPuzzleMirrorIndex() const
+{
+	for (std::size_t index = 0; index < fixedMirrors_.size(); ++index) {
+		if (fixedMirrors_[index]->objectType == "PUZZLE_MIRROR") {
+			return index;
+		}
+	}
+	return 0;
+}
+
 // 以前のLevelDataを参照しないよう、全一覧を空にしてから現在のLevelDataを分類します。
 void StageMapObjectIndex::Build(const LevelLoader::LevelData& levelData)
 {
 	floor_ = nullptr;
 	playerStart_ = nullptr;
 	carryableMirror_ = nullptr;
+	chargeSwitch_ = nullptr;
+	mirrorFloor_ = nullptr;
+	orbitLight_ = nullptr;
+	staticLights_.clear();
 	fixedMirrors_.clear();
 	runtimeObjects_.clear();
 	eventTriggers_.clear();
@@ -48,6 +83,14 @@ void StageMapObjectIndex::Collect(const std::vector<LevelLoader::ObjectData>& ob
 			playerStart_ = &objectData;
 		} else if (objectData.objectType == "CARRYABLE_MIRROR") {
 			carryableMirror_ = &objectData;
+		} else if (objectData.objectType == "CHARGE_SWITCH") {
+			chargeSwitch_ = &objectData;
+		} else if (objectData.objectType == "MIRROR_FLOOR") {
+			mirrorFloor_ = &objectData;
+		} else if (objectData.objectType == "ORBIT_LIGHT") {
+			orbitLight_ = &objectData;
+		} else if (objectData.objectType == "STATIC_LIGHT") {
+			staticLights_.push_back(&objectData);
 		} else if (objectData.tag == "Mirror") {
 			fixedMirrors_.push_back(&objectData);
 		} else if (objectData.objectType == "EVENT_TRIGGER") {

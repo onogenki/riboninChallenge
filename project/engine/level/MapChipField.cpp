@@ -9,6 +9,21 @@
 
 namespace
 {
+	// CSVの記号と共通の役割を対応させ、種類追加時も同じ検索処理を使います。
+	struct ChipTypeMapping
+	{
+		char symbol;
+		MapChipType type;
+	};
+	constexpr ChipTypeMapping kChipTypeMappings[] = {
+		{ 'P', MapChipType::PlayerStart },
+		{ 'E', MapChipType::EnemySpawn },
+		{ 'B', MapChipType::Block },
+		{ 'G', MapChipType::Gimmick },
+		{ 'C', MapChipType::Checkpoint },
+		{ 'L', MapChipType::Goal },
+	};
+
 	// 呼び出し元から移したCSVセルの前後にある空白と改行コードを取り除きます。
 	// 値として受けるため、呼び出し元の文字列を参照し続けません。
 	std::string Trim(std::string value)
@@ -88,17 +103,13 @@ bool MapChipField::LoadCsv(std::istream& stream)
 
 MapChipType MapChipField::GetType(const Chip& chip)
 {
-	// 記号とゲーム上の役割の対応表です。
-	// P0・P1の番号による違いは、使用するStage側でchip.subIdを見て決めます。
-	switch (chip.type) {
-	case 'P': return MapChipType::PlayerStart;
-	case 'E': return MapChipType::EnemySpawn;
-	case 'B': return MapChipType::Block;
-	case 'G': return MapChipType::Gimmick;
-	case 'C': return MapChipType::Checkpoint;
-	case 'L': return MapChipType::Goal;
-	default: return MapChipType::Unknown;
+	// 番号による違いはStage側がchip.subIdを使い、未登録の記号はUnknownのままにします。
+	for (const ChipTypeMapping& mapping : kChipTypeMappings) {
+		if (mapping.symbol == chip.type) {
+			return mapping.type;
+		}
 	}
+	return MapChipType::Unknown;
 }
 
 const MapChipField::Chip* MapChipField::FindFirst(char type) const

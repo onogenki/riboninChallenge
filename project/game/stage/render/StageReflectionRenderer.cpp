@@ -64,7 +64,6 @@ void StageReflectionRenderer::DrawOne(Context& context, size_t& reflectionUpdate
 			context.player->GetObject().UpdateCameraForDraw(&reflectionCamera);
 			context.player->GetObject().Draw();
 		}
-		context.lightPuzzle->Draw(reflectionCamera);
 		context.hazardLights->Draw(reflectionCamera);
 
 		fixedMirror->EndReflection();

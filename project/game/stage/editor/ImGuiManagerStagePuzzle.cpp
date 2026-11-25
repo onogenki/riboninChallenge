@@ -134,11 +134,6 @@ bool ImGuiManager::MirrorDebugWindow(
 
 // 反射Laserの発射位置・方向と、Switch・Doorの進行状態を表示します。
 bool ImGuiManager::LightPuzzleDebugWindow(
-	Vector3& laserOrigin,
-	Vector3& laserDirection,
-	Vector3& doorLaserOrigin,
-	Vector3& doorLaserDirection,
-	float& laserVisualWidth,
 	Vector3& chargeSwitchPosition,
 	Vector3& doorSwitchPosition,
 	float& largeMirrorTargetYawOffset,
@@ -159,24 +154,8 @@ bool ImGuiManager::LightPuzzleDebugWindow(
 		return false;
 	}
 
-	ImGui::Text("Laser Source Settings");
-	ImGui::TextWrapped("The cyan Charge Laser is reflected by the carried mirror. The orange Door Laser is reflected by the large mirror after its 90 degree turn.");
+	ImGui::TextWrapped("Any active beam can activate either switch.");
 	bool isChanged = false;
-	if (ImGui::DragFloat3("Charge Laser Origin", &laserOrigin.x, 0.05f)) {
-		isChanged = true;
-	}
-	if (ImGui::DragFloat3("Charge Laser Direction", &laserDirection.x, 0.02f)) {
-		isChanged = true;
-	}
-	if (ImGui::DragFloat3("Door Laser Origin", &doorLaserOrigin.x, 0.05f)) {
-		isChanged = true;
-	}
-	if (ImGui::DragFloat3("Door Laser Direction", &doorLaserDirection.x, 0.02f)) {
-		isChanged = true;
-	}
-	if (ImGui::SliderFloat("Laser Visual Width", &laserVisualWidth, 0.04f, 0.80f)) {
-		isChanged = true;
-	}
 	if (ImGui::DragFloat3("Charge Switch Position", &chargeSwitchPosition.x, 0.05f)) {
 		isChanged = true;
 	}
@@ -194,7 +173,7 @@ bool ImGuiManager::LightPuzzleDebugWindow(
 		isChargeSwitchReceivingLight
 			? ImVec4(1.0f, 0.85f, 0.20f, 1.0f)
 			: ImVec4(0.70f, 0.70f, 0.70f, 1.0f),
-		"Charge Light: %s",
+		"Charge Switch: %s",
 		isChargeSwitchReceivingLight ? "HITTING SWITCH" : "NOT HITTING");
 	ImGui::ProgressBar(
 		std::clamp(mirrorCharge, 0.0f, 1.0f),
@@ -210,20 +189,15 @@ bool ImGuiManager::LightPuzzleDebugWindow(
 		isDoorSwitchReceivingLight
 			? ImVec4(0.35f, 1.0f, 0.55f, 1.0f)
 			: ImVec4(0.70f, 0.70f, 0.70f, 1.0f),
-		"Large Mirror Reflection: %s",
+		"Door Switch: %s",
 		isDoorSwitchReceivingLight ? "HITTING DOOR SWITCH" : "NOT HITTING");
 	ImGui::Text("Door: %s (%.0f%%)",
 		isDoorSwitchReceivingLight ? "OPENING / OPEN" : "CLOSING / CLOSED",
 		std::clamp(doorOpenAmount, 0.0f, 1.0f) * 100.0f);
-	ImGui::TextWrapped("The large mirror always reflects on its front side. Charge it to swing the mirror sideways and redirect the reflected light to the door switch.");
+	ImGui::TextWrapped("Any active beam can be reflected toward either switch.");
 	ImGui::End();
 	return isChanged;
 #else
-	(void)laserOrigin;
-	(void)laserDirection;
-	(void)doorLaserOrigin;
-	(void)doorLaserDirection;
-	(void)laserVisualWidth;
 	(void)chargeSwitchPosition;
 	(void)doorSwitchPosition;
 	(void)largeMirrorTargetYawOffset;

@@ -79,7 +79,6 @@ namespace
 // PlayerのColliderを広げた箱で候補を選び、反射後の線分を距離順に評価します。
 void StageLightWarning::Update(
 	Player& player,
-	const StageLightPuzzle& lightPuzzle,
 	const StageHazardLights& hazardLights,
 	float deltaTime)
 {
@@ -90,8 +89,7 @@ void StageLightWarning::Update(
 		{ playerSphere.center.x + extent, playerSphere.center.y + extent, playerSphere.center.z + extent },
 	};
 	NearestLight nearest{};
-	ConsiderSegments(lightPuzzle.GetChargeLaser().GetSegments(), playerSphere, playerWarningBox, nearest);
-	ConsiderSegments(lightPuzzle.GetDoorLaser().GetSegments(), playerSphere, playerWarningBox, nearest);
+	ConsiderSegments(hazardLights.GetStaticSegments(), playerSphere, playerWarningBox, nearest);
 	ConsiderSegments(hazardLights.GetCeilingSweepSegments(), playerSphere, playerWarningBox, nearest);
 	ConsiderSegments(hazardLights.GetHorizontalMoveSegments(), playerSphere, playerWarningBox, nearest);
 	ConsiderSegments(hazardLights.GetBottomPulseSegments(), playerSphere, playerWarningBox, nearest);

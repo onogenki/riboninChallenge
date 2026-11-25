@@ -70,7 +70,7 @@ public:
 	// @param fixedMirror Edit Viewで変更済みの一枚目の固定鏡です。
 	// @param baseYaw Puzzleの進行中の回転量を除いた、JSONへ保存する基準角度です。
 	// @return 最初のMirrorタグを見つけて反映した時だけtrueです。
-	bool SynchronizeFirstMirror(LevelLoader::LevelData& levelData, const FixedMirror& fixedMirror, float baseYaw);
+	bool SynchronizeMirror(LevelLoader::LevelData& levelData, const FixedMirror& fixedMirror, float baseYaw, std::size_t mirrorIndex = 0);
 	// JSONのオブジェクト数が変わった時だけ、編集対象の番号を有効範囲へ戻します。
 	void ClampSelectedObjectIndex(std::size_t objectCount);
 	// Stage切替時だけInspector・Viewport・Shelfの前Stage選択と履歴を消します。

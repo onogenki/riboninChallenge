@@ -14,6 +14,8 @@
 #include "StageCollisionWorld.h"
 #include "StageHazardLights.h"
 #include "StageLightDeath.h"
+#include "StageLightPuzzle.h"
+#include "StageLighting.h"
 #include "StageLightWarning.h"
 #include "StageMapRepository.h"
 #include "StageMapRuntime.h"
@@ -26,6 +28,7 @@
 #include <cstdlib>
 #include <string>
 #include <fstream>
+#include <numbers>
 #include <utility>
 #include <windows.h>
 
@@ -35,6 +38,72 @@ using namespace MyMath;
 
 namespace
 {
+	// 五種類のLightを個別に通し、同じ光が両SwitchとPlayerに届くか本編の判定で調べます。
+	bool CheckAllLightSwitches()
+	{
+		FixedMirror mirror;
+		Engine::Object3d chargeSwitch;
+		Engine::Object3d doorSwitch;
+		Engine::Object3d door;
+		StageLightPuzzle puzzle;
+		StageLightPuzzle::Settings settings = puzzle.GetSettings();
+		settings.chargeSwitchPosition = { 0.0f, 0.0f, 5.0f };
+		settings.doorSwitchPosition = { 0.0f, 0.0f, 5.0f };
+		settings.chargeSwitchRadius = 0.25f;
+		settings.doorSwitchRadius = 0.25f;
+		puzzle.SetSettings(settings);
+		const Sphere playerSphere{ { 0.0f, 0.0f, 5.0f }, 0.25f };
+		for (int selected = 0; selected < 5; ++selected) {
+			StageHazardLights lights;
+			int sourceIndex = 0;
+			lights.Update(0.0f, &playerSphere, [&](const std::vector<LaserSegment>&) {
+				const bool useSource = sourceIndex++ == selected;
+				return useSource
+					? std::vector<LaserSegment>{{ { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 10.0f }, false, 0 }}
+					: std::vector<LaserSegment>{};
+			});
+			puzzle.Update(0.0f, lights, &mirror, &chargeSwitch, &doorSwitch, &door);
+			// 光に近いPlayerへの予兆と、床・壁用SpotLightも種類ごとに作られるか調べます。
+			Player nearPlayer;
+			nearPlayer.SetPosition({ 1.0f, 0.0f, 5.0f });
+			StageLightWarning warning;
+			warning.Update(nearPlayer, lights, 1.0f);
+			StageLighting lighting;
+			lighting.InitializeDefaults();
+			lighting.UpdateLaserSpotLights(lights);
+			const bool hasIllumination = std::any_of(
+				lighting.GetSpotLights().begin(), lighting.GetSpotLights().end(),
+				[](const Engine::Object3d::SpotLight& light) { return light.intensity > 0.0f; });
+			if (!lights.IsPlayerHit() || !puzzle.IsChargeSwitchReceivingLight() ||
+				!puzzle.IsDoorSwitchReceivingLight() || warning.GetStrength() <= 0.0f ||
+				!hasIllumination) {
+				return false;
+			}
+		}
+		// 反射線分が16本を超えても、後から来たLightの照明を落とさないことを確認します。
+		StageHazardLights manyLights;
+		manyLights.Update(0.0f, nullptr, [](const std::vector<LaserSegment>&) {
+			return std::vector<LaserSegment>(4,
+				{ { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 10.0f }, false, 0 });
+		});
+		StageLighting manyLighting;
+		manyLighting.InitializeDefaults();
+		manyLighting.UpdateLaserSpotLights(manyLights);
+		const auto& spots = manyLighting.GetSpotLights();
+		if (spots.size() < 20 || spots[19].intensity <= 0.0f) {
+			return false;
+		}
+		// 赤い予告線は本物のLightではなく、Switchを起動しません。
+		StageHazardLights warningOnly;
+		warningOnly.Update(13.0f, &playerSphere, [](const std::vector<LaserSegment>&) {
+			return std::vector<LaserSegment>{};
+		});
+		puzzle.Update(0.0f, warningOnly, &mirror, &chargeSwitch, &doorSwitch, &door);
+		return !warningOnly.GetBottomPulseWarningSegments().empty() &&
+			!warningOnly.IsPlayerHit() && !puzzle.IsChargeSwitchReceivingLight() &&
+			!puzzle.IsDoorSwitchReceivingLight();
+	}
+
 	// 環境変数を"1"にした時だけ、自動確認を実行します。
 	bool IsEnvironmentEnabled(const char* name)
 	{
@@ -217,15 +286,21 @@ namespace
 		FixedMirror fixedMirror;
 		fixedMirror.SetSurface({ 1.0f, 2.0f, 3.0f }, 0.0f, 4.0f, 6.0f);
 		StageEditor editor;
-		const bool synchronized = editor.SynchronizeFirstMirror(levelData, fixedMirror, 0.25f);
+		const bool synchronized = editor.SynchronizeMirror(levelData, fixedMirror, 0.25f);
 		const LevelLoader::ObjectData& edited = levelData.objects.front().children.front();
 		const LevelLoader::ObjectData& unchanged = levelData.objects.back();
-		LevelLoader::LevelData noMirrorData{};
-		return synchronized &&
+		const bool firstCorrect =
 			edited.translation.x == 1.0f && edited.translation.y == 2.0f && edited.translation.z == 3.0f &&
 			edited.rotation.y == 0.25f && edited.scaling.x == 2.0f && edited.scaling.y == 3.0f &&
-			unchanged.translation.x == 9.0f && unchanged.translation.y == 9.0f &&
-			!editor.SynchronizeFirstMirror(noMirrorData, fixedMirror, 0.25f);
+			unchanged.translation.x == 9.0f && unchanged.translation.y == 9.0f;
+		fixedMirror.SetSurface({ 5.0f, 6.0f, 7.0f }, 0.0f, 4.0f, 6.0f);
+		const bool secondCorrect = editor.SynchronizeMirror(levelData, fixedMirror, 0.5f, 1) &&
+			levelData.objects.back().translation.x == 5.0f &&
+			levelData.objects.back().rotation.y == 0.5f &&
+			levelData.objects.front().children.front().translation.x == 1.0f;
+		LevelLoader::LevelData noMirrorData{};
+		return synchronized && firstCorrect && secondCorrect &&
+			!editor.SynchronizeMirror(noMirrorData, fixedMirror, 0.25f);
 	}
 
 	// Editorの再構築失敗時は元へ戻し、成功した一括削除も明示保存前のメモリだけに留めます。
@@ -466,13 +541,6 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	carryableMirror_ = context.carryableMirror;
 	fixedMirrors_ = context.fixedMirrors;
 	mirrorFloor_ = context.mirrorFloor;
-	laserOrigin_ = context.laserOrigin;
-	laserDirection_ = context.laserDirection;
-	laserCollisionRadius_ = context.laserCollisionRadius;
-	doorLaserOrigin_ = context.doorLaserOrigin;
-	doorLaserDirection_ = context.doorLaserDirection;
-	doorSwitchPosition_ = context.doorSwitchPosition;
-	doorSwitchRadius_ = context.doorSwitchRadius;
 	largeMirrorBaseYaw_ = context.largeMirrorBaseYaw;
 	largeMirrorTargetYawOffset_ = context.largeMirrorTargetYawOffset;
 	gameplaySmokeEnabled_ = IsEnvironmentEnabled("RIBONIN_CHALLENGE_STAGE1_GAMEPLAY_SMOKE");
@@ -486,6 +554,61 @@ void Stage1GameplaySmoke::Initialize(const InitializeContext& context)
 	gameplaySmokeLightDeathState_ = CheckStageLightDeath();
 	// 実際のStage配置やPlayerに影響させず、危険Lightの周期だけを確認します。
 	gameplaySmokeHazardTiming_ = CheckHazardLightTiming();
+	gameplaySmokeAllLightSwitches_ = CheckAllLightSwitches();
+	if (context.hazardLights && context.lightPuzzle && context.reflectHazardSegments &&
+		!context.hazardLights->GetStaticLightSources().empty()) {
+		const LaserSegment& source = context.hazardLights->GetStaticLightSources().front();
+		const auto& settings = context.lightPuzzle->GetSettings();
+		const Sphere switchSphere{ settings.chargeSwitchPosition, settings.chargeSwitchRadius };
+		const auto direct = context.reflectHazardSegments({ source });
+		const bool unlitWithoutMirror = !Laser::IsAnySegmentHitSphere(direct, switchSphere, 0.16f);
+		// 実際の手持ちMirrorの持ち位置と表面を使い、床上に立ったPlayerから反射できるか確認します。
+		const float yaw = std::numbers::pi_v<float> * 0.25f;
+		const auto& hold = carryableMirror_->GetHoldSettings();
+		const Vector3 playerPosition{
+			settings.chargeSwitchPosition.x - std::sin(yaw) * hold.verticalDistance,
+			-1.18f,
+			source.start.z - std::cos(yaw) * hold.verticalDistance,
+		};
+		carryableMirror_->SetCarried(true);
+		carryableMirror_->Update(2.0f, playerPosition, yaw, false);
+		const auto reflected = context.reflectHazardSegments({ source });
+		const bool reachesSwitch = reflected.size() >= 2 && reflected.front().hitMirror &&
+			Laser::IsAnySegmentHitSphere(reflected, switchSphere, 0.16f);
+		StageHazardLights probeLights;
+		probeLights.SetStaticLights({ source });
+		probeLights.Update(0.0f, nullptr, context.reflectHazardSegments);
+		StageLightPuzzle probePuzzle;
+		probePuzzle.SetSettings(settings);
+		FixedMirror probeMirror;
+		Engine::Object3d chargeSwitch, doorSwitch, door;
+		probePuzzle.Update(1.0f, probeLights, &probeMirror, &chargeSwitch, &doorSwitch, &door);
+		gameplaySmokeHandheldSwitchPath_ = unlitWithoutMirror && reachesSwitch &&
+			probePuzzle.IsChargeSwitchReceivingLight() &&
+			probePuzzle.GetLargeMirrorRotationAmount() > 0.01f;
+		carryableMirror_->ResetForRespawn();
+	}
+	if (context.mirrorFloor && context.reflectHazardSegments) {
+		const Vector3 center = context.mirrorFloor->GetMirror().GetCenter();
+		const auto reflected = context.reflectHazardSegments({
+			{ { center.x, center.y + 3.0f, center.z },
+				{ center.x, center.y - 3.0f, center.z }, false, 0 },
+		});
+		gameplaySmokeMirrorFloorActualBlocking_ = reflected.size() >= 2 &&
+			reflected.front().hitMirror && reflected[1].end.y > reflected[1].start.y;
+		// 鏡の本当に手前にある壁は、paddingの例外を通さず光を遮ります。
+		const Mirror testMirror({ 0.0f, 0.0f, 5.0f }, { 0.0f, 0.0f, -1.0f }, 4.0f, 4.0f);
+		Laser testLaser;
+		testLaser.SetOrigin({ 0.0f, 0.0f, 0.0f });
+		testLaser.SetDirection({ 0.0f, 0.0f, 1.0f });
+		testLaser.SetMaxDistance(10.0f);
+		const OBB wall = Collision::MakeOBB(
+			{ { 1.0f, 1.0f, 1.0f }, {}, { 0.0f, 0.0f, 4.0f } },
+			{ 2.0f, 2.0f, 0.5f });
+		testLaser.Update({ &testMirror }, { wall }, 0.06f);
+		gameplaySmokeMirrorFloorActualBlocking_ = gameplaySmokeMirrorFloorActualBlocking_ &&
+			testLaser.GetSegments().size() == 1 && !testLaser.GetSegments().front().hitMirror;
+	}
 
 	VerifyEnemyManagerOwnership(context.object3dCommon);
 
@@ -864,7 +987,7 @@ void Stage1GameplaySmoke::VerifyFixedMirrorAndDoor(const std::vector<std::unique
 			mirrorFloorBackfaceProbe.GetSegments()[1].end.y < mirrorFloorBackfaceProbe.GetSegments()[1].start.y;
 	}
 
-	// 斜め回転した大型MirrorがDoor Switchへ光を送れることを確認します。
+	// 置き場所に依存せず、回転後の大型MirrorでLightが反射することを確認します。
 	if (!fixedMirrors.empty() && fixedMirrors.front()) {
 		const Mirror diagonalDoorMirror(
 			fixedMirrors.front()->GetMirror().GetCenter(),
@@ -873,14 +996,15 @@ void Stage1GameplaySmoke::VerifyFixedMirrorAndDoor(const std::vector<std::unique
 			fixedMirrors.front()->GetMirror().GetWidth(),
 			fixedMirrors.front()->GetMirror().GetHeight());
 		Laser diagonalDoorLaser;
-		diagonalDoorLaser.SetOrigin(doorLaserOrigin_);
-		diagonalDoorLaser.SetDirection(doorLaserDirection_);
+		const Vector3 mirrorCenter = diagonalDoorMirror.GetCenter();
+		const Vector3 mirrorNormal = diagonalDoorMirror.GetNormal();
+		diagonalDoorLaser.SetOrigin(Add(mirrorCenter, Multiply(3.0f, mirrorNormal)));
+		diagonalDoorLaser.SetDirection(Multiply(-1.0f, mirrorNormal));
 		diagonalDoorLaser.SetMaxDistance(20.0f);
 		diagonalDoorLaser.SetMaxReflectionCount(1);
 		diagonalDoorLaser.Update({ &diagonalDoorMirror });
-		const Sphere diagonalDoorSwitch{ doorSwitchPosition_, doorSwitchRadius_ };
-		gameplaySmokeDoorDiagonalReflection_ =
-			diagonalDoorLaser.IsHitSphere(diagonalDoorSwitch, laserCollisionRadius_);
+		gameplaySmokeDoorDiagonalReflection_ = diagonalDoorLaser.GetSegments().size() >= 2 &&
+			diagonalDoorLaser.GetSegments().front().hitMirror;
 	}
 }
 
@@ -1145,6 +1269,35 @@ void Stage1GameplaySmoke::ObserveFrame(const UpdateContext& context, float delta
 		hasReflectedSegment(context.hazardLights->GetHorizontalMoveSegments()) ||
 		hasReflectedSegment(context.hazardLights->GetBottomPulseSegments()) ||
 		hasReflectedSegment(context.hazardLights->GetOrbitSegments());
+	const auto& staticSegments = context.hazardLights->GetStaticSegments();
+	gameplaySmokeStaticMirrorReflection_ = gameplaySmokeStaticMirrorReflection_ ||
+		std::any_of(staticSegments.begin(), staticSegments.end(),
+			[](const LaserSegment& segment) { return segment.hitMirror; });
+	const auto startsAt = [&staticSegments](const Vector3& position)
+	{
+		return std::any_of(staticSegments.begin(), staticSegments.end(), [&](const LaserSegment& segment) {
+			return Length(Subtract(segment.start, position)) < 0.001f;
+		});
+	};
+	const auto& staticSources = context.hazardLights->GetStaticLightSources();
+	gameplaySmokeStaticLightsLoaded_ = gameplaySmokeStaticLightsLoaded_ ||
+		(!staticSources.empty() && std::all_of(staticSources.begin(), staticSources.end(),
+			[&](const LaserSegment& source) { return startsAt(source.start); }));
+	if (context.lightPuzzle) {
+		gameplaySmokeSwitchInitiallyUnlit_ = gameplaySmokeSwitchInitiallyUnlit_ ||
+			!context.lightPuzzle->IsChargeSwitchReceivingLight();
+	}
+	const auto& orbit = context.hazardLights->GetOrbitSegments();
+	if (orbit.size() == 3) {
+		Vector3 average{};
+		for (const LaserSegment& beam : orbit) {
+			average.x += beam.start.x / 3.0f;
+			average.z += beam.start.z / 3.0f;
+		}
+		const Vector3& center = context.hazardLights->GetOrbitCenter();
+		gameplaySmokeOrbitCenterApplied_ = gameplaySmokeOrbitCenterApplied_ ||
+			(std::abs(average.x - center.x) < 0.01f && std::abs(average.z - center.z) < 0.01f);
+	}
 	gameplaySmokeDoorStartsClosed_ =
 		gameplaySmokeDoorStartsClosed_ ||
 		(!context.isDoorSwitchReceivingLight && context.doorOpenAmount <= 0.01f);
@@ -1265,6 +1418,12 @@ void Stage1GameplaySmoke::FinishWhenReady()
 		gameplaySmokeStageMapTransformLookup_ &&
 		gameplaySmokeLightDeathState_ &&
 		gameplaySmokeHazardTiming_ &&
+		gameplaySmokeAllLightSwitches_ &&
+		gameplaySmokeStaticLightsLoaded_ &&
+		gameplaySmokeStaticMirrorReflection_ &&
+		gameplaySmokeHandheldSwitchPath_ &&
+		gameplaySmokeSwitchInitiallyUnlit_ &&
+		gameplaySmokeOrbitCenterApplied_ &&
 		gameplaySmokeMirrorEditAtomicity_ &&
 		gameplaySmokeStageEditorRollback_ &&
 		gameplaySmokeStageEditorModelMetadata_ &&
@@ -1288,6 +1447,7 @@ void Stage1GameplaySmoke::FinishWhenReady()
 		gameplaySmokeMirrorBlocksPlayer_ &&
 		gameplaySmokeFixedMirrorReflection_ &&
 		gameplaySmokeMirrorFloorReflectsLaser_ &&
+		gameplaySmokeMirrorFloorActualBlocking_ &&
 		gameplaySmokeMirrorFloorReflection_ &&
 		gameplaySmokeHazardReflectionRoute_ &&
 		gameplaySmokeDoorStartsClosed_ &&
@@ -1311,6 +1471,12 @@ void Stage1GameplaySmoke::FinishWhenReady()
 			<< " stageMapTransformLookup=" << gameplaySmokeStageMapTransformLookup_
 			<< " lightDeathState=" << gameplaySmokeLightDeathState_
 			<< " hazardTiming=" << gameplaySmokeHazardTiming_
+			<< " allLightSwitches=" << gameplaySmokeAllLightSwitches_
+			<< " staticLightsLoaded=" << gameplaySmokeStaticLightsLoaded_
+			<< " staticMirrorReflection=" << gameplaySmokeStaticMirrorReflection_
+			<< " handheldSwitchPath=" << gameplaySmokeHandheldSwitchPath_
+			<< " switchInitiallyUnlit=" << gameplaySmokeSwitchInitiallyUnlit_
+			<< " orbitCenterApplied=" << gameplaySmokeOrbitCenterApplied_
 			<< " mirrorEditAtomicity=" << gameplaySmokeMirrorEditAtomicity_
 			<< " stageEditorRollback=" << gameplaySmokeStageEditorRollback_
 			<< " stageEditorModelMetadata=" << gameplaySmokeStageEditorModelMetadata_
@@ -1334,6 +1500,7 @@ void Stage1GameplaySmoke::FinishWhenReady()
 			<< " mirrorBlocksPlayer=" << gameplaySmokeMirrorBlocksPlayer_
 			<< " fixedMirrorReflection=" << gameplaySmokeFixedMirrorReflection_
 			<< " mirrorFloorLaser=" << gameplaySmokeMirrorFloorReflectsLaser_
+			<< " mirrorFloorBlockedWorld=" << gameplaySmokeMirrorFloorActualBlocking_
 			<< " mirrorFloorReflection=" << gameplaySmokeMirrorFloorReflection_
 			<< " hazardReflection=" << gameplaySmokeHazardLightReflection_
 			<< " hazardReflectionRoute=" << gameplaySmokeHazardReflectionRoute_

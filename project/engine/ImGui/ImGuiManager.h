@@ -110,14 +110,9 @@ public:
 		float& mirrorYaw,
 		const Engine::Camera& reflectionCamera,
 		bool hasReflectionCapture);
-	// 反射Laserの発射位置・方向と、Switch・Doorの進行状態を表示します。
-	// 発射位置または方向が変更されたフレームだけtrueを返します。
+	// Switchの位置とMirror角度、Switch・Doorの進行状態を表示します。
+	// 編集可能な値が変更されたフレームだけtrueを返します。
 	bool LightPuzzleDebugWindow(
-		Vector3& laserOrigin,
-		Vector3& laserDirection,
-		Vector3& doorLaserOrigin,
-		Vector3& doorLaserDirection,
-		float& laserVisualWidth,
 		Vector3& chargeSwitchPosition,
 		Vector3& doorSwitchPosition,
 		float& largeMirrorTargetYawOffset,

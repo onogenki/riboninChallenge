@@ -6,7 +6,6 @@
 #include <vector>
 
 class StageHazardLights;
-class StageLightPuzzle;
 
 // Stage全体の照明値を所有し、JSONの三灯とLaser・危険Lightを描画用SpotLightへ合成します。
 // ギミックの進行はStageLightPuzzleとStageHazardLights、GPUへの反映はRenderContextが担当します。
@@ -24,7 +23,7 @@ public:
 	// 読込済みLightingを適用し、指定がない時は現在の平行光・点光源を保ち、JSON用SpotLightを消します。
 	void ApplyLevel(const LevelLoader::LightingData* lighting);
 	// ギミック更新後の線分を、次の描画で使うSpotLight配列へ同じ優先順で合成します。
-	void UpdateLaserSpotLights(const StageLightPuzzle& lightPuzzle, const StageHazardLights& hazardLights,
+	void UpdateLaserSpotLights(const StageHazardLights& hazardLights,
 		const Engine::Object3d::SpotLight* goalLight = nullptr);
 
 	// RenderContextが描画値を一括転送するため、内部のLightを変更できない参照で渡します。

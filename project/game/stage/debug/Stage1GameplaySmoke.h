@@ -12,6 +12,7 @@ namespace Engine { class Object3dCommon; }
 namespace Engine { class Camera; }
 class Player;
 class StageHazardLights;
+class StageLightPuzzle;
 
 // Stage1の鏡・Laser・Cameraを、環境変数指定時だけ自動確認するDebug用部品です。
 class Stage1GameplaySmoke
@@ -24,19 +25,14 @@ public:
 		CarryableMirror* carryableMirror = nullptr;
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;
 		FixedMirror* mirrorFloor = nullptr;
-		Vector3 laserOrigin{};
-		Vector3 laserDirection{};
-		float laserCollisionRadius = 0.0f;
-		Vector3 doorLaserOrigin{};
-		Vector3 doorLaserDirection{};
-		Vector3 doorSwitchPosition{};
-		float doorSwitchRadius = 0.0f;
 		float largeMirrorBaseYaw = 0.0f;
 		float largeMirrorTargetYawOffset = 0.0f;
 		// EnemyManagerがEnemyを生成する時に使う共通3D描画設定です。所有しません。
 		Engine::Object3dCommon* object3dCommon = nullptr;
 		// 本編と同じ鏡・遮蔽物を使う、危険Lightの反射経路です。
 		std::function<std::vector<LaserSegment>(const std::vector<LaserSegment>&)> reflectHazardSegments;
+		const StageHazardLights* hazardLights = nullptr;
+		const StageLightPuzzle* lightPuzzle = nullptr;
 	};
 
 	// 毎フレーム変わる本編の値だけを、自動確認へ渡します。
@@ -47,6 +43,7 @@ public:
 		const std::vector<MyMath::OBB>* solidObbs = nullptr;
 		bool isDoorSwitchReceivingLight = false;
 		float doorOpenAmount = 0.0f;
+		const StageLightPuzzle* lightPuzzle = nullptr;
 	};
 
 	// 環境変数が有効な時だけ、鏡・Laser・Cameraの確認を準備します。
@@ -80,13 +77,10 @@ private:
 	CarryableMirror* carryableMirror_ = nullptr;
 	const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors_ = nullptr;
 	FixedMirror* mirrorFloor_ = nullptr;
-	Vector3 laserOrigin_{};
-	Vector3 laserDirection_{};
-	float laserCollisionRadius_ = 0.0f;
-	Vector3 doorLaserOrigin_{};
-	Vector3 doorLaserDirection_{};
-	Vector3 doorSwitchPosition_{};
-	float doorSwitchRadius_ = 0.0f;
+	// 独立した反射試験に使う仮の光線で、Stage内の専用ライトは生成しません。
+	Vector3 laserOrigin_{ 0.0f, 2.0f, 7.5f };
+	Vector3 laserDirection_{ 0.0f, -0.85f, -1.2f };
+	float laserCollisionRadius_ = 0.06f;
 	float largeMirrorBaseYaw_ = 0.0f;
 	float largeMirrorTargetYawOffset_ = 0.0f;
 
@@ -104,6 +98,16 @@ private:
 	bool gameplaySmokeLightDeathState_ = false;
 	// 横Lightの往復と下Lightの点灯・予告が所定の時刻に切り替わるか記録します。
 	bool gameplaySmokeHazardTiming_ = false;
+	// 各Lightが両SwitchとPlayerへ届き、予告だけではSwitchを動かさないか記録します。
+	bool gameplaySmokeAllLightSwitches_ = false;
+	// JSONの二本の固定Lightが、Stage本編で指定した始点から更新されたかを記録します。
+	bool gameplaySmokeStaticLightsLoaded_ = false;
+	// 最奥の固定Lightが鏡に当たり、反射線分を作ったか記録します。
+	bool gameplaySmokeStaticMirrorReflection_ = false;
+	// 手持ち鏡でのみ最奥のSwitchへ光を導けるか記録します。
+	bool gameplaySmokeHandheldSwitchPath_ = false;
+	bool gameplaySmokeSwitchInitiallyUnlit_ = false;
+	bool gameplaySmokeOrbitCenterApplied_ = false;
 	// 不正な鏡編集データで既存Mirrorが途中まで変更されないか記録します。
 	bool gameplaySmokeMirrorEditAtomicity_ = false;
 	// Editorの再構築失敗でJSONデータと選択が元へ戻るか記録します。
@@ -162,6 +166,8 @@ private:
 	bool gameplaySmokeFixedMirrorReflection_ = false;
 	// 鏡床がLaserを反射できたかを記録します。
 	bool gameplaySmokeMirrorFloorReflectsLaser_ = false;
+	// 本編の床・壁を含む遮蔽経路でも、床上の鏡で実際に反射するか記録します。
+	bool gameplaySmokeMirrorFloorActualBlocking_ = false;
 	// 鏡床が反射Textureを更新できたかを記録します。
 	bool gameplaySmokeMirrorFloorReflection_ = false;
 	// 危険LightがMirrorで反射したかを記録します。

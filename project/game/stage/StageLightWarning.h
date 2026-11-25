@@ -4,7 +4,6 @@
 
 class Player;
 class StageHazardLights;
-class StageLightPuzzle;
 
 // 反射後の危険LightとPlayerの距離を調べ、光が来る方向の予兆だけを滑らかに更新します。
 class StageLightWarning
@@ -13,7 +12,6 @@ public:
 	// AABBで候補を絞った後、最短距離からPlayer個体の予兆方向と強さを更新します。
 	void Update(
 		Player& player,
-		const StageLightPuzzle& lightPuzzle,
 		const StageHazardLights& hazardLights,
 		float deltaTime);
 	// 接触直前の方向と強さを保存し、死亡演出へ途切れず引き継ぎます。

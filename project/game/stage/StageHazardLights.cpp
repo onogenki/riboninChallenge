@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <utility>
 
 using namespace MyMath;
 
@@ -28,6 +29,18 @@ namespace
 StageHazardLights::StageHazardLights() = default;
 
 StageHazardLights::~StageHazardLights() = default;
+
+// Stageの切替時にも前のStageの固定Lightを持ち越さないよう、一覧を丸ごと差し替えます。
+void StageHazardLights::SetStaticLights(std::vector<LaserSegment> lights)
+{
+	staticLightSources_ = std::move(lights);
+}
+
+// 移動範囲と周期は保ち、三本が回る中心だけをStageデータに合わせます。
+void StageHazardLights::SetOrbitCenter(const Vector3& center)
+{
+	orbitCenter_ = center;
+}
 
 // 各危険LightのRendererを作り、見えない光の判定だけが残らないよう失敗を返します。
 bool StageHazardLights::Initialize(Engine::DirectXCommon* directXCommon)
@@ -52,7 +65,8 @@ bool StageHazardLights::Initialize(Engine::DirectXCommon* directXCommon)
 		!createRenderer(horizontalMoveRenderer_, { 1.00f, 0.82f, 0.10f, 1.0f }, 0.68f, 4) ||
 		!createRenderer(bottomPulseRenderer_, { 0.15f, 0.55f, 1.00f, 1.0f }, 0.78f, 4) ||
 		!createRenderer(bottomPulseWarningRenderer_, { 1.00f, 0.05f, 0.05f, 0.80f }, 2.40f, 1) ||
-		!createRenderer(orbitRenderer_, { 0.20f, 1.00f, 0.35f, 1.0f }, 0.74f, 12)) {
+		!createRenderer(orbitRenderer_, { 0.20f, 1.00f, 0.35f, 1.0f }, 0.74f, 12) ||
+		!createRenderer(staticRenderer_, { 0.95f, 0.20f, 1.00f, 1.0f }, 0.70f, 64)) {
 		return false;
 	}
 	return true;
@@ -66,6 +80,7 @@ void StageHazardLights::Reset()
 	bottomPulseSegments_.clear();
 	bottomPulseWarningSegments_.clear();
 	orbitSegments_.clear();
+	staticSegments_.clear();
 	time_ = 0.0f;
 	isPlayerHit_ = false;
 }
@@ -162,11 +177,14 @@ void StageHazardLights::Update(
 		orbitSegments_.push_back({ orbitPosition, { orbitPosition.x, -4.00f, orbitPosition.z }, false, 0 });
 	}
 
+	// JSON由来の固定Lightも、動くLightと同じ反射処理と接触判定を通します。
+	staticSegments_ = staticLightSources_;
 	if (reflectSegments) {
 		ceilingSweepSegments_ = reflectSegments(ceilingSweepSegments_);
 		horizontalMoveSegments_ = reflectSegments(horizontalMoveSegments_);
 		bottomPulseSegments_ = reflectSegments(bottomPulseSegments_);
 		orbitSegments_ = reflectSegments(orbitSegments_);
+		staticSegments_ = reflectSegments(staticSegments_);
 	}
 
 	// 反射後を含む有効な危険Lightだけ、Playerの球Colliderと接触判定します。
@@ -176,13 +194,24 @@ void StageHazardLights::Update(
 	}
 	const auto isHitBySegments = [playerSphere](const std::vector<LaserSegment>& segments)
 	{
-		return Laser::IsAnySegmentHitSphere(segments, *playerSphere, 0.16f);
+		return Laser::IsAnySegmentHitSphere(segments, *playerSphere, kCollisionPadding);
 	};
 	isPlayerHit_ =
 		isHitBySegments(ceilingSweepSegments_) ||
 		isHitBySegments(horizontalMoveSegments_) ||
 		isHitBySegments(bottomPulseSegments_) ||
-		isHitBySegments(orbitSegments_);
+		isHitBySegments(orbitSegments_) ||
+		isHitBySegments(staticSegments_);
+}
+
+// 見えている危険Lightだけを対象とし、出現前の予告線でスイッチを動かしません。
+bool StageHazardLights::IsHitSphere(const Sphere& sphere) const
+{
+	return Laser::IsAnySegmentHitSphere(ceilingSweepSegments_, sphere, kCollisionPadding) ||
+		Laser::IsAnySegmentHitSphere(horizontalMoveSegments_, sphere, kCollisionPadding) ||
+		Laser::IsAnySegmentHitSphere(bottomPulseSegments_, sphere, kCollisionPadding) ||
+		Laser::IsAnySegmentHitSphere(orbitSegments_, sphere, kCollisionPadding) ||
+		Laser::IsAnySegmentHitSphere(staticSegments_, sphere, kCollisionPadding);
 }
 
 // 全危険Lightを同じCameraへ描画し、通常画面とMirror反射画面で同じ見た目にします。
@@ -202,5 +231,8 @@ void StageHazardLights::Draw(const Engine::Camera& camera) const
 	}
 	if (orbitRenderer_) {
 		orbitRenderer_->Draw(orbitSegments_, camera);
+	}
+	if (staticRenderer_) {
+		staticRenderer_->Draw(staticSegments_, camera);
 	}
 }

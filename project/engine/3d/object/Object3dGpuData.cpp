@@ -224,6 +224,7 @@ void Object3dGpuData::SetSpotLight(const Engine::Object3d::SpotLight& light)
 {
 	spotLightData_.lights.fill({});
 	spotLightData_.lights[0] = light;
+	spotLightData_.count = 1;
 }
 
 // 複数SpotLightをそのままGPU用配列へコピーします。
@@ -231,6 +232,13 @@ void Object3dGpuData::SetSpotLights(
 	const std::array<Engine::Object3d::SpotLight, Engine::Object3d::kMaximumSpotLightCount>& lights)
 {
 	spotLightData_.lights = lights;
+	// 後ろの未使用枠はShaderで処理しないよう、有効な最後の位置だけを渡します。
+	spotLightData_.count = 0;
+	for (size_t index = 0; index < lights.size(); ++index) {
+		if (lights[index].intensity > 0.0f && lights[index].distance > 0.0f) {
+			spotLightData_.count = static_cast<uint32_t>(index + 1);
+		}
+	}
 }
 
 // Transform行列用Bufferの生成とMapを確認し、失敗した行列へ書き込みません。
@@ -299,6 +307,7 @@ void Object3dGpuData::InitializeDefaultLights()
 	pointLightData_.radius = 10.0f;
 	pointLightData_.decay = 1.0f;
 	spotLightData_.lights.fill({});
+	spotLightData_.count = 1;
 	Engine::Object3d::SpotLight& defaultLight = spotLightData_.lights[0];
 	defaultLight.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	defaultLight.position = { 2.0f, 1.25f, 0.0f };

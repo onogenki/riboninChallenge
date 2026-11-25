@@ -26,6 +26,11 @@ public:
 	bool Initialize(Engine::DirectXCommon* directXCommon);
 	// Stage切替時に、危険Lightの時間と前Frameの線分を初期状態へ戻します。
 	void Reset();
+	// Stage JSONから読み込んだ固定Lightを、次の更新から使います。
+	void SetStaticLights(std::vector<LaserSegment> lights);
+	// 三本の回転Lightの中心を、Stageごとの配置から設定します。
+	void SetOrbitCenter(const Vector3& center);
+	const Vector3& GetOrbitCenter() const { return orbitCenter_; }
 
 	// 時刻から危険Lightを更新し、反射・Player接触までを計算します。
 	void Update(
@@ -40,16 +45,25 @@ public:
 	const std::vector<LaserSegment>& GetBottomPulseSegments() const { return bottomPulseSegments_; }
 	const std::vector<LaserSegment>& GetBottomPulseWarningSegments() const { return bottomPulseWarningSegments_; }
 	const std::vector<LaserSegment>& GetOrbitSegments() const { return orbitSegments_; }
+	// 動かない直線Lightも反射後の線分を照明と警告に渡します。
+	const std::vector<LaserSegment>& GetStaticSegments() const { return staticSegments_; }
+	const std::vector<LaserSegment>& GetStaticLightSources() const { return staticLightSources_; }
 	// trueなら現在の危険LightがPlayerへ当たっています。
 	bool IsPlayerHit() const { return isPlayerHit_; }
+	// 予告線を除く反射後の危険Lightが、指定されたスイッチの球へ届いたか調べます。
+	bool IsHitSphere(const MyMath::Sphere& sphere) const;
 
 private:
+	// PlayerとSwitchに同じ光の太さで接触判定を行います。
+	static constexpr float kCollisionPadding = 0.16f;
 	// 4種類の危険Lightの現在線分です。
 	std::vector<LaserSegment> ceilingSweepSegments_;
 	std::vector<LaserSegment> horizontalMoveSegments_;
 	std::vector<LaserSegment> bottomPulseSegments_;
 	std::vector<LaserSegment> bottomPulseWarningSegments_;
 	std::vector<LaserSegment> orbitSegments_;
+	std::vector<LaserSegment> staticSegments_;
+	std::vector<LaserSegment> staticLightSources_;
 	// 同じ時刻なら同じ位置になるよう、移動経過時間だけを保存します。
 	float time_ = 0.0f;
 	bool isPlayerHit_ = false;
@@ -67,4 +81,5 @@ private:
 	std::unique_ptr<LaserRenderer> bottomPulseRenderer_;
 	std::unique_ptr<LaserRenderer> bottomPulseWarningRenderer_;
 	std::unique_ptr<LaserRenderer> orbitRenderer_;
+	std::unique_ptr<LaserRenderer> staticRenderer_;
 };

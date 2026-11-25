@@ -207,14 +207,6 @@ bool Stage::InitializeStageGimmicks()
 		mirrorFloorWidth_,
 		mirrorFloorHeight_);
 
-	// 白い発射球二つの生成をまとめ、寿命はCollectionに残します。
-	StageGimmickFactory::LaserEmitters emitters;
-	if (!StageGimmickFactory::CreateLaserEmitters(sceneObjects_, puzzleSettings, emitters)) {
-		return false;
-	}
-	laserEmitter_ = emitters.charge;
-	doorLaserEmitter_ = emitters.door;
-
 	// 危険Lightの色・太さ・描画用Rendererは、軌道と同じギミック部品が所有します。
 	if (!hazardLights_.Initialize(dxCommon)) {
 		return false;
@@ -325,13 +317,6 @@ void Stage::InitializeGameplaySmoke()
 		carryableMirror_.get(),
 		&fixedMirrors_,
 		mirrorFloor_.get(),
-		puzzleSettings.laserOrigin,
-		puzzleSettings.laserDirection,
-		puzzleSettings.laserCollisionRadius,
-		puzzleSettings.doorLaserOrigin,
-		puzzleSettings.doorLaserDirection,
-		puzzleSettings.doorSwitchPosition,
-		puzzleSettings.doorSwitchRadius,
 		puzzleSettings.largeMirrorBaseYaw,
 		puzzleSettings.largeMirrorTargetYawOffset,
 		object3dCommon_,
@@ -339,6 +324,8 @@ void Stage::InitializeGameplaySmoke()
 		{
 			return ReflectHazardLightSegments(sourceSegments);
 		},
+		&hazardLights_,
+		&lightPuzzle_,
 	});
 }
 
@@ -367,15 +354,12 @@ void Stage::Finalize()
 	collisionWorld_.Clear();
 	stageMapRepository_.Clear();
 	floor_ = nullptr;
-	laserEmitter_ = nullptr;
-	doorLaserEmitter_ = nullptr;
 	chargeSwitch_ = nullptr;
 	doorSwitch_ = nullptr;
 	lightDoor_ = nullptr;
 	fixedMirrors_.clear();
 	mirrorFloor_.reset();
 	carryableMirror_.reset();
-	lightPuzzle_.Finalize();
 	stageStart_.reset();
 	stageBgm_.Stop();
 	cameraController_.reset();
@@ -442,7 +426,7 @@ void Stage::Update()
 			{
 				return ReflectHazardLightSegments(sourceSegments);
 			});
-		stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_);
+		stageLighting_.UpdateLaserSpotLights(hazardLights_);
 		const bool startRequested =
 			isGameViewActive &&
 			(Engine::Input::GetInstance()->TriggerKey(DIK_RETURN) ||
@@ -506,6 +490,7 @@ void Stage::Update()
 					&collisionWorld_.GetSolidObbs(),
 					lightPuzzle_.IsDoorSwitchReceivingLight(),
 					lightPuzzle_.GetDoorOpenAmount(),
+					&lightPuzzle_,
 				},
 				deltaTime);
 			if (!fixedMirrors_.empty()) {
@@ -513,7 +498,6 @@ void Stage::Update()
 			}
 		}
 		if (!fixedMirrors_.empty()) {
-			UpdateLightPuzzle(deltaTime, checkPlayerCollision);
 			// 危険Lightの軌道・反射・Player接触は、Stage固有ギミックへまとめて任せます。
 			hazardLights_.Update(
 				deltaTime,
@@ -522,21 +506,23 @@ void Stage::Update()
 				{
 					return ReflectHazardLightSegments(sourceSegments);
 				});
+			// 危険Lightも同じフレームにSwitchを動かせるよう、反射後にPuzzleを更新します。
+			UpdateLightPuzzle(deltaTime);
 			// 見た目だけの線ではなく、反射後の経路も周囲を照らすSpotLightへ反映します。
-			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_, &goalLight);
+			stageLighting_.UpdateLaserSpotLights(hazardLights_, &goalLight);
 			// 接触判定より先に警告の方向と範囲を更新し、死亡演出へそのまま引き継ぎます。
 			if (player_ && checkPlayerCollision) {
-				stageLightWarning_.Update(*player_, lightPuzzle_, hazardLights_, deltaTime);
+				stageLightWarning_.Update(*player_, hazardLights_, deltaTime);
 			}
 			if (checkPlayerCollision && !isStageStartPlaying &&
-				(lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit())) {
+				hazardLights_.IsPlayerHit()) {
 				if (player_) {
 					lightDeath_.Begin(*player_, stageLightWarning_);
 				}
 			}
 		} else {
 			// 設計開始時のStageでは前StageのLaser光だけを残さず、共通の床と配置物を表示します。
-			stageLighting_.UpdateLaserSpotLights(lightPuzzle_, hazardLights_, &goalLight);
+			stageLighting_.UpdateLaserSpotLights(hazardLights_, &goalLight);
 		}
 	} else {
 		// Edit ViewではCollider表示だけを現在の配置へ同期し、Player入力や演出は進めません。
@@ -560,7 +546,7 @@ void Stage::Update()
 			player_->GetSphere(),
 			cameraManager_->GetActiveCamera(),
 			player_->IsColliding(),
-			lightPuzzle_.IsPlayerHitByLaser() || hazardLights_.IsPlayerHit());
+			hazardLights_.IsPlayerHit());
 	}
 	DrawStagePuzzleDebugUi();
 	DrawStageEditorUi();
@@ -821,22 +807,23 @@ void Stage::UpdateReflectionCameras()
 	}
 }
 
+// 固定鏡の配列外や無効な鏡をPuzzleへ渡さず、指定された一枚だけを返します。
+FixedMirror* Stage::GetPuzzleMirror() const
+{
+	return puzzleMirrorIndex_ < fixedMirrors_.size() ? fixedMirrors_[puzzleMirrorIndex_].get() : nullptr;
+}
+
 // 鏡の状態を受け取り、Laser・Switch・DoorのPuzzle規則を専用部品へ任せます。
-void Stage::UpdateLightPuzzle(float deltaTime, bool checkPlayerCollision)
+void Stage::UpdateLightPuzzle(float deltaTime)
 {
 	if (!chargeSwitch_ || !doorSwitch_ || !lightDoor_ ||
-		fixedMirrors_.empty() || !fixedMirrors_.front()) {
+		!GetPuzzleMirror()) {
 		return;
 	}
-	const std::vector<const Mirror*> reflectors = GetLaserReflectors();
 	lightPuzzle_.Update(
 		deltaTime,
-		reflectors,
-		collisionWorld_.GetLightBlockingObbs(),
-		player_ && checkPlayerCollision ? &player_->GetSphere() : nullptr,
-		fixedMirrors_.front().get(),
-		laserEmitter_,
-		doorLaserEmitter_,
+		hazardLights_,
+		GetPuzzleMirror(),
 		chargeSwitch_,
 		doorSwitch_,
 		lightDoor_);
@@ -1009,6 +996,10 @@ bool Stage::ApplyStageMapData(bool rebuildRuntimeObjects)
 	const LevelLoader::ObjectData* floorData = objectIndex.GetFloor();
 	const LevelLoader::ObjectData* playerStartData = objectIndex.GetPlayerStart();
 	const LevelLoader::ObjectData* carryableMirrorData = objectIndex.GetCarryableMirror();
+	const LevelLoader::ObjectData* chargeSwitchData = objectIndex.GetChargeSwitch();
+	const LevelLoader::ObjectData* mirrorFloorData = objectIndex.GetMirrorFloor();
+	const LevelLoader::ObjectData* orbitLightData = objectIndex.GetOrbitLight();
+	const auto& staticLightData = objectIndex.GetStaticLights();
 	const std::vector<const LevelLoader::ObjectData*>& mirrorDataList = objectIndex.GetFixedMirrors();
 	std::vector<const LevelLoader::ObjectData*> additionalObjects = objectIndex.GetRuntimeObjects();
 	const std::vector<const LevelLoader::ObjectData*>& eventTriggerDataList = objectIndex.GetEventTriggers();
@@ -1023,6 +1014,32 @@ bool Stage::ApplyStageMapData(bool rebuildRuntimeObjects)
 
 	// 床はPlayerの足場として必須です。固定鏡は設計を始めたばかりのStageでは空も許します。
 	if (!floorData) {
+		return false;
+	}
+	// 不正なLight設定は採用前に拒否し、描けない光だけの判定を作りません。
+	if (staticLightData.size() > 16) {
+		return false;
+	}
+	std::vector<LaserSegment> staticLights;
+	staticLights.reserve(staticLightData.size());
+	const auto isFinitePosition = [](const Vector3& position)
+	{
+		return std::isfinite(position.x) && std::isfinite(position.y) && std::isfinite(position.z);
+	};
+	for (const LevelLoader::ObjectData* light : staticLightData) {
+		if (!light || light->controlPoints.size() != 1 ||
+			!isFinitePosition(light->translation) || !isFinitePosition(light->controlPoints.front()) ||
+			Length(Subtract(light->controlPoints.front(), light->translation)) <= 0.0001f) {
+			return false;
+		}
+		staticLights.push_back({ light->translation, light->controlPoints.front(), false, 0 });
+	}
+	if ((orbitLightData && !isFinitePosition(orbitLightData->translation)) ||
+		(chargeSwitchData && (!isFinitePosition(chargeSwitchData->translation) ||
+		!std::isfinite(chargeSwitchData->scaling.x) || chargeSwitchData->scaling.x <= 0.0f)) ||
+		(mirrorFloorData && (!isFinitePosition(mirrorFloorData->translation) ||
+			!std::isfinite(mirrorFloorData->scaling.x) || !std::isfinite(mirrorFloorData->scaling.y) ||
+			mirrorFloorData->scaling.x <= 0.0f || mirrorFloorData->scaling.y <= 0.0f))) {
 		return false;
 	}
 
@@ -1055,6 +1072,26 @@ bool Stage::ApplyStageMapData(bool rebuildRuntimeObjects)
 	stageLighting_.InitializeDefaults();
 	stageLighting_.ApplyLevel(levelData->hasLighting ? &levelData->lighting : nullptr);
 	ApplyFloorData(*floorData);
+	// JSONがないStageへ前の配置を持ち越さず、固定LightをStage単位で入れ替えます。
+	hazardLights_.SetStaticLights(std::move(staticLights));
+	// 指定がないStageでは従来の中心へ戻し、直前のStageの配置を持ち越しません。
+	hazardLights_.SetOrbitCenter(orbitLightData ? orbitLightData->translation : Vector3{ 24.0f, 0.0f, 62.0f });
+	StageLightPuzzle::Settings puzzleSettings = lightPuzzle_.GetSettings();
+	if (chargeSwitchData) {
+		puzzleSettings.chargeSwitchPosition = chargeSwitchData->translation;
+		puzzleSettings.chargeSwitchRadius = chargeSwitchData->scaling.x;
+	} else if (rebuildRuntimeObjects) {
+		const StageLightPuzzle::Settings defaults{};
+		puzzleSettings.chargeSwitchPosition = defaults.chargeSwitchPosition;
+		puzzleSettings.chargeSwitchRadius = defaults.chargeSwitchRadius;
+	}
+	lightPuzzle_.SetSettings(puzzleSettings);
+	if (mirrorFloor_ && mirrorFloorData) {
+		mirrorFloor_->SetSurface(mirrorFloorData->translation, 0.0f,
+			mirrorFloorData->scaling.x * 2.0f, mirrorFloorData->scaling.y * 2.0f);
+	} else if (mirrorFloor_ && rebuildRuntimeObjects) {
+		mirrorFloor_->SetSurface(mirrorFloorPosition_, 0.0f, mirrorFloorWidth_, mirrorFloorHeight_);
+	}
 
 	// ---------- 鏡データの反映 ----------
 	if (rebuildFixedMirrors) {
@@ -1064,12 +1101,13 @@ bool Stage::ApplyStageMapData(bool rebuildRuntimeObjects)
 	}
 	// Inspector・JSONで変えた基準角度をPuzzleにも渡し、次の更新で元へ戻るのを防ぎます。
 	// プレイ中の充電による回転量は保持し、Levelデータとは分けて扱います。
-	if (!mirrorDataList.empty()) {
+	puzzleMirrorIndex_ = objectIndex.GetPuzzleMirrorIndex();
+	if (FixedMirror* puzzleMirror = GetPuzzleMirror()) {
 		StageLightPuzzle::Settings puzzleSettings = lightPuzzle_.GetSettings();
-		puzzleSettings.largeMirrorBaseYaw = mirrorDataList.front()->rotation.y;
+		puzzleSettings.largeMirrorBaseYaw = mirrorDataList[puzzleMirrorIndex_]->rotation.y;
 		lightPuzzle_.SetSettings(puzzleSettings);
-		fixedMirrors_.front()->SetOrientation(
-			fixedMirrors_.front()->GetPitch(),
+		puzzleMirror->SetOrientation(
+			puzzleMirror->GetPitch(),
 			puzzleSettings.largeMirrorBaseYaw +
 			puzzleSettings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount());
 	}

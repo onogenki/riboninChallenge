@@ -35,21 +35,16 @@ void StagePuzzleDebugUi::DrawMirror(const MirrorContext& context)
 	}
 }
 
-// Light Puzzleの編集値を表示し、長さ0の方向ベクトルを安全な向きへ戻します。
+// Light PuzzleのSwitchとMirrorの調整値を表示し、変更有無を返します。
 bool StagePuzzleDebugUi::DrawLightPuzzle(const LightContext& context)
 {
 	if (!context.carryableMirror || !context.settings) {
 		return false;
 	}
-	// 配置・方向・幅は設定として編集し、Puzzleの進行状態はコピーした値を表示します。
+	// Switch配置とMirror角度を編集し、Puzzleの進行状態は表示だけに使います。
 	StageLightPuzzle::Settings& settings = *context.settings;
 
 	if (!ImGuiManager::GetInstance()->LightPuzzleDebugWindow(
-		settings.laserOrigin,
-		settings.laserDirection,
-		settings.doorLaserOrigin,
-		settings.doorLaserDirection,
-		settings.laserVisualWidth,
 		settings.chargeSwitchPosition,
 		settings.doorSwitchPosition,
 		settings.largeMirrorTargetYawOffset,
@@ -63,16 +58,6 @@ bool StagePuzzleDebugUi::DrawLightPuzzle(const LightContext& context)
 		return false;
 	}
 
-	if (Length(settings.laserDirection) > 0.0001f) {
-		settings.laserDirection = Normalize(settings.laserDirection);
-	} else {
-		settings.laserDirection = { 0.0f, 0.0f, -1.0f };
-	}
-	if (Length(settings.doorLaserDirection) > 0.0001f) {
-		settings.doorLaserDirection = Normalize(settings.doorLaserDirection);
-	} else {
-		settings.doorLaserDirection = { 1.0f, 0.0f, 0.0f };
-	}
 	return true;
 }
 

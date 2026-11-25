@@ -115,10 +115,12 @@ private:
 	void UpdateMirrorGameplay();
 	// 固定鏡・持てる鏡・鏡床を、Laserが反射できるMirror一覧として返します。
 	std::vector<const Mirror*> GetLaserReflectors() const;
+	// JSONで指定した、スイッチで回る鏡だけを返します。
+	FixedMirror* GetPuzzleMirror() const;
 	// 一本の危険LightをLaserとして追跡し、反射後の全線分を返します。
 	std::vector<LaserSegment> ReflectHazardLightSegments(const std::vector<LaserSegment>& sourceSegments) const;
 	// 鏡の更新後に、Laser・Switch・DoorのPuzzle状態を更新します。
-	void UpdateLightPuzzle(float deltaTime, bool checkPlayerCollision = true);
+	void UpdateLightPuzzle(float deltaTime);
 	// ---------- Camera制御 ----------
 
 	// Playerを自動追尾する通常Cameraを更新します。
@@ -172,6 +174,7 @@ private:
 
 	// 大型の固定鏡です。複数枚それぞれが反射Cameraと専用Textureを持ちます。
 	std::vector<std::unique_ptr<FixedMirror>> fixedMirrors_;
+	std::size_t puzzleMirrorIndex_ = 0;
 	// 持ち運べず、両面から来たLightを反射する鏡床ギミックです。
 	std::unique_ptr<FixedMirror> mirrorFloor_;
 	// 通常床とは別に置く、持ち運べない鏡床ギミックの配置です。
@@ -184,13 +187,8 @@ private:
 	std::unique_ptr<CarryableMirror> carryableMirror_;
 	// ---------- Laserの状態 ----------
 
-	// 携帯MirrorでCharge Switchへ送る、シアン色の充電用Laserです。
-	// Laser・Switch・Doorの進行状態と判定規則を所有するStage専用ギミックです。
+	// 光を受けるSwitchとDoorの進行状態を所有するStage専用ギミックです。
 	StageLightPuzzle lightPuzzle_{};
-	// Charge Laserの発射位置を見分けるために置く、小さな白い球です。
-	Engine::Object3d* laserEmitter_ = nullptr;
-	// 大型Mirrorの回転後にDoor Switchへ送る、オレンジ色の専用Laserです。
-	Engine::Object3d* doorLaserEmitter_ = nullptr;
 	// ---------- 時間制御で動く危険Light ----------
 	// 危険Lightの軌道・反射後線分・Player接触・描画をまとめるStage固有ギミックです。
 	StageHazardLights hazardLights_{};
