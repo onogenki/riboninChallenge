@@ -32,7 +32,8 @@ public:
 		Vector3 doorSwitchPosition{ -3.0f, 1.0f, 2.80f };
 		float doorSwitchRadius = 0.80f;
 		Vector3 doorClosedPosition{ -4.5f, -0.5f, 2.80f };
-		Vector3 doorColliderLocalHalfSize{ 10.0f, 1.5f, 10.0f };
+		// wall.objの元の半寸法に合わせ、見えない床中央まで扉の判定を広げません。
+		Vector3 doorColliderLocalHalfSize{ 2.0f, 2.0f, 0.7f };
 		float doorOpenHeight = 4.5f;
 		float largeMirrorBaseYaw = 3.14159265f;
 		float largeMirrorTargetYawOffset = 1.04719755f;

@@ -98,6 +98,8 @@ private:
 	bool gameplaySmokeSphereColliderApi_ = false;
 	// StageのOBB一覧が無効・Trigger Colliderを壁として収集しないか記録します。
 	bool gameplaySmokeStageMapColliderFlags_ = false;
+	// タグ検索がモデルのTransformだけを返し、存在しない場合を区別できるか記録します。
+	bool gameplaySmokeStageMapTransformLookup_ = false;
 	// 独立Playerで、接触回数・一秒の上昇・復帰後の状態がそろうか記録します。
 	bool gameplaySmokeLightDeathState_ = false;
 	// 横Lightの往復と下Lightの点灯・予告が所定の時刻に切り替わるか記録します。

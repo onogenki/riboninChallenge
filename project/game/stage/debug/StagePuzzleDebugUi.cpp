@@ -93,6 +93,18 @@ void StagePuzzleDebugUi::DrawCollision(const CollisionContext& context)
 		context.activeCamera,
 		floorCollision.isCollision);
 
+	// Playerを止めるDoorはJSON配置物ではないため、実際の判定を閉じている間だけ表示します。
+	if (context.lightPuzzle && context.lightPuzzle->GetDoorOpenAmount() < 0.95f) {
+		const OBB& doorObb = context.lightPuzzle->GetDoorCollider();
+		const Collision::CollisionInfo doorCollision =
+			context.player->CheckCollision(doorObb);
+		ImGuiManager::GetInstance()->DrawObbCollisionDebug(
+			doorObb,
+			playerSphere,
+			context.activeCamera,
+			doorCollision.isCollision);
+	}
+
 	for (const auto& fixedMirror : *context.fixedMirrors) {
 		if (!fixedMirror) {
 			continue;

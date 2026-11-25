@@ -189,6 +189,7 @@ void StageEditor::DrawCollision(const Context& context) const
 	StagePuzzleDebugUi::CollisionContext collisionContext{};
 	collisionContext.player = context.player;
 	collisionContext.floorObb = context.floorObb;
+	collisionContext.lightPuzzle = context.lightPuzzle;
 	collisionContext.activeCamera = context.activeCamera;
 	collisionContext.fixedMirrors = context.fixedMirrors;
 	collisionContext.mirrorFloor = context.mirrorFloor;

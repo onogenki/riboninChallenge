@@ -18,6 +18,7 @@ class FixedMirror;
 namespace Engine { class Object3d; }
 class Player;
 class StageCameraEvents;
+class StageLightPuzzle;
 class StageMapRuntime;
 
 // Stage1のEdit Viewに必要なUI部品をまとめる、編集専用の窓口です。
@@ -37,6 +38,7 @@ public:
 		bool playerStartFromCsv = false;
 		Player* player = nullptr;
 		const MyMath::OBB* floorObb = nullptr;
+		const StageLightPuzzle* lightPuzzle = nullptr;
 		Engine::Object3d* floor = nullptr;
 		Engine::Camera* activeCamera = nullptr;
 		Engine::CameraController* cameraController = nullptr;

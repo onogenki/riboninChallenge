@@ -79,7 +79,7 @@ bool StageGimmickFactory::CreateSwitchesAndDoor(
 		return false;
 	}
 
-	// 旧Boxと同じ4×3×1の大きさへ合わせ、扉の位置と当たり判定を保ちます。
+	// wall.objを4×3×1に表示し、StageLightPuzzleのColliderと扉の大きさをそろえます。
 	Engine::Object3d* lightDoor = objects.Create("stageObj/wall/wall.obj");
 	if (!lightDoor) {
 		return false;

@@ -26,6 +26,7 @@ void Stage::DrawStageEditorUi()
 		});
 	editorContext.player = player_.get();
 	editorContext.floorObb = floor_ ? &collisionWorld_.GetFloorObb() : nullptr;
+	editorContext.lightPuzzle = lightDoor_ && !fixedMirrors_.empty() ? &lightPuzzle_ : nullptr;
 	editorContext.floor = floor_;
 	editorContext.activeCamera = cameraManager_ ? cameraManager_->GetActiveCamera() : nullptr;
 	// 通常Cameraの所有者はStage1のまま、Edit Viewへ一時調整用の参照だけを渡します。

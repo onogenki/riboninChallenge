@@ -574,11 +574,13 @@ Camera・Lightは生成時に個別設定せず、毎フレーム`Object3dRender
 
 エンジン層では、`Framework::Run()`が「Initialize → Update/Drawの反復 → Finalize」を固定し、ゲーム側の`Game`がScene登録・起動確認を含む`Initialize`と`Update`、Scene描画を行う`Draw`だけを上書きします。これはTemplate Methodです。`Game::Finalize()`は基底処理を呼ぶだけで独自の仕事がなかったため上書きせず、`Framework::Finalize()`を使います。どちらも基底クラスにvirtualデストラクタがあり、基底ポインタからの破棄に対応します。
 
-Scene単位の状態管理では、`SceneManager`が`unique_ptr<BaseScene>`で現在Sceneを所有し、仮想`Update()`・`Draw()`を呼び出します。次Sceneの予約後はGPU完了を待ち、旧Sceneの`Finalize()`と破棄、新Sceneの`Initialize()`の順で切り替えます。これはSceneを状態クラスとするState Patternです。ゲーム側の`LoadingScene`・`Stage1`・`TitleScene`と、エンジン側の`DebugScene`がそれぞれ必要な振る舞いだけを実装します。`Stage1`の仮Titleは同じSceneの開始モードであり、Enterのたびに別Sceneクラスへ分ける変更はしていません。
+Scene単位の状態管理では、`SceneManager`が`unique_ptr<BaseScene>`で現在Sceneを所有し、仮想`Update()`・`Draw()`を呼び出します。次Sceneの予約後はGPU完了を待ち、旧Sceneの`Finalize()`と破棄、新Sceneの`Initialize()`の順で切り替えます。これはSceneを状態クラスとするState Patternです。ゲーム側の`LoadingScene`・`Stage`・`TitleScene`と、エンジン側の`DebugScene`がそれぞれ必要な振る舞いだけを実装します。`Stage`の仮Titleは同じSceneの開始モードであり、Enterのたびに別Sceneクラスへ分ける変更はしていません。
 
 生成では、`AbstractSceneFactory::CreateScene()`を`SceneFactory`が上書きし、登録名に対応するSceneを作ります。`SceneFactory::RegisterScene()`は空の名前・生成関数を拒否し、切替時に呼べない関数が残らないようにします。既存APIを保つためFactoryの生成時に従来のTitleOriginalとDebugを登録し、`Game::Initialize()`が`RegisterGameScenes()`を呼んでLoading・Title・Stageなどを追加してから`SceneManager`へFactoryを渡します。これによりStageの型をエンジン側Factoryへ増やさず、静的初期化の実行順にも依存しません。これはFactory Methodと登録関数の組合せです。一体のモデルには別の`Object3dFactory`を使い、読込・GPU準備が終わったObjectだけをSceneへ渡します。後者は単純Factoryであり、前者と同じ名前のパターンとして混同しません。
 
 `Collider`の派生型は球と箱に共通する有効・Trigger状態を再利用しますが、基底ポインタ経由の仮想`Check()`はありません。したがって「ポリモーフィズムを使った箇所」とは数えません。球対箱の判定は現在の型別オーバーロードが責任を明示しており、実在しない共通動作を基底へ追加しません。また`TitleScene`の準備・演出の列挙型と`StageStart`の落下→Camera引継ぎは、現状では固定された短い進行です。Scene単位のState Patternとは区別し、Stateクラスを増やす場合は状態ごとの異なる処理と遷移が増えた時に判断します。
+
+ゴールの位置は、`StageMapRuntime::FindTransformByTag()`が所有中のモデルから読み取り専用で借り、`StageGoal::SetGoalTransform()`へ渡します。配置物を削除・再構築する間はこのポインタを保持しません。`StageCollisionWorld`はColliderを同期してから配置物の一覧を読み、`StageEditViewport`は一覧自体を変更せず、ギズモで操作するモデルをViewportへ渡します。Edit Viewの既存の編集経路があるため、`StageMapRuntime::GetObjects()`の変更可能な公開APIは残っており、完全に読み取り専用になったわけではありません。
 
 SkeletalモデルをLoop再生したいSceneは、生成後に次の一行だけ書きます。
 

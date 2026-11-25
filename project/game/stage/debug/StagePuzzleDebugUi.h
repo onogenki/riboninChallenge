@@ -44,13 +44,14 @@ public:
 
 	struct CollisionContext
 	{
-		// 確認するPlayer・床・鏡・追加オブジェクトはStage1が所有します。
-		Player* player = nullptr;
+		// 確認するPlayer・床・鏡・追加オブジェクトはStageが所有し、ここでは変更しません。
+		const Player* player = nullptr;
 		const MyMath::OBB* floorObb = nullptr;
+		const StageLightPuzzle* lightPuzzle = nullptr;
 		Engine::Camera* activeCamera = nullptr;
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;
-		FixedMirror* mirrorFloor = nullptr;
-		CarryableMirror* carryableMirror = nullptr;
+		const FixedMirror* mirrorFloor = nullptr;
+		const CarryableMirror* carryableMirror = nullptr;
 		const StageMapRuntime* stageMapRuntime = nullptr;
 		const StageCameraEvents* stageCameraEvents = nullptr;
 	};
