@@ -63,9 +63,19 @@ void Laser::Update(
 			if (!hit.isHit || hit.t <= 0.0001f) {
 				continue;
 			}
+			// 床のすぐ上の鏡では、光の太さ用paddingだけが鏡より先に床へ触れる場合があります。
+			// 実際の床面が鏡より奥なら鏡を優先し、床自体が手前なら従来どおり遮ります。
+			const float paddedDistance = hit.t * remainingDistance;
+			if (nearestHit.isHit && blockingPadding > 0.0f && paddedDistance <= nearestDistance) {
+				const Collision::SegmentHit surfaceHit =
+					Collision::SegmentOBB(rayOrigin, rayEnd, blockingObb, 0.0f);
+				if (surfaceHit.isHit && surfaceHit.t * remainingDistance >= nearestDistance - 0.0001f) {
+					continue;
+				}
+			}
 			nearestBlockingDistance = (std::min)(
 				nearestBlockingDistance,
-				hit.t * remainingDistance);
+				paddedDistance);
 		}
 
 		const bool isBlockingHit = nearestBlockingDistance <= remainingDistance;

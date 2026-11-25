@@ -20,16 +20,17 @@ void StageEditor::Initialize()
 	levelEditor_.Initialize();
 }
 
-// Edit Viewで動かした一枚目の鏡だけを、入れ子のJSON Objectから探して保存用データへ写します。
-bool StageEditor::SynchronizeFirstMirror(
-	LevelLoader::LevelData& levelData, const FixedMirror& fixedMirror, float baseYaw)
+// Edit Viewで動かした指定番号の鏡だけを、入れ子のJSON Objectへ写します。
+bool StageEditor::SynchronizeMirror(
+	LevelLoader::LevelData& levelData, const FixedMirror& fixedMirror, float baseYaw, std::size_t mirrorIndex)
 {
 	const Mirror& mirror = fixedMirror.GetMirror();
+	std::size_t currentIndex = 0;
 	std::function<bool(std::vector<LevelLoader::ObjectData>&)> syncMirrorData;
 	syncMirrorData = [&](std::vector<LevelLoader::ObjectData>& objects)
 	{
 		for (LevelLoader::ObjectData& objectData : objects) {
-			if (objectData.tag == "Mirror") {
+			if (objectData.tag == "Mirror" && currentIndex++ == mirrorIndex) {
 				objectData.translation = mirror.GetCenter();
 				objectData.rotation.y = baseYaw;
 				objectData.scaling.x = mirror.GetWidth() * 0.5f;

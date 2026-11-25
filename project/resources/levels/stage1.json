@@ -511,12 +511,12 @@
             },
             "file_name": "debug/plane.obj",
             "name": "StageMirror",
-            "object_type": "STATIC",
+            "object_type": "PUZZLE_MIRROR",
             "tag": "Mirror",
             "transform": {
                 "rotation": [
                     0.0,
-                    180.0,
+                    -90.0,
                     0.0
                 ],
                 "scaling": [
@@ -525,12 +525,64 @@
                     1.0
                 ],
                 "translation": [
-                    0.025751762092113495,
+                    30.8,
                     1.0,
-                    8.0
+                    70.0
                 ]
             },
             "type": "MESH"
+        },
+        {
+            "name": "MirrorChargeSwitch",
+            "object_type": "CHARGE_SWITCH",
+            "transform": {
+                "rotation": [0.0, 0.0, 0.0],
+                "scaling": [0.45, 0.45, 0.45],
+                "translation": [29.0, 0.0, 68.0]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "name": "FarMirrorFloor",
+            "object_type": "MIRROR_FLOOR",
+            "transform": {
+                "rotation": [0.0, 0.0, 0.0],
+                "scaling": [2.25, 2.25, 1.0],
+                "translation": [24.0, -1.985, 67.0]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "name": "FarStaticLight1",
+            "object_type": "STATIC_LIGHT",
+            "control_points": [[17.0, 0.0, 66.0]],
+            "transform": {
+                "rotation": [0.0, 0.0, 0.0],
+                "scaling": [1.0, 1.0, 1.0],
+                "translation": [33.0, 0.0, 66.0]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "name": "MiddleOrbitLight",
+            "object_type": "ORBIT_LIGHT",
+            "transform": {
+                "rotation": [0.0, 0.0, 0.0],
+                "scaling": [1.0, 1.0, 1.0],
+                "translation": [24.0, 0.0, 50.0]
+            },
+            "type": "EMPTY"
+        },
+        {
+            "name": "FarStaticLight2",
+            "object_type": "STATIC_LIGHT",
+            "control_points": [[33.0, 2.5, 70.0]],
+            "transform": {
+                "rotation": [0.0, 0.0, 0.0],
+                "scaling": [1.0, 1.0, 1.0],
+                "translation": [17.0, 2.5, 70.0]
+            },
+            "type": "EMPTY"
         },
         {
             "collider": {

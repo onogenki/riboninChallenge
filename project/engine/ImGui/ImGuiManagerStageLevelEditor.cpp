@@ -378,6 +378,13 @@ LevelEditorResult ImGuiManager::LevelHotReloadWindow(
 				1.2f);
 		}
 
+		if (objectData.objectType == "STATIC_LIGHT" && objectData.controlPoints.size() == 1) {
+			ImGui::SeparatorText("Static Light");
+			ImGui::TextDisabled("Position is the start; edit the end in world coordinates.");
+			result.dataChanged |= ImGui::DragFloat3(
+				"Light End", &objectData.controlPoints.front().x, 0.05f);
+		}
+
 		if (objectData.objectType == "PATH_OBJECT") {
 			ImGui::SeparatorText("Control Point Path");
 			ImGui::TextDisabled("Path movement runs while Game View is active.");

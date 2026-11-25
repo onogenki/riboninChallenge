@@ -3,6 +3,7 @@
 #include "FixedMirror.h"
 #include "ImGuiManager.h"
 #include "Player.h"
+#include "StageMapObjectIndex.h"
 #include "debug/StagePuzzleDebugUi.h"
 #include <algorithm>
 
@@ -67,22 +68,21 @@ void Stage::DrawStagePuzzleDebugUi()
 	}
 	if (ImGuiManager::GetInstance()->IsEditViewActive()) {
 		StagePuzzleDebugUi::MirrorContext mirrorContext{};
-		mirrorContext.fixedMirror =
-			!fixedMirrors_.empty() ? fixedMirrors_.front().get() : nullptr;
+		mirrorContext.fixedMirror = GetPuzzleMirror();
 		mirrorContext.onMirrorChanged = [this]()
 		{
 			LevelLoader::LevelData* levelData = stageMapRepository_.GetLevelData();
-			if (!levelData || fixedMirrors_.empty() || !fixedMirrors_.front()) {
+			if (!levelData || !GetPuzzleMirror()) {
 				return;
 			}
-			FixedMirror& fixedMirror = *fixedMirrors_.front();
+			FixedMirror& fixedMirror = *GetPuzzleMirror();
 			// Puzzleが毎フレーム角度を計算するので、編集角度を元の設定にも戻します。
 			// 進行中の回転量はJSONへ焼き込まず、基準角度だけを保存します。
 			StageLightPuzzle::Settings settings = lightPuzzle_.GetSettings();
 			settings.largeMirrorBaseYaw = fixedMirror.GetYaw() -
 				settings.largeMirrorTargetYawOffset * lightPuzzle_.GetLargeMirrorRotationAmount();
 			lightPuzzle_.SetSettings(settings);
-			stageEditor_.SynchronizeFirstMirror(*levelData, fixedMirror, settings.largeMirrorBaseYaw);
+			stageEditor_.SynchronizeMirror(*levelData, fixedMirror, settings.largeMirrorBaseYaw, puzzleMirrorIndex_);
 		};
 		StagePuzzleDebugUi::DrawMirror(mirrorContext);
 	}
@@ -104,5 +104,13 @@ void Stage::DrawStagePuzzleDebugUi()
 	// UIが実際に設定を変更した時だけ、Puzzleと所有Rendererへまとめて反映します。
 	if (StagePuzzleDebugUi::DrawLightPuzzle(lightContext)) {
 		lightPuzzle_.SetSettings(puzzleSettings);
+		// Editorで動かしたSwitchをLevelDataへ戻し、Save Mapで次回も同じ位置にします。
+		if (LevelLoader::LevelData* levelData = stageMapRepository_.GetLevelData()) {
+			if (LevelLoader::ObjectData* switchData =
+				StageMapObjectIndex::FindObjectTypeForEdit(*levelData, "CHARGE_SWITCH")) {
+				switchData->translation = puzzleSettings.chargeSwitchPosition;
+				stageEditor_.SetReloadStatus("Switch edited in memory. Press Save Map to keep it.");
+			}
+		}
 	}
 }

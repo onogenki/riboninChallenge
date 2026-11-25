@@ -1,7 +1,6 @@
 #include "StageLighting.h"
 
 #include "StageHazardLights.h"
-#include "StageLightPuzzle.h"
 #include "MyMath.h"
 #include <algorithm>
 #include <cmath>
@@ -79,7 +78,6 @@ void StageLighting::ApplyLevel(const LevelLoader::LightingData* lighting)
 
 // Laserと危険Lightの線分を、壁や床を照らす従来と同じ優先順のSpotLightへ変換します。
 void StageLighting::UpdateLaserSpotLights(
-	const StageLightPuzzle& lightPuzzle,
 	const StageHazardLights& hazardLights,
 	const Engine::Object3d::SpotLight* goalLight)
 {
@@ -131,9 +129,8 @@ void StageLighting::UpdateLaserSpotLights(
 		}
 	};
 
-	// 通常のPuzzle Light、Door Light、四種類の危険Lightを同じ仕組みで照明へ反映します。
-	addSegmentsAsSpotLights(lightPuzzle.GetChargeLaser().GetSegments(), { 0.05f, 0.95f, 1.00f, 1.0f }, 3.5f);
-	addSegmentsAsSpotLights(lightPuzzle.GetDoorLaser().GetSegments(), { 1.00f, 0.38f, 0.05f, 1.0f }, 3.5f);
+	// 固定Lightと四種類の動くLightを、同じ仕組みで照明へ反映します。
+	addSegmentsAsSpotLights(hazardLights.GetStaticSegments(), { 0.95f, 0.20f, 1.00f, 1.0f }, 3.2f);
 	addSegmentsAsSpotLights(hazardLights.GetCeilingSweepSegments(), { 0.95f, 0.20f, 1.00f, 1.0f }, 3.2f);
 	addSegmentsAsSpotLights(hazardLights.GetHorizontalMoveSegments(), { 1.00f, 0.82f, 0.10f, 1.0f }, 3.0f);
 	addSegmentsAsSpotLights(hazardLights.GetBottomPulseSegments(), { 0.15f, 0.55f, 1.00f, 1.0f }, 3.4f);

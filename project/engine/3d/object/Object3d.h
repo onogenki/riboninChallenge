@@ -20,7 +20,8 @@ class Object3d
 {
 public:
 	// 一つのSceneで同時に使用できる、実際に面を照らすSpotLightの本数です。
-	static constexpr size_t kMaximumSpotLightCount = 16;
+	// 固定Light最大16本と動くLightの各反射、通常照明を同時に収めます。
+	static constexpr size_t kMaximumSpotLightCount = 96;
 
 	//座標変換行列データ
 	struct TransformationMatrix
@@ -68,6 +69,8 @@ public:
 	struct SpotLightSet
 	{
 		std::array<SpotLight, kMaximumSpotLightCount> lights{};
+		uint32_t count = 0;
+		uint32_t padding[3]{};
 	};
 	// HLSLのSpotLight配列は一要素64byteなので、CPU側の並びも同じ大きさを保証します。
 	static_assert(sizeof(SpotLight) == 64);

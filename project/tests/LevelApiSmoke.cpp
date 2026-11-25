@@ -24,6 +24,53 @@ namespace
 		return actual.x == expected.x && actual.y == expected.y && actual.z == expected.z;
 	}
 
+	// Stage1の仕掛け配置を一時JSONへ保存し、再読込後も同じ値と種類で取り出せるか確認します。
+	bool CheckPuzzlePlacementRoundTrip()
+	{
+		const auto source = LevelLoader::Load("stage1");
+		if (!source) {
+			return false;
+		}
+		StageMapObjectIndex before;
+		before.Build(*source);
+		if (!before.GetChargeSwitch() || !before.GetMirrorFloor() || !before.GetOrbitLight() ||
+			before.GetStaticLights().empty() || before.GetFixedMirrors().empty()) {
+			return false;
+		}
+		const std::string name = "SmokePuzzle_" +
+			std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
+		const auto path = std::filesystem::path("resources/levels") / (name + ".json");
+		const auto temp = std::filesystem::path(path.wstring() + L".tmp");
+		if (std::filesystem::exists(path) || std::filesystem::exists(temp)) {
+			return false;
+		}
+		const bool saved = LevelLoader::Save(name, *source);
+		const auto loaded = saved ? LevelLoader::Load(name) : nullptr;
+		bool valid = false;
+		if (loaded) {
+			StageMapObjectIndex after;
+			after.Build(*loaded);
+			valid = after.GetChargeSwitch() && after.GetMirrorFloor() && after.GetOrbitLight() &&
+				after.GetStaticLights().size() == before.GetStaticLights().size() && !after.GetFixedMirrors().empty() &&
+				MatchesVector3(after.GetChargeSwitch()->translation, before.GetChargeSwitch()->translation) &&
+				MatchesVector3(after.GetMirrorFloor()->translation, before.GetMirrorFloor()->translation) &&
+				MatchesVector3(after.GetOrbitLight()->translation, before.GetOrbitLight()->translation) &&
+				MatchesVector3(after.GetFixedMirrors().front()->translation, before.GetFixedMirrors().front()->translation);
+			for (size_t i = 0; valid && i < before.GetStaticLights().size(); ++i) {
+				const auto* a = before.GetStaticLights()[i];
+				const auto* b = after.GetStaticLights()[i];
+				valid = a->controlPoints.size() == 1 && b->controlPoints.size() == 1 &&
+					MatchesVector3(a->translation, b->translation) &&
+					MatchesVector3(a->controlPoints.front(), b->controlPoints.front());
+			}
+		}
+		std::error_code error;
+		std::filesystem::remove(path, error);
+		if (error) { return false; }
+		std::filesystem::remove(temp, error);
+		return valid && !error;
+	}
+
 	// Blender座標の照明を読み取った後、各Lightの値が期待通りか比較します。
 	bool MatchesExpectedLighting(const LevelLoader::LightingData& light)
 	{
@@ -558,6 +605,10 @@ int main()
 	MapChipField field;
 	check(field.LoadCsv(csv), "read in-memory CSV");
 	check(field.GetChips().size() == 10, "blank cells create no chips");
+	// 読込済み以外の不明記号は代替せず、従来どおりUnknownとして扱います。
+	check(MapChipField::GetType({ 'X', 0, 0, 0 }) == MapChipType::Unknown &&
+		MapChipField::GetType({ 'p', 0, 0, 0 }) == MapChipType::Unknown,
+		"unregistered raw symbols remain unknown");
 	check(!field.LoadCsv("missing_map_chip_smoke.csv") && field.GetChips().size() == 10,
 		"missing optional file does not discard loaded chips");
 
@@ -629,12 +680,23 @@ int main()
 	}
 	check(index.GetPlayerStart() && index.GetPlayerStart()->translation.x == 7.0f,
 		"editing PlayerStart updates the LevelData read by the stage");
+	LevelLoader::LevelData mirrorLevel;
+	LevelLoader::ObjectData decorationMirror{};
+	decorationMirror.tag = "Mirror";
+	LevelLoader::ObjectData puzzleMirror = decorationMirror;
+	puzzleMirror.objectType = "PUZZLE_MIRROR";
+	mirrorLevel.objects = { decorationMirror, puzzleMirror };
+	index.Build(mirrorLevel);
+	check(index.GetFixedMirrors().size() == 2 && index.GetPuzzleMirrorIndex() == 1,
+		"the marked puzzle mirror is selected even after another mirror");
 	check(CheckLevelJsonValidationAndLighting(),
 		"JSON validation, new/replacement saves, and failed replacement preserve the old file");
 	check(CheckStageMapSelection(),
 		"Stage IDs 1-5 map to files; invalid IDs preserve selection and requests run once");
 	check(CheckStageJsonIsolation(),
 		"Stage 1-5 keep saved objects and discard an unsaved addition when switching away and back");
+	check(CheckPuzzlePlacementRoundTrip(),
+		"Stage1 switch, moving mirror, mirror floor and lights survive save and reload");
 	check(CheckModelMetadataJsonRoundTrip(),
 		"saved model and BOX survive reload while unsaved model and collider edits disappear");
 	check(CheckStageMapFileMonitor(),

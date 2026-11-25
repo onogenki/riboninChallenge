@@ -80,7 +80,6 @@ void StageSceneRenderer::Draw(const Context& context)
 	// 後続Objectが通常Pipelineを前提にできるよう、描画設定を戻します。
 	context.object3dCommon->SetCommonDrawSetting();
 	if (context.drawStagePuzzle) {
-		context.lightPuzzle->Draw(*context.activeCamera);
 		context.hazardLights->Draw(*context.activeCamera);
 	}
 	// Goalの光は台座とPlayerの後に描き、白い芯と柔らかい外側を同じCameraへ重ねます。

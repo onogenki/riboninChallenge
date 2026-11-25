@@ -12,6 +12,8 @@ public:
 	void Build(const LevelLoader::LevelData& levelData);
 	// 編集用に、childrenを含むPlayerStartを元のLevelDataから探します。
 	static LevelLoader::ObjectData* FindPlayerStartForEdit(LevelLoader::LevelData& levelData);
+	// Editorが変更した仕掛けをJSON用データへ戻せるよう、同じ種類の最後のObjectを探します。
+	static LevelLoader::ObjectData* FindObjectTypeForEdit(LevelLoader::LevelData& levelData, const std::string& objectType);
 
 	// Stageに一枚だけ必要な床を返します。見つからない場合はnullptrです。
 	const LevelLoader::ObjectData* GetFloor() const { return floor_; }
@@ -19,8 +21,15 @@ public:
 	const LevelLoader::ObjectData* GetPlayerStart() const { return playerStart_; }
 	// Playerが持てるMirrorの初期配置を返します。見つからない場合はnullptrです。
 	const LevelLoader::ObjectData* GetCarryableMirror() const { return carryableMirror_; }
+	// 光の仕掛けに使う配置をJSONから参照します。
+	const LevelLoader::ObjectData* GetChargeSwitch() const { return chargeSwitch_; }
+	const LevelLoader::ObjectData* GetMirrorFloor() const { return mirrorFloor_; }
+	const LevelLoader::ObjectData* GetOrbitLight() const { return orbitLight_; }
+	const std::vector<const LevelLoader::ObjectData*>& GetStaticLights() const { return staticLights_; }
 	// 固定Mirrorとして生成する配置物一覧です。
 	const std::vector<const LevelLoader::ObjectData*>& GetFixedMirrors() const { return fixedMirrors_; }
+	// 指定されたPuzzle Mirrorを優先し、旧JSONでは先頭の鏡を使います。
+	std::size_t GetPuzzleMirrorIndex() const;
 	// 通常の3DモデルとしてStageMapRuntimeが生成する配置物一覧です。
 	const std::vector<const LevelLoader::ObjectData*>& GetRuntimeObjects() const { return runtimeObjects_; }
 	// Playerが入るとCameraを切り替えるTrigger一覧です。
@@ -37,6 +46,10 @@ private:
 	const LevelLoader::ObjectData* floor_ = nullptr;
 	const LevelLoader::ObjectData* playerStart_ = nullptr;
 	const LevelLoader::ObjectData* carryableMirror_ = nullptr;
+	const LevelLoader::ObjectData* chargeSwitch_ = nullptr;
+	const LevelLoader::ObjectData* mirrorFloor_ = nullptr;
+	const LevelLoader::ObjectData* orbitLight_ = nullptr;
+	std::vector<const LevelLoader::ObjectData*> staticLights_;
 	std::vector<const LevelLoader::ObjectData*> fixedMirrors_;
 	std::vector<const LevelLoader::ObjectData*> runtimeObjects_;
 	std::vector<const LevelLoader::ObjectData*> eventTriggers_;
