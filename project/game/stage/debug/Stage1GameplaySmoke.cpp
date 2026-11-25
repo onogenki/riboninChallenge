@@ -122,6 +122,31 @@ namespace
 			!death.IsPlaying() && death.GetDeathCount() == 0;
 	}
 
+	// 同じタグの空モデルを飛ばし、最初の有効モデルのTransformだけを取得できるか確認します。
+	bool CheckStageMapTransformLookup()
+	{
+		StageMapRuntime runtime;
+		StageMapRuntime::RuntimeObject missingVisual{};
+		missingVisual.tag = "Goal";
+		runtime.GetObjects().push_back(std::move(missingVisual));
+		StageMapRuntime::RuntimeObject first{};
+		first.tag = "Goal";
+		first.visual = std::make_unique<Engine::Object3d>();
+		first.visual->SetTranslate({ 2.0f, 3.0f, 4.0f });
+		runtime.GetObjects().push_back(std::move(first));
+		StageMapRuntime::RuntimeObject second{};
+		second.tag = "Goal";
+		second.visual = std::make_unique<Engine::Object3d>();
+		second.visual->SetTranslate({ 8.0f, 9.0f, 10.0f });
+		runtime.GetObjects().push_back(std::move(second));
+		const Transform* found = runtime.FindTransformByTag("Goal");
+		const bool firstValid = found && found->translate.x == 2.0f &&
+			found->translate.y == 3.0f && found->translate.z == 4.0f;
+		const bool missing = runtime.FindTransformByTag("Missing") == nullptr;
+		runtime.Clear();
+		return firstValid && missing && runtime.FindTransformByTag("Goal") == nullptr;
+	}
+
 	// ColliderのフラグをOBB一覧へ変換する時に失わないか、実素材を使わず確認します。
 	bool CheckStageMapColliderFlags()
 	{
@@ -759,6 +784,7 @@ void Stage1GameplaySmoke::VerifyColliderAndEditorContracts(Engine::Object3dCommo
 		playerChecksObbDirectly &&
 		playerChecksSphereDirectly;
 	gameplaySmokeStageMapColliderFlags_ = CheckStageMapColliderFlags();
+	gameplaySmokeStageMapTransformLookup_ = CheckStageMapTransformLookup();
 	gameplaySmokeMirrorEditAtomicity_ = CheckMirrorEditsRejectPartialUpdate();
 	gameplaySmokeStageEditorRollback_ = CheckStageEditorFailureRollback();
 	gameplaySmokeStageEditorModelMetadata_ = CheckStageEditorModelMetadata(
@@ -1236,6 +1262,7 @@ void Stage1GameplaySmoke::FinishWhenReady()
 	const bool success =
 		gameplaySmokeSphereColliderApi_ &&
 		gameplaySmokeStageMapColliderFlags_ &&
+		gameplaySmokeStageMapTransformLookup_ &&
 		gameplaySmokeLightDeathState_ &&
 		gameplaySmokeHazardTiming_ &&
 		gameplaySmokeMirrorEditAtomicity_ &&
@@ -1281,6 +1308,7 @@ void Stage1GameplaySmoke::FinishWhenReady()
 		log << (success ? "SUCCESS" : "FAILURE")
 			<< ": sphereColliderApi=" << gameplaySmokeSphereColliderApi_
 			<< " stageMapColliderFlags=" << gameplaySmokeStageMapColliderFlags_
+			<< " stageMapTransformLookup=" << gameplaySmokeStageMapTransformLookup_
 			<< " lightDeathState=" << gameplaySmokeLightDeathState_
 			<< " hazardTiming=" << gameplaySmokeHazardTiming_
 			<< " mirrorEditAtomicity=" << gameplaySmokeMirrorEditAtomicity_

@@ -85,6 +85,9 @@ public:
 	// 所有権はStageMapRuntimeにあり、配置物の追加・削除・再構築やClearを挟んでポインタを保持しないでください。
 	// 戻り値の配置物自体はconstですが、visualが指すモデルまではconstになりません。
 	const RuntimeObject* FindByTag(const std::string& tag) const;
+	// 指定タグのモデルのTransformだけを借ります。見つからない時はnullptrです。
+	// 配置物の削除・再構築やClearを挟んでポインタを保持しないでください。
+	const Transform* FindTransformByTag(const std::string& tag) const;
 	// Stage終了時に、実行中のモデルをすべて解放します。
 	void Clear();
 

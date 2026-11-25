@@ -278,6 +278,13 @@ const StageMapRuntime::RuntimeObject* StageMapRuntime::FindByTag(const std::stri
 	return nullptr;
 }
 
+// モデルそのものを公開せず、既存のタグ検索と同じ対象のTransformだけを借ります。
+const Transform* StageMapRuntime::FindTransformByTag(const std::string& tag) const
+{
+	const RuntimeObject* object = FindByTag(tag);
+	return object ? &object->visual->GetTransform() : nullptr;
+}
+
 void StageMapRuntime::Clear()
 {
 	objects_.clear();

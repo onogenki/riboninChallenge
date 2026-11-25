@@ -17,8 +17,8 @@ class StageCollisionWorld
 public:
 	struct Context
 	{
-		// 見た目と判定を共有するStageの床です。所有しません。
-		Engine::Object3d* floor = nullptr;
+		// 床のTransformを判定に使います。変更・所有はしません。
+		const Engine::Object3d* floor = nullptr;
 		// Playerを止める固定Mirror一覧です。所有しません。
 		const std::vector<std::unique_ptr<FixedMirror>>* fixedMirrors = nullptr;
 		// 持っていない時だけPlayerを止める小型Mirrorです。所有しません。

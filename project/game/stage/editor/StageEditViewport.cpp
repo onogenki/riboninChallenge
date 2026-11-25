@@ -41,7 +41,9 @@ void StageEditViewport::Draw(const Context& context)
 			++fixedMirrorIndex;
 		}
 	}
-	for (StageMapRuntime::RuntimeObject& runtimeObject : context.mapRuntime->GetObjects()) {
+	// 一覧とColliderを変更せず、ギズモが操作するモデルだけをViewportへ渡します。
+	const StageMapRuntime& mapRuntime = *context.mapRuntime;
+	for (const StageMapRuntime::RuntimeObject& runtimeObject : mapRuntime.GetObjects()) {
 		addObject(runtimeObject.sourceName, runtimeObject.visual.get());
 	}
 

@@ -50,7 +50,9 @@ void StageCollisionWorld::Rebuild(const Context& context)
 
 	if (context.stageMapRuntime) {
 		context.stageMapRuntime->SyncColliders();
-		for (const StageMapRuntime::RuntimeObject& runtimeObject : context.stageMapRuntime->GetObjects()) {
+		// 同期後は配置物の一覧を変更せず、判定に必要な情報だけを読み取ります。
+		const StageMapRuntime& mapRuntime = *context.stageMapRuntime;
+		for (const StageMapRuntime::RuntimeObject& runtimeObject : mapRuntime.GetObjects()) {
 			// 生のOBBへ変える前にColliderの有効・Trigger設定を確認し、通過用を壁にしません。
 			if (!runtimeObject.visual || !runtimeObject.hasBoxCollider ||
 				!runtimeObject.GetCollider().IsEnabled() || runtimeObject.GetCollider().IsTrigger()) {

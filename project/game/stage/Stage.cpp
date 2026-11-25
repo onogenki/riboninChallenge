@@ -466,8 +466,8 @@ void Stage::Update()
 		stageMapRuntime_.UpdatePaths(Engine::DirectXCommon::GetInstance()->GetDeltaTime());
 	}
 	// モデル移動後の位置に光と歩ける台座を合わせ、Edit Viewの配置変更にも追従させます。
-	if (const StageMapRuntime::RuntimeObject* goalObject = stageMapRuntime_.FindByTag(kGoalTag)) {
-		stageGoal_.SetGoalTransform(goalObject->visual->GetTransform());
+	if (const Transform* goalTransform = stageMapRuntime_.FindTransformByTag(kGoalTag)) {
+		stageGoal_.SetGoalTransform(*goalTransform);
 	} else {
 		stageGoal_.ClearGoal();
 	}
